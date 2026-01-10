@@ -1,0 +1,255 @@
+.loginContainer {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;   
+  width: 100vw;           
+  padding: 10px;  
+  background: linear-gradient(to bottom, #0A2A43,#0B2B44,#2e6996);
+  font-family: Arial, sans-serif;
+}
+
+/* Logo Section */
+.loginLogo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.loginLogoImg {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+}
+
+.loginTitle {
+  margin-top: 10px;
+  font-size: 26px;
+  font-weight: 700;
+  color: white !important;
+  text-align: center;
+}
+
+
+/* Form Container */
+.loginFormBox {
+  background: #FFD54F;
+  padding: 30px 35px;
+  border-radius: 10px;
+  width: 90%;
+  max-width: 420px;
+  min-width: 280px; 
+  box-shadow: inset 5px 0 10px -3px rgba(0, 0, 0, 0.3); /* inner shadow */
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* center the button */
+  gap: 15px; /* gap between children (labels/inputs) */
+  box-sizing: border-box; /* ensures padding is included in width */
+}
+
+.loginForm {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.loginField {
+  display: flex;
+  flex-direction: column;
+}
+
+.loginLabel {
+  font-size: 14px;
+  color: #444;
+  font-weight: 600;
+  margin-bottom: 4px;
+  align-self: flex-start; /* keep label left aligned */
+}
+
+.loginInput {
+  background: #fff;         /* white background */
+  border: 1px solid #ffffff;   /* light border */
+  max-width: 100%;         /* prevents overflowing */
+  padding: 10px 10px;
+  border-radius: 6px;
+  color: #000;              /* black text */
+  font-size: 14px;
+  font-weight: normal;
+  outline: none;
+  box-sizing: border-box;   /* include padding in width */
+}
+
+.loginInput:focus {
+  border-color: #164163;
+}
+
+/*Log In Button */
+.loginSubmit {
+  background: #164163;
+  border: none;
+  padding: 10px 45px; /* reduced horizontal padding */
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.2s;
+  align-self: center;
+}
+
+.loginSubmit:hover {
+  background: #3776bd;
+}
+
+.loginBack:hover {
+  background: #b3b3b3;
+}
+
+/* Wrap input + eye icon */
+.passwordWrapper {
+  position: relative;
+  width: 100%;
+}
+
+/* Input with space for icon */
+.loginInput {
+  width: 100%;
+  padding: 10px 40px 10px 10px; /* right padding leaves space for the eye */
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  color: #000;
+  box-sizing: border-box;
+}
+
+/* Eye icon inside the input */
+.eyeIcon {
+  position: absolute;
+  right: 10px;           /* distance from right edge */
+  top: 50%;              
+  transform: translateY(-50%);
+  cursor: pointer;
+  font-size: 18px;
+  color: #696969;
+}
+
+/* --- NEW UPDATES FOR REMEMBER ME & FORGOT PASSWORD --- */
+
+.formOptions {
+  display: flex;
+  justify-content: space-between; /* This pushes checkbox left and link right */
+  align-items: center;
+  width: 100%;
+  margin-top: -5px;   /* Slight adjustment to pull it closer to the input */
+  margin-bottom: 5px;
+}
+
+.rememberLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;           /* Space between checkbox and text */
+  font-size: 12px;
+  color: #444;        /* Matches your loginLabel color */
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.forgotLink {
+  font-size: 12px;
+  color: #3D86C7;     /* Matches your blue brand color */
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.forgotLink:hover {
+  text-decoration: underline;
+}
+
+.forgotContainer {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.backBtn {
+  position: absolute;
+  left: -10px;
+  top: -10px;
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #333;
+}
+
+.forgotTitle {
+  font-size: 22px;
+  margin-bottom: 5px;
+  color: #333;
+}
+
+.forgotSubtitle {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 25px;
+  text-align: center;
+}
+
+.recoveryOption {
+  width: 100%;
+  background: white;
+  border: none;
+  border-radius: 10px;
+  padding: 15px;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  transition: transform 0.2s;
+}
+
+.recoveryOption:hover {
+  transform: translateY(-2px);
+}
+
+.recoveryIcon {
+  font-size: 24px;
+  color: #333;
+}
+
+.recoveryText {
+  display: flex;
+  flex-direction: column;
+}
+
+.recoveryText strong {
+  font-size: 14px;
+  color: #333;
+}
+
+.recoveryText span {
+  font-size: 10px;
+  color: #777;
+}
+
+.forgotContainer .loginInput {
+  width: 100%;        
+  padding: 12px;      
+  font-size: 15px;   
+  border: 1px solid #ccc; 
+}
+
+/* Optional: If you want the inputs to be narrower than the yellow box */
+.forgotContainer .loginField {
+  width: 100%; 
+  max-width: 320px;   
+  margin: 0 auto;     
+}
