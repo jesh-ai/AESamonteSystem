@@ -17,7 +17,7 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-[#0A2A43] to-[#1a5887]">
+    <main className="min-h-screen bg-linear-to-b from-[#0A2A43] to-[#1a5887]">
       {!isLoggedIn ? (
         /* Show Login Screen */
         <div className="flex justify-center items-center h-screen">
