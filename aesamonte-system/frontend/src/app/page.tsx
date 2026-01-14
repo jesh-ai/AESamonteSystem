@@ -3,9 +3,12 @@
 import { useState } from "react";
 import Login from "@/app/auth/auth";
 import Dashboard from "@/app/dashboard/dashboard";
+import Sidebar from "@/components/layout/SideNavBar";
 
 export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userInfo, setUserInfo] = useState<string>("");
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Simplified: directly set logged in to true
   const handleLogin = () => {
@@ -14,6 +17,7 @@ export default function Home() {
 
   const handleLogout = () => {
     setIsLoggedIn(false);
+    setUserInfo("");
   };
 
   return (
@@ -24,8 +28,21 @@ export default function Home() {
           <Login onLogin={handleLogin} />
         </div>
       ) : (
-        /* Show Dashboard directly after login */
-        <Dashboard onLogout={handleLogout} />
+          <div className="flex h-screen overflow-hidden">
+          <Sidebar 
+            roleOrName={userInfo} 
+            onLogout={handleLogout} 
+            collapsed={isCollapsed} 
+            setCollapsed={setIsCollapsed} 
+          />
+          
+          <div 
+            className={`flex-1 transition-all duration-300 overflow-y-auto bg-[#fefcf6] p-0 
+              ${isCollapsed ? "ml-*" : "ml-*"}`} 
+          >
+            <Dashboard onLogout={handleLogout} />
+          </div>
+          </div>
       )} 
     </main>
   );

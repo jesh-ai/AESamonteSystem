@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import "../css/globals.css"; 
+import "../css/global.css"; 
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -9,7 +9,6 @@ export const metadata: Metadata = {
   description: "An Inventory and Sales System for AE Samonte Merchandise ",
 };
 
-// This MUST be "export default" and MUST return JSX
 export default function RootLayout({
   children,
 }: {
