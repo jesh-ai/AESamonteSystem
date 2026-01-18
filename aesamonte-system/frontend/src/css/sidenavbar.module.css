@@ -119,6 +119,15 @@
   overflow: visible; /* ensures shadows render properly */
 }
 
+.activeNavItem {
+  background-color: #ECD693 !important; /* Gold highlight */
+  color: #000000 !important;
+  font-weight: 700;
+  box-shadow:
+    inset 0 4px 6px rgba(0, 0, 0, 0.45),   /* Top inner shadow */
+    inset -25px 0 5px rgba(0, 0, 0, 0.35); /* Right inner shadow */
+}
+
 .navItem:hover {
   background-color: #3e73b1;
   transform: translateX(4px);

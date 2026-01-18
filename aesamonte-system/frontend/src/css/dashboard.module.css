@@ -2,6 +2,7 @@
   background-color: #F8F3D9; 
   display: flex;
   flex-direction: column;
+
 }
 
 /* ===== Header ===== */
@@ -14,6 +15,14 @@
   height: 70px;
   border-bottom: 1px solid #e5e7eb;
   margin-bottom: 1.5rem; /* Adds space before the cards */
+}
+
+.mainContent {
+  flex: 1;
+  padding: 2rem; /* This provides the gap around the edges */
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .welcomeText {

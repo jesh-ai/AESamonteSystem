@@ -1,0 +1,149 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  background-color: #F8F3D9; /* Cream background from goal UI */
+  min-height: 100vh;
+  width: 100%;
+  overflow: hidden;
+}
+
+.statsColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem; /* Adds space between Total Orders and Total Sales */
+  height: 100%;
+}
+
+.miniCard {
+  background: white;
+  padding: 2rem; /* Compact padding */
+  border-radius: 12px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.topNav {
+  height: 60px;
+  background-color: #ffffff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 1rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.mainContent {
+  flex: 1;
+  padding: 1.5rem 2rem; /* Matches professional margins */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem
+}
+
+.headerActions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pageTitle {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #164163;
+}
+
+.tallCard {
+  grid-column: 3;    /* Always stays in the 3rd column */
+  grid-row: 2 / 4;   /* Starts at row 2 and spans until row 4 (covering two rows) */
+  display: flex;
+  flex-direction: column;
+}
+
+.headerActions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.reportsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: auto; 
+  grid-auto-rows: auto;
+  gap: 1rem;
+  height: calc(100vh - 100px); /* Adjusts to fit within viewport */
+}
+
+.reportCard, .miniCard {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 1rem; /* Reduced from 2rem to save vertical space */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Base Export Button (Navy/Dark Gray) */
+.exportBtn {
+  background-color: #1a4263; 
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  /* Smooth transition for background and color */
+  transition: all 0.3s ease-in-out;
+}
+
+/* Hover State - Slight brightness change */
+.exportBtn:hover {
+  background-color: #3e73b1;
+  transform: translateY(-1px);
+}
+
+/* Active State - Yellow Background with Black Text */
+.exportBtn:active {
+  background-color: #ffd54f !important; /* Yellow bg from your pic */
+  color: #000000 !important; /* Black text for visibility */
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.spanTwo {
+  grid-column: span 2;
+}
+
+.placeholderList .row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.chartPlaceholder {
+  height: 160px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+}
+
+.pill {
+  font-size: 0.75rem;
+  background: #dcfce7;
+  color: #15803d;
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px solid #bbf7d0;
+}

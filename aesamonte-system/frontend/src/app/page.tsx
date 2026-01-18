@@ -4,11 +4,13 @@ import { useState } from "react";
 import Login from "@/app/auth/auth";
 import Dashboard from "@/app/dashboard/dashboard";
 import Sidebar from "@/components/layout/SideNavBar";
+import Reports from "@/app/reports/reports";
 
 export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userInfo, setUserInfo] = useState<string>("");
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [activeTab, setActiveTab] = useState("Dashboard");
 
   // Simplified: directly set logged in to true
   const handleLogin = (data: string) => {
@@ -19,6 +21,7 @@ export default function Home() {
   const handleLogout = () => {
     setIsLoggedIn(false);
     setUserInfo("");
+    setActiveTab("Dashboard");
   };
 
   return (
@@ -29,19 +32,25 @@ export default function Home() {
           <Login onLogin={handleLogin} />
         </div>
       ) : (
-          <div className="flex h-screen overflow-hidden">
+        <div className="flex h-screen overflow-hidden bg-[#fefcf6]">
           <Sidebar 
             roleOrName={userInfo} 
             onLogout={handleLogout} 
             collapsed={isCollapsed} 
-            setCollapsed={setIsCollapsed} 
+            setCollapsed={setIsCollapsed}
+            activeTab={activeTab}
+            onTabChange={setActiveTab} // New prop to manage active tab 
           />
           
           <div 
-            className={`flex-1 transition-all duration-300 overflow-y-auto bg-[#fefcf6] p-0 
+            className={`flex-1 transition-all duration-300 overflow-y-auto bg-[#F8F3D9] p-0 
               ${isCollapsed ? "ml-*" : "ml-*"}`} 
           >
-            <Dashboard role={userInfo} onLogout={handleLogout} />
+            {activeTab === "Dashboard" ? (
+              <Dashboard role={userInfo} onLogout={handleLogout} />
+            ) : activeTab === "Reports" ? (
+              <Reports role={userInfo} onLogout={handleLogout} />
+            ) : null}
           </div>
           </div>
       )} 
