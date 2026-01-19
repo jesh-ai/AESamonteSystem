@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   background-color: #F8F3D9; /* Matching the cream background */
-  height: 100vh;
+  min-height: 100vh;
   width: 100%;
 }
 
@@ -12,6 +12,7 @@
   display: flex;
   justify-content: center;
   align-items: flex-start;
+  overflow-y: auto;
 }
 
 .settingsCard {
@@ -350,4 +351,167 @@
   font-weight: 700;
   color: #1a4263;
   margin: 0;
+}
+
+/* Container for the table rows to allow horizontal scrolling on small screens */
+.placeholderContainer {
+  width: 100%;
+  overflow-x: auto; /* Adds horizontal scroll if the screen is too narrow */
+  background: white;
+  border-radius: 12px;
+  padding-bottom: 1rem;
+}
+
+/* User Management Grid: Prevents columns from shrinking below readable widths */
+.listHeader, .userPlaceholderRow {
+  display: grid;
+  /* Use minmax to ensure columns have a 'bottom out' point before they shrink too much */
+  grid-template-columns: 
+    minmax(120px, 1.5fr) 
+    minmax(100px, 1fr) 
+    minmax(150px, 2fr) 
+    minmax(100px, 1fr) 
+    minmax(120px, 1fr);
+  align-items: center;
+  gap: 1rem;
+  min-width: 700px; /* Forces the grid to maintain this width */
+}
+
+/* Specific to Access Control Grid */
+.accessHeader, .accessRow {
+  display: grid;
+  grid-template-columns: 
+    minmax(120px, 1.5fr) 
+    minmax(200px, 2.5fr) 
+    minmax(100px, 1fr) 
+    minmax(100px, 1fr) 
+    minmax(120px, 1fr);
+  align-items: center;
+  gap: 1rem;
+  min-width: 750px;
+}
+
+/* Ensure individual spans don't wrap and stay on one line */
+.userPlaceholderRow span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* Adds '...' if text is still too long */
+}
+
+.flexHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+}
+
+.compactSaveBtn {
+  background-color: #1a4263;
+  color: white;
+  padding: 8px 24px;
+  border-radius: 6px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0; /* Prevents the button itself from shrinking */
+}
+
+/* src/css/backup.module.css */
+.section {
+  margin-bottom: 2rem;
+}
+
+/* Layout for Backup Options */
+.backupContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  width: 100%;
+}
+
+.backupRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+  padding-left: 1.5rem;
+}
+
+.checkInfo {
+  display: flex;
+  gap: 1rem;
+}
+
+.checkInfo label p {
+  font-size: 0.85rem;
+  color: #666;
+  margin: 0;
+}
+
+.timeSelect {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.timeGroup, .dayGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.timeGroup input {
+  width: 40px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  text-align: center;
+}
+
+/* Restore Styling */
+.restoreSection {
+  margin-top: 3rem;
+}
+
+.restoreActions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.browseInput {
+  display: flex;
+  width: 100%;
+  max-width: 500px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #f1f1f1;
+  overflow: hidden;
+}
+
+.browseInput input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 8px;
+}
+
+.browseBtn {
+  background: #999;
+  border: none;
+  padding: 8px 20px;
+  cursor: pointer;
+}
+
+.mainRestoreBtn {
+  background-color: #ECD693; /* Matches goal UI yellow */
+  padding: 10px 45px;
+  border-radius: 8px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
 }

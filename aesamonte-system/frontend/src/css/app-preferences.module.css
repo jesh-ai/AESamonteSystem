@@ -1,0 +1,76 @@
+/* src/css/app-preferences.module.css */
+
+.formContainer {
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.sectionLabel {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1a4263;
+  margin-bottom: 2rem;
+  text-align: left;
+  width: 100%;
+}
+
+.settingsForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 450px; /* Constrains the form for the compact design */
+  margin: 0 auto;   /* Centers the form inside the white card */
+}
+
+.formRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 3rem;
+  width: 100%;
+}
+
+.formRow label {
+  font-weight: 500;
+  color: #333;
+  font-size: 1rem;
+}
+
+/* Form Controls */
+.formSelect, .formInput {
+  flex: 1;
+  max-width: 200px;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background-color: #ffffff;
+  font-size: 0.9rem;
+}
+
+.importBtn {
+  background-color: #1a4263;
+  color: white;
+  padding: 8px 24px;
+  border-radius: 6px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.formActions {
+  display: flex;
+  justify-content: center;
+  margin-top: 2rem;
+}
+
+.saveBtn {
+  background-color: #1a4263;
+  color: white;
+  padding: 10px 45px;
+  border-radius: 8px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}

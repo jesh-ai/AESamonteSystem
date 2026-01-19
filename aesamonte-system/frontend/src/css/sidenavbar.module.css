@@ -148,6 +148,7 @@
   margin-left: -3.5rem;
   gap: 2rem; 
 }
+
 .collapsed .navItem {
   display: flex;
   justify-content: flex-start;
@@ -156,6 +157,12 @@
   padding-left: 0.95rem;
   margin-right: -4.2rem;
   margin-left: -3.2rem;
+}
+
+.collapsed .activeNavItem {
+  box-shadow:
+    inset 0 4px 6px rgba(0, 0, 0, 0.45),   /* top inner shadow */
+    inset -5px 0 5px rgba(0, 0, 0, 0.35);
 }
 
 .collapsed .navItem:hover {
