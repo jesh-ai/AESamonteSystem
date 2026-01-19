@@ -5,7 +5,8 @@ import Login from "@/app/auth/auth";
 import Dashboard from "@/app/dashboard/dashboard";
 import Sidebar from "@/components/layout/SideNavBar";
 import Reports from "@/app/reports/reports";
-import Settings from "@/app/settings/settings"
+import Settings from "@/app/settings/settings";
+import Help from "@/app/help/help";
 
 export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -53,7 +54,10 @@ export default function Home() {
               <Reports role={userInfo} onLogout={handleLogout} />
             ) : activeTab === "Settings" ? (
               <Settings role={userInfo} onLogout={handleLogout} />
+            ) : activeTab === "Help" ? (
+              <Help role={userInfo} onLogout={handleLogout} />
             ) : null}
+            
           </div>
           </div>
       )} 
