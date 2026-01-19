@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import styles from '@/css/reports.module.css'
+import styles from '@/css/sales.module.css'
 import TopHeader from '@/components/layout/TopHeader'
 import ExportButton from '@/components/features/ExportButton'
 
