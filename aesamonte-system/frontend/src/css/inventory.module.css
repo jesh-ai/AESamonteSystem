@@ -1,38 +1,168 @@
-/* MAIN CONTAINER & WHITE CARD */
+/* ===================== MAIN CONTAINER ===================== */
 .container {
   display: flex;
   flex-direction: column;
   background-color: #F8F3D9;
   min-height: 100vh;
   width: 100%;
+  overflow: hidden; /* prevents page overflow */
 }
 
+.mainContent {
+  flex: 1;
+  padding: 1.5rem 2rem; /* same as sales */
+  display: flex;
+  flex-direction: column;
+  gap: 1rem; /* same as sales */
+  overflow-y: auto; /* scrollable */
+}
+
+.headerActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+
+/* ===================== TOP CARDS GRID ===================== */
+.topGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem; /* same as sales */
+  align-items: stretch;
+}
+
+.statCard {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 1.5rem; /* same as sales */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.cardTitle {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.bigNumber {
+  font-size: 2.75rem;
+  font-weight: 700;
+  color: #164163;
+  line-height: 1.1;
+}
+
+.cardFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+.subText {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.pillGreen {
+  font-size: 0.75rem;
+  background: #dcfce7;
+  color: #15803d;
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px solid #bbf7d0;
+  font-weight: 600;
+}
+
+.pillRed {
+  font-size: 0.75rem;
+  background: #fee2e2;
+  color: #dc2626;
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px solid #fecaca;
+  font-weight: 600;
+}
+
+.list {
+  margin-top: 0.75rem;
+}
+
+.listRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.altRow {
+  background: #EFF2F4;
+}
+
+.outOfStockList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.outOfStockBadge {
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  color: #991b1b;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* ===== COLORS ===== */
+
+.listLabel {
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.listValue {
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.listValueBlue {
+  color: #164163;
+  font-size: 14px;
+}
+
+
+/* ===================== TABLE CONTAINER ===================== */
 .tableContainer {
   background-color: #ffffff;
-  margin: 2rem 3rem; 
-  padding: 2.5rem;
+  margin: 2rem 0; /* same as sales */
+  padding: 2.5rem; /* same as sales */
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
-/* HEADER - ARCHIVE, SEARCH, ADD IN ONE ROW */
+/* HEADER - ARCHIVE, SEARCH, ADD */
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem;
+  margin-bottom: 2rem; /* same as sales */
 }
 
 .title {
   font-size: 1.5rem;
   font-weight: 700;
-  color:#164163;
-  margin-bottom: 1rem;
+  color: #164163;
 }
 
 .controls {
   display: flex !important;
-  flex-direction: row !important; 
+  flex-direction: row !important;
   align-items: center;
   gap: 12px;
 }
@@ -44,6 +174,7 @@
   padding: 8px 15px;
   border-radius: 8px;
   width: 250px;
+  gap: 8px; /* spacing between input & icon */
 }
 
 .searchInput {
@@ -53,12 +184,12 @@
   width: 100%;
 }
 
-
+/* BUTTONS */
 .addButton {
   background: #1a4263 !important;
   color: white !important;
   border: none;
-  padding: 10px 25px;
+  padding: 10px 25px; /* same as sales */
   border-radius: 8px;
   font-weight: 700;
   cursor: pointer;
@@ -73,34 +204,40 @@
   background: white;
   border: 1px solid #ddd;
   border-radius: 8px;
-  padding: 8px;
+  padding: 8px; /* same as sales */
   cursor: pointer;
   display: flex;
 }
 
-.archiveIconBtn:hover{
+.archiveIconBtn:hover {
   background-color: #3e73b1;
   transform: translateY(-1px);
 }
 
-/* TABLE HEADER - ARROWS BESIDE TEXT */
+/* ===================== TABLE STYLING ===================== */
 .table {
   width: 100%;
   border-collapse: collapse;
 }
 
 .table th {
-  padding: 15px;
+  padding: 15px; /* same as sales */
   text-align: left;
   border-bottom: 2px solid #f1f3f4;
   font-size: 0.85rem;
   font-weight: 700;
 }
 
+.table td {
+  padding: 15px; /* same as sales */
+  border-bottom: 1px solid #f1f3f4;
+  font-size: 0.9rem;
+}
 
+/* SORTABLE HEADER */
 .sortableHeader {
   display: flex !important;
-  flex-direction: row !important; 
+  flex-direction: row !important;
   align-items: center;
   gap: 6px;
   white-space: nowrap;
@@ -108,15 +245,9 @@
 
 .sortIconsStack {
   display: flex;
-  flex-direction: column; 
+  flex-direction: column;
   line-height: 0.5;
   justify-content: center;
-}
-
-.table td {
-  padding: 15px;
-  border-bottom: 1px solid #f1f3f4;
-  font-size: 0.9rem;
 }
 
 /* ACTION COLUMN & CENTERING */
@@ -134,10 +265,10 @@
   display: inline-flex;
 }
 
-/* ACTION POPUP - CORRECT COLORS */
+/* ACTION POPUP */
 .popupMenu {
   position: absolute;
-  right: 55px; 
+  right: 55px;
   top: 50%;
   transform: translateY(-50%);
   background: #2b3e50;
@@ -151,34 +282,34 @@
 }
 
 .popBtnAdd { 
-  background: #FFC107 !important; /* Yellow */
-  color: white !important; 
-  border: none; 
-  padding: 6px 15px; 
-  border-radius: 6px; 
-  font-weight: bold; 
+  background: #FFC107 !important;
+  color: white !important;
+  border: none;
+  padding: 6px 15px;
+  border-radius: 6px;
+  font-weight: bold;
 }
 
 .popBtnEdit { 
-  background: white !important; /* White */
-  color: #1a4263 !important; 
-  border: none; 
-  padding: 6px 15px; 
-  border-radius: 6px; 
-  display: flex; 
-  align-items: center; 
-  gap: 5px; 
+  background: white !important;
+  color: #1a4263 !important;
+  border: none;
+  padding: 6px 15px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .popBtnArchive { 
-  background: #90A4AE !important; /* Grey */
-  color: white !important; 
-  border: none; 
-  padding: 6px 15px; 
-  border-radius: 6px; 
-  display: flex; 
-  align-items: center; 
-  gap: 5px; 
+  background: #90A4AE !important;
+  color: white !important;
+  border: none;
+  padding: 6px 15px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .closeX {
@@ -189,17 +320,28 @@
   font-size: 1.2rem;
 }
 
-/* FOOTER & PAGINATION - FORCED HORIZONTAL */
+/* FOOTER / PAGINATION */
 .footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 2rem;
+  margin-top: 2rem; /* same as sales */
+}
+
+.showDataText {
+  font-size: 0.9rem;
+}
+
+.countBadge {
+  font-weight: 600;
+  background: #f1f3f4;
+  padding: 2px 6px;
+  border-radius: 6px;
 }
 
 .pagination {
   display: flex !important;
-  flex-direction: row !important; 
+  flex-direction: row !important;
   gap: 8px;
   align-items: center;
 }
@@ -207,7 +349,7 @@
 .pageCircle, .pageCircleActive {
   width: 32px;
   height: 32px;
-  border-radius: 6px; 
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -222,7 +364,7 @@
 }
 
 .pageCircleActive {
-  background-color: #1a4263; 
+  background-color: #1a4263;
   border: none;
   font-weight: 600;
   color: #ddd;

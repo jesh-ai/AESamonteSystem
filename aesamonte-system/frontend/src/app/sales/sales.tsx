@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import styles from '@/css/sales.module.css'
 import TopHeader from '@/components/layout/TopHeader'
+import ExportButton from '@/components/features/ExportButton'
 import { LuSearch, LuEllipsisVertical, LuChevronUp, LuChevronDown, LuChevronRight, LuArchive } from 'react-icons/lu'
 
 interface SalesSummary {
@@ -84,6 +85,11 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
       <TopHeader role={role} onLogout={onLogout} />
 
       <main className={s.mainContent}>
+
+        <div className={s.headerActions}>
+          <ExportButton />
+        </div>
+
         {/* Top Cards */}
         <div className={s.topGrid}>
           <section className={s.statCard}>
@@ -98,9 +104,9 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
           <section className={s.statCard}>
             <p className={s.cardTitle}>Sales Report</p>
             <div className={s.list}>
-              <div className={s.listRow}><span>Weekly Sales</span><span className={s.green}>{data.weeklySales.toLocaleString()}</span></div>
-              <div className={`${s.listRow} ${s.altRow}`}><span>Monthly Sales</span><span className={s.red}>{data.monthlySales.toLocaleString()}</span></div>
-              <div className={s.listRow}><span>Yearly Sales</span><span className={s.blue}>{data.yearlySales.toLocaleString()}</span></div>
+              <div className={`${s.listRow} ${s.altRow}`}><span>Weekly Sales</span><span className={s.green}>{data.weeklySales.toLocaleString()}</span></div>
+              <div className={s.listRow}><span>Monthly Sales</span><span className={s.red}>{data.monthlySales.toLocaleString()}</span></div>
+              <div className={`${s.listRow} ${s.altRow}`}><span>Yearly Sales</span><span className={s.blue}>{data.yearlySales.toLocaleString()}</span></div>
             </div>
           </section>
 
