@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import styles from "@/css/inventory.module.css";
+import TopHeader from '@/components/layout/TopHeader';
 import { 
   LuSearch, LuEllipsisVertical, LuChevronUp, LuChevronDown, 
   LuPencil, LuArchive, LuDownload, LuChevronRight
@@ -27,14 +28,12 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
     setSortConfig({ key, direction });
   };
 
-  // Search Logic
   const filteredProducts = initialProducts.filter((p) =>
     p.item.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.id.includes(searchTerm)
   );
 
-  // Sort Logic
   const sortedProducts = [...filteredProducts].sort((a, b) => {
     if (!sortConfig.key || !sortConfig.direction) return 0;
     const aValue = a[sortConfig.key as keyof typeof a];
@@ -46,27 +45,28 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
 
   return (
     <div className={s.container}>
-      {/* HEADER: Search and Archive Button */}
-      <div className={s.header}>
-        <h1 className={s.title}>Product List</h1>
-        <div className={s.controls}>
-          <button className={s.archiveIconBtn} title="View Archive"><LuArchive size={20} /></button>
-          <div className={s.searchWrapper}>
-            <input 
-              type="text" 
-              placeholder="Search..." 
-              className={s.searchInput} 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <LuSearch size={18} color="#5f6368" />
-          </div>
-          <button className={s.addButton}>ADD</button>
-        </div>
-      </div>
+      <TopHeader role={role} onLogout={onLogout} />
 
-      {/* TABLE: Data with Sortable Headers */}
       <div className={s.tableContainer}>
+        <div className={s.header}>
+          <h1 className={s.title}>Product List</h1>
+          <div className={s.controls}>
+            {/* Archive, Search, ADD */}
+            <button className={s.archiveIconBtn} title="View Archive"><LuArchive size={20} /></button>
+            <div className={s.searchWrapper}>
+              <input 
+                type="text" 
+                placeholder="Search..." 
+                className={s.searchInput} 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <LuSearch size={18} color="#5f6368" />
+            </div>
+            <button className={s.addButton}>ADD</button>
+          </div>
+        </div>
+
         <table className={s.table}>
           <thead>
             <tr>
@@ -81,9 +81,9 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
               ].map((col) => (
                 <th key={col.label}>
                   <div className={s.sortableHeader}>
-                    {col.label}
+                    <span className={s.columnLabel}>{col.label}</span>
                     {col.sortable !== false && (
-                      <div className={s.sortIcons}>
+                      <div className={s.sortIconsStack}>
                         <span 
                           className={`${s.arrowBtn} ${sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''}`} 
                           onClick={() => requestSort(col.key, 'asc')}
@@ -101,7 +101,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
                   </div>
                 </th>
               ))}
-              <th style={{ textAlign: 'right' }}>Action</th>
+              <th className={s.actionHeader}>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -115,19 +115,15 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
                 <td>₱ {p.unitPrice.toFixed(2)}</td>
                 <td>₱ {p.price.toLocaleString()}</td>
                 <td className={s.actionCell}>
-                  {/* three dots icon */}
                   <div className={s.moreIcon} onClick={() => setOpenMenuId(openMenuId === p.id ? null : p.id)}>
                     <LuEllipsisVertical size={20} />
                   </div>
-                  
-                  {/* Popup Menu */}
                   {openMenuId === p.id && (
                     <div className={s.popupMenu}>
                       <button className={s.popBtnAdd}>ADD</button>
                       <button className={s.popBtnEdit}><LuPencil size={14} /> Edit</button>
                       <button className={s.popBtnArchive}><LuDownload size={14} /> Archive</button>
                       <button className={s.closeX} onClick={() => setOpenMenuId(null)}>×</button>
-                      <div className={s.popupArrow}></div>
                     </div>
                   )}
                 </td>
@@ -135,15 +131,19 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
             ))}
           </tbody>
         </table>
-      </div>
 
-      {/* FOOTER: Showing data count and pagination */}
-      <div className={s.footer}>
-        <span>Show data <span className={s.countBadge}>{sortedProducts.length}</span> of {initialProducts.length}</span>
-        <div className={s.pagination}>
-          <button className={s.pageActive}>1</button>
-          <button className={s.pageBtn}>2</button>
-          <button className={s.nextBtn}>Next <LuChevronRight size={14} /></button>
+        <div className={s.footer}>
+          <div className={s.showDataText}>
+            Show data <span className={s.countBadge}>{sortedProducts.length}</span> of {initialProducts.length}
+          </div>
+          <div className={s.pagination}>
+            <button className={s.pageCircleActive}>1</button>
+            <button className={s.pageCircle}>2</button>
+            <button className={s.pageCircle}>3</button>
+            <button className={s.nextBtn}>
+              Next <LuChevronRight size={18} />
+            </button>
+          </div>
         </div>
       </div>
     </div>

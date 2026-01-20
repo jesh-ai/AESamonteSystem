@@ -2,13 +2,13 @@
 
 import React, { useState } from 'react';
 import styles from "@/css/help.module.css";
+import TopHeader from '@/components/layout/TopHeader';
 
 interface HelpProps {
   role: string;
   onLogout: () => void;
 }
 
-// Prefixing with _ fixes the "unused parameter" error (TS6133)
 const Help: React.FC<HelpProps> = ({ role, onLogout }) => {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const s = styles as Record<string, string>;
@@ -128,30 +128,35 @@ The report will be downloaded for record keeping, review, or business meetings.`
 
   return (
     <div className={s['help-container']}>
-      <h1 className={s['help-title']}>User Guide & System Help</h1>
-      
-      <div className={s['video-placeholder']}>
-        <div className={s['play-button']}>▶</div>
-      </div>
+      {/* HEADER PART ADDED HERE */}
+      <TopHeader role={role} onLogout={onLogout} />
 
-      <div className={s['help-list']}>
-        {guides.map((guide, index) => (
-          <div key={index} className={s['help-item']}>
-            <div 
-              className={s['help-header']} 
-              onClick={() => setOpenIndex(openIndex === index ? null : index)}
-            >
-              <span>{guide.title}</span>
-              <span>{openIndex === index ? '▲' : '▼'}</span>
-            </div>
-            
-            {openIndex === index && (
-              <div className={s['help-content']} style={{ whiteSpace: 'pre-line' }}>
-                {guide.content}
+      <div className={s['help-content-wrapper']}>
+        <h1 className={s['help-title']}>User Guide & System Help</h1>
+        
+        <div className={s['video-placeholder']}>
+          <div className={s['play-button']}>▶</div>
+        </div>
+
+        <div className={s['help-list']}>
+          {guides.map((guide, index) => (
+            <div key={index} className={s['help-item']}>
+              <div 
+                className={s['help-header']} 
+                onClick={() => setOpenIndex(openIndex === index ? null : index)}
+              >
+                <span>{guide.title}</span>
+                <span>{openIndex === index ? '▲' : '▼'}</span>
               </div>
-            )}
-          </div>
-        ))}
+              
+              {openIndex === index && (
+                <div className={s['help-content']} style={{ whiteSpace: 'pre-line' }}>
+                  {guide.content}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
