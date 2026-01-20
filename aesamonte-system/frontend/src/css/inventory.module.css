@@ -325,7 +325,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 2rem; /* same as sales */
+  margin-top: 2rem; 
 }
 
 .showDataText {
@@ -333,11 +333,12 @@
 }
 
 .countBadge {
-  font-weight: 600;
-  background: #f1f3f4;
-  padding: 2px 6px;
-  border-radius: 6px;
+  border: 1px solid #ccc;
+  padding: 2px 8px;
+  border-radius: 10px;
 }
+
+
 
 .pagination {
   display: flex !important;

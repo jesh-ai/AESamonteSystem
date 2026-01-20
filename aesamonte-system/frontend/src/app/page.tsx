@@ -8,7 +8,8 @@ import Reports from "@/app/reports/reports";
 import Settings from "@/app/settings/settings";
 import Help from "@/app/help/help";
 import Inventory from "@/app/inventory/inventory";
-import Sales from "@/app/sales/sales"; // 1. Added Sales import
+import Sales from "@/app/sales/sales"; 
+import Orders from "@/app/order/order";
 
 export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -28,7 +29,7 @@ export default function Home() {
     setActiveTab("Dashboard");
   };
 
-  return (
+ return (
     <main className="min-h-screen bg-linear-to-b from-[#0A2A43] to-[#1a5887]">
       {!isLoggedIn ? (
         /* Show Login Screen */
@@ -54,8 +55,10 @@ export default function Home() {
               <Dashboard role={userInfo} onLogout={handleLogout} />
             ) : activeTab === "Inventory" ? (
               <Inventory role={userInfo} onLogout={handleLogout} />
-            ) : activeTab === "Sales" ? ( // 2. Added Sales condition
+            ) : activeTab === "Sales" ? (
               <Sales role={userInfo} onLogout={handleLogout} />
+            ) : activeTab === "Orders" ? ( // Added Order condition here
+              <Orders role={userInfo} onLogout={handleLogout} />
             ) : activeTab === "Reports" ? (
               <Reports role={userInfo} onLogout={handleLogout} />
             ) : activeTab === "Settings" ? (

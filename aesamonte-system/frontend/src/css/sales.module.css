@@ -275,10 +275,9 @@
 }
 
 .countBadge {
-  font-weight: 600;
-  background: #f1f3f4;
-  padding: 2px 6px;
-  border-radius: 6px;
+  border: 1px solid #ccc;
+  padding: 2px 8px;
+  border-radius: 10px;
 }
 
 .pagination {
@@ -311,7 +310,7 @@
   font-weight: 600;
   color: #ddd;
 }
-
+ 
 .nextBtn {
   display: flex;
   align-items: center;
