@@ -7,7 +7,7 @@ import Sidebar from "@/components/layout/SideNavBar";
 import Reports from "@/app/reports/reports";
 import Settings from "@/app/settings/settings";
 import Help from "@/app/help/help";
-import Inventory from "@/app/inventory/inventory";
+import Inventory from "@/app/inventory/page";
 import Sales from "@/app/sales/sales"; 
 import Orders from "@/app/order/order";
 import Suppliers from "@/app/suppliers/suppliers";
