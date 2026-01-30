@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from "@/css/suppliers.module.css";
 import TopHeader from '@/components/layout/TopHeader'
 import { 
@@ -26,24 +26,38 @@ interface Supplier {
 const Suppliers = ({ role, onLogout }: SuppliersProps) => {
   const s = styles as Record<string, string>;
 
-  /* ================= PSEUDO DATA ================= */
-  const initialSuppliers: Supplier[] = [
-    { id: "1", supplierName: "Yu Corporation", contactPerson: "Lou Yu", contactNumber: "09891234567", costPrice: 25.5, leadTime: 7, moq: 100 },
-    { id: "2", supplierName: "LIW Company", contactPerson: "Xian Li", contactNumber: "09987654321", costPrice: 18.0, leadTime: 5, moq: 200 },
-    { id: "3", supplierName: "Global Source Ltd.", contactPerson: "Maria Chen", contactNumber: "09771234567", costPrice: 32.75, leadTime: 10, moq: 150 },
-    { id: "4", supplierName: "Prime Industrial", contactPerson: "John Cruz", contactNumber: "09661234567", costPrice: 15.2, leadTime: 4, moq: 300 },
-    { id: "5", supplierName: "Metro Supplies Co.", contactPerson: "Angela Tan", contactNumber: "09551234567", costPrice: 21.0, leadTime: 6, moq: 120 },
-  ];
-
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({ key: '', direction: null });
+
+  // Fetch logic
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      try {
+        setIsLoading(true);
+        // API endpoint
+        const response = await fetch('/api/suppliers');
+        if (response.ok) {
+          const data = await response.json();
+          setSuppliers(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch suppliers:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSuppliers();
+  }, []);
 
   const requestSort = (key: string, direction: 'asc' | 'desc') => {
     setSortConfig({ key, direction });
   };
 
-  const filteredSuppliers = initialSuppliers.filter(s =>
+  const filteredSuppliers = suppliers.filter(s =>
     s.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.contactNumber.includes(searchTerm)
@@ -58,15 +72,16 @@ const Suppliers = ({ role, onLogout }: SuppliersProps) => {
     return 0;
   });
 
+  if (isLoading) return <div className={s.loadingContainer}>Loading Suppliers...</div>;
+
   return (
     <div className={s.container}>
-      {/* Top header like other pages */}
       <TopHeader role={role} onLogout={onLogout} />
 
       <div className={s.mainContent}>
         <div className={s.tableContainer}>
 
-          {/* Header */}
+          {/* HEADER */}
           <div className={s.header}>
             <h1 className={s.title}>Suppliers</h1>
             <div className={s.controls}>
@@ -87,7 +102,7 @@ const Suppliers = ({ role, onLogout }: SuppliersProps) => {
             </div>
           </div>
 
-          {/* Table */}
+          {/* TABLE */}
           <table className={s.table}>
             <thead>
               <tr>
@@ -103,8 +118,18 @@ const Suppliers = ({ role, onLogout }: SuppliersProps) => {
                     <div className={s.sortableHeader}>
                       <span>{col.label}</span>
                       <div className={s.sortIconsStack}>
-                        <span onClick={() => requestSort(col.key, 'asc')}><LuChevronUp size={12} /></span>
-                        <span onClick={() => requestSort(col.key, 'desc')}><LuChevronDown size={12} /></span>
+                        <span 
+                          className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''}
+                          onClick={() => requestSort(col.key, 'asc')}
+                        >
+                          <LuChevronUp size={12} />
+                        </span>
+                        <span 
+                          className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''}
+                          onClick={() => requestSort(col.key, 'desc')}
+                        >
+                          <LuChevronDown size={12} />
+                        </span>
                       </div>
                     </div>
                   </th>
@@ -114,34 +139,42 @@ const Suppliers = ({ role, onLogout }: SuppliersProps) => {
             </thead>
 
             <tbody>
-              {sortedSuppliers.map((supply, index) => (
-                <tr key={supply.id} className={index % 2 !== 0 ? s.rowOdd : ''}>
-                  <td style={{ fontWeight: 600 }}>{supply.supplierName}</td>
-                  <td>{supply.contactPerson}</td>
-                  <td>{supply.contactNumber}</td>
-                  <td>₱ {supply.costPrice.toFixed(2)}</td>
-                  <td>{supply.leadTime}</td>
-                  <td>{supply.moq}</td>
-                  <td className={s.actionCell}>
-                    <div className={s.moreIcon} onClick={() => setOpenMenuId(openMenuId === supply.id ? null : supply.id)}>
-                      <LuEllipsisVertical size={20} />
-                    </div>
-                    {openMenuId === supply.id && (
-                      <div className={s.popupMenu}>
-                        <button className={s.popBtnEdit}><LuPencil size={14}/> Edit</button>
-                        <button className={s.popBtnArchive}><LuDownload size={14} /> Archive</button>
-                        <button className={s.closeX} onClick={() => setOpenMenuId(null)}>×</button>
+              {sortedSuppliers.length > 0 ? (
+                sortedSuppliers.map((supply, index) => (
+                  <tr key={supply.id} className={index % 2 !== 0 ? s.rowOdd : ''}>
+                    <td style={{ fontWeight: 600 }}>{supply.supplierName}</td>
+                    <td>{supply.contactPerson}</td>
+                    <td>{supply.contactNumber}</td>
+                    <td>₱ {supply.costPrice.toFixed(2)}</td>
+                    <td>{supply.leadTime}</td>
+                    <td>{supply.moq}</td>
+                    <td className={s.actionCell}>
+                      <div className={s.moreIcon} onClick={() => setOpenMenuId(openMenuId === supply.id ? null : supply.id)}>
+                        <LuEllipsisVertical size={20} />
                       </div>
-                    )}
+                      {openMenuId === supply.id && (
+                        <div className={s.popupMenu}>
+                          <button className={s.popBtnEdit}><LuPencil size={14}/> Edit</button>
+                          <button className={s.popBtnArchive}><LuDownload size={14} /> Archive</button>
+                          <button className={s.closeX} onClick={() => setOpenMenuId(null)}>×</button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+                    No suppliers found in database.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
 
-          {/* Footer */}
+          {/* FOOTER */}
           <div className={s.footer}>
-            <div>Show data <span className={s.countBadge}>{sortedSuppliers.length}</span> of {initialSuppliers.length}</div>
+            <div>Show data <span className={s.countBadge}>{sortedSuppliers.length}</span> of {suppliers.length}</div>
             <div className={s.pagination}>
                 <button className={s.pageCircleActive}>1</button>
                 <button className={s.pageCircle}>2</button>

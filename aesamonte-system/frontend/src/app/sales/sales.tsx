@@ -34,34 +34,50 @@ interface SalesProps {
 
 export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
   const s = styles as Record<string, string>
+  
   const [data, setData] = useState<SalesSummary | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({ key: '', direction: null })
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
 
   useEffect(() => {
-    setData({
-      totalSales: 21059,
-      totalSalesChange: 5,
-      weeklySales: 903,
-      monthlySales: 5029,
-      yearlySales: 21095,
-      topClientName: 'Trans Logistica',
-      topClientSales: 5520,
-      topClientChange: 11,
-    })
+    const fetchData = async () => {
+      try {
+        setIsLoading(true)
+        
+        // Replace these URLs with your actual API endpoints
+        const [summaryRes, transRes] = await Promise.all([
+          fetch('/api/sales/summary'),
+          fetch('/api/sales/transactions')
+        ])
 
-    setTransactions([
-      { no: 4002, name: 'JOY Company Incorporation', address: 'Muralla Intramuros', date: '04/15/25', qty: 10, amount: 982.44, status: 'PENDING' },
-      { no: 4001, name: 'Trans Logistica International', address: '1562 Tondo Manila', date: '04/14/25', qty: 88, amount: 6509.44, status: 'PENDING' },
-      { no: 4000, name: 'HP INC.', address: 'Muralla Intramuros', date: '04/15/25', qty: 121, amount: 288500, status: 'PAID' },
-      { no: 3999, name: 'Deli Group Corporation', address: 'Muralla Intramuros', date: '04/15/25', qty: 5, amount: 5000, status: 'PAID' },
-      { no: 3998, name: 'Brothers', address: 'Muralla Intramuros', date: '04/15/25', qty: 3, amount: 450, status: 'PAID' },
-    ])
+        if (summaryRes.ok && transRes.ok) {
+          const summaryData = await summaryRes.json()
+          const transactionsData = await transRes.json()
+          
+          setData(summaryData)
+          setTransactions(transactionsData)
+        }
+      } catch (error) {
+        console.error("Error connecting to database:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchData()
   }, [])
 
-  if (!data) return null
+  if (isLoading) return <div className={s.loadingContainer}>Connecting to database...</div>
+  
+  // If no data returns, provide an empty object so the page doesn't crash
+  const summary = data || {
+    totalSales: 0, totalSalesChange: 0, weeklySales: 0, 
+    monthlySales: 0, yearlySales: 0, topClientName: 'None', 
+    topClientSales: 0, topClientChange: 0 
+  }
 
   const filteredTx = transactions.filter((tx) =>
     tx.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -85,44 +101,42 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
       <TopHeader role={role} onLogout={onLogout} />
 
       <main className={s.mainContent}>
-
         <div className={s.headerActions}>
           <ExportButton />
         </div>
 
-        {/* Top Cards */}
+         {/* HEADER */}
         <div className={s.topGrid}>
           <section className={s.statCard}>
             <p className={s.cardTitle}>Total Sales</p>
-            <h2 className={s.bigNumber}>{data.totalSales.toLocaleString()}</h2>
+            <h2 className={s.bigNumber}>{summary.totalSales.toLocaleString()}</h2>
             <div className={s.cardFooter}>
               <span className={s.subText}>vs last month</span>
-              <span className={s.pill}>↗ {data.totalSalesChange}%</span>
+              <span className={s.pill}>↗ {summary.totalSalesChange}%</span>
             </div>
           </section>
 
           <section className={s.statCard}>
             <p className={s.cardTitle}>Sales Report</p>
             <div className={s.list}>
-              <div className={`${s.listRow} ${s.altRow}`}><span>Weekly Sales</span><span className={s.green}>{data.weeklySales.toLocaleString()}</span></div>
-              <div className={s.listRow}><span>Monthly Sales</span><span className={s.red}>{data.monthlySales.toLocaleString()}</span></div>
-              <div className={`${s.listRow} ${s.altRow}`}><span>Yearly Sales</span><span className={s.blue}>{data.yearlySales.toLocaleString()}</span></div>
+              <div className={`${s.listRow} ${s.altRow}`}><span>Weekly Sales</span><span className={s.green}>{summary.weeklySales.toLocaleString()}</span></div>
+              <div className={s.listRow}><span>Monthly Sales</span><span className={s.red}>{summary.monthlySales.toLocaleString()}</span></div>
+              <div className={`${s.listRow} ${s.altRow}`}><span>Yearly Sales</span><span className={s.blue}>{summary.yearlySales.toLocaleString()}</span></div>
             </div>
           </section>
 
           <section className={s.statCard}>
             <p className={s.cardTitle}>Top Client</p>
-            <h2 className={s.bigNumber}>{data.topClientSales.toLocaleString()}</h2>
+            <h2 className={s.bigNumber}>{summary.topClientSales.toLocaleString()}</h2>
             <div className={s.cardFooter}>
-              <span className={s.subText}>{data.topClientName}</span>
-              <span className={s.pill}>↗ {data.topClientChange}%</span>
+              <span className={s.subText}>{summary.topClientName}</span>
+              <span className={s.pill}>↗ {summary.topClientChange}%</span>
             </div>
           </section>
         </div>
 
-        {/* Transactions Table */}
+         {/* TABLE */}
         <div className={s.tableContainer}>
-          {/* HEADER: SEARCH */}
           <div className={s.header}>
             <h1 className={s.title}>Transactions</h1>
             <div className={s.controls}>
@@ -140,7 +154,6 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
             </div>
           </div>
 
-          {/* TABLE */}
           <table className={s.table}>
             <thead>
               <tr>
@@ -173,32 +186,40 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
               </tr>
             </thead>
             <tbody>
-              {sortedTx.map((tx, index) => (
-                <tr key={tx.no} className={index % 2 !== 0 ? s.rowOdd : ''}>
-                  <td>{tx.no}</td>
-                  <td style={{ fontWeight: 600 }}>{tx.name}</td>
-                  <td>{tx.address}</td>
-                  <td>{tx.date}</td>
-                  <td>{tx.qty}</td>
-                  <td>₱ {tx.amount.toLocaleString()}</td>
-                  <td className={tx.status === 'PAID' ? s.statusPaid : s.statusPending}>{tx.status}</td>
-                  <td className={s.actionCell}>
-                    <div className={s.moreIcon} onClick={() => setOpenMenuId(openMenuId === tx.no ? null : tx.no)}>
-                      <LuEllipsisVertical size={20} />
-                    </div>
-                    {openMenuId === tx.no && (
-                      <div className={s.popupMenu}>
-                        <button className={s.popBtnArchive}>Archive</button>
-                        <button className={s.closeX} onClick={() => setOpenMenuId(null)}>×</button>
+              {sortedTx.length > 0 ? (
+                sortedTx.map((tx, index) => (
+                  <tr key={tx.no} className={index % 2 !== 0 ? s.rowOdd : ''}>
+                    <td>{tx.no}</td>
+                    <td style={{ fontWeight: 600 }}>{tx.name}</td>
+                    <td>{tx.address}</td>
+                    <td>{tx.date}</td>
+                    <td>{tx.qty}</td>
+                    <td>₱ {tx.amount.toLocaleString()}</td>
+                    <td className={tx.status === 'PAID' ? s.statusPaid : s.statusPending}>{tx.status}</td>
+                    <td className={s.actionCell}>
+                      <div className={s.moreIcon} onClick={() => setOpenMenuId(openMenuId === tx.no ? null : tx.no)}>
+                        <LuEllipsisVertical size={20} />
                       </div>
-                    )}
+                      {openMenuId === tx.no && (
+                        <div className={s.popupMenu}>
+                          <button className={s.popBtnArchive}>Archive</button>
+                          <button className={s.closeX} onClick={() => setOpenMenuId(null)}>×</button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+                    No transactions available.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
 
-          {/* FOOTER - PAGINATION */}
+               {/* FOOTER */}
           <div className={s.footer}>
             <div className={s.showDataText}>
               Show data <span className={s.countBadge}>{sortedTx.length}</span> of {transactions.length}
@@ -212,7 +233,6 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
               </button>
             </div>
           </div>
-
         </div>
       </main>
     </div>

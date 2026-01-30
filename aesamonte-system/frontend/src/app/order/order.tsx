@@ -31,28 +31,40 @@ interface OrderProps {
 
 export default function OrderPage({ role = 'Admin', onLogout }: OrderProps) {
   const s = styles as Record<string, string>
+  
+
   const [summary, setSummary] = useState<OrderSummary | null>(null)
   const [orders, setOrders] = useState<OrderItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  
   const [searchTerm, setSearchTerm] = useState('')
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null) // State for the popup menu
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({ key: '', direction: null })
 
+  // Fetch logic 
   useEffect(() => {
-    setSummary({
-      shippedToday: { current: 5, total: 6, yesterday: 40 },
-      cancelled: { current: 1, yesterday: 10 },
-      totalOrders: { count: 22013, growth: 3.1 }
-    })
+    const fetchOrderData = async () => {
+      try {
+        setIsLoading(true)
+        
+        // Replace these with your actual database API endpoints
+        const [summaryRes, ordersRes] = await Promise.all([
+          fetch('/api/orders/summary'),
+          fetch('/api/orders/list')
+        ])
 
-    setOrders([
-      { no: 4002, item: 'JOY Company Incorporation', brand: 'Muralla Intramuros', date: '04/15/25', qty: 10, unitPrice: 5000, status: 'TO SHIP' },
-      { no: 4001, item: 'Trans Logistica International...', brand: '1562 Tondo Manila', date: '04/14/25', qty: 88, unitPrice: 19000, status: 'TO SHIP' },
-      { no: 4000, item: 'HP INC.', brand: 'Muralla Intramuros', date: '04/15/25', qty: 121, unitPrice: 288500, status: 'RECEIVED' },
-      { no: 3999, item: 'Deli Group Corporation', brand: 'Muralla Intramuros', date: '04/15/25', qty: 5, unitPrice: 5000, status: 'RECEIVED' },
-      { no: 3998, item: 'Brothers', brand: 'Muralla Intramuros', date: '04/15/25', qty: 3, unitPrice: 450, status: 'RECEIVED' },
-      { no: 3997, item: 'DONG-A', brand: 'Muralla Intramuros', date: '04/15/25', qty: 10, unitPrice: 5000, status: 'RECEIVED' },
-      { no: 3996, item: 'JOY Company Incorporation', brand: 'Muralla Intramuros', date: '04/15/25', qty: 3, unitPrice: 450, status: 'RECEIVED' },
-    ])
+        if (summaryRes.ok && ordersRes.ok) {
+          setSummary(await summaryRes.json())
+          setOrders(await ordersRes.json())
+        }
+      } catch (error) {
+        console.error("Database connection failed:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchOrderData()
   }, [])
 
   const requestSort = (key: string, direction: 'asc' | 'desc') => {
@@ -75,49 +87,57 @@ export default function OrderPage({ role = 'Admin', onLogout }: OrderProps) {
     return 0;
   });
 
-  if (!summary) return null
+  if (isLoading) return <div className={s.loadingContainer}>Loading Orders...</div>
+
+  const orderSummary = summary || {
+    shippedToday: { current: 0, total: 0, yesterday: 0 },
+    cancelled: { current: 0, yesterday: 0 },
+    totalOrders: { count: 0, growth: 0 }
+  }
 
   return (
     <div className={s.container}>
       <TopHeader role={role} onLogout={onLogout} />
-
+       {/* HEADER */}
       <main className={s.mainContent}>
-        {/* Top Cards Section */}
         <div className={s.topGrid}>
+          {/* SHIPPED */}
           <section className={s.statCard}>
             <p className={s.cardTitle}>Shipped Today</p>
             <div className={s.cardMainRow}>
               <LuTruck className={s.cardIcon} size={32} />
               <h2 className={s.bigNumber}>
-                <span className={s.greenText}>{summary.shippedToday.current}</span>/{summary.shippedToday.total}
+                <span className={s.greenText}>{orderSummary.shippedToday.current}</span>/{orderSummary.shippedToday.total}
               </h2>
             </div>
             <div className={s.cardFooter}>
               <span>Shipped Yesterday</span>
-              <span className={s.greenText}>{summary.shippedToday.yesterday}/{summary.shippedToday.yesterday}</span>
+              <span className={s.greenText}>{orderSummary.shippedToday.yesterday}/{orderSummary.shippedToday.yesterday}</span>
             </div>
           </section>
 
+          {/* CANCELLED */}
           <section className={s.statCard}>
             <p className={s.cardTitle}>Orders Cancelled</p>
-            <h2 className={`${s.bigNumber} ${s.redText} ${s.textCenter}`}>{summary.cancelled.current}</h2>
+            <h2 className={`${s.bigNumber} ${s.redText} ${s.textCenter}`}>{orderSummary.cancelled.current}</h2>
             <div className={s.cardFooter}>
               <span>Cancelled Yesterday</span>
-              <span className={s.redText}>{summary.cancelled.yesterday}</span>
+              <span className={s.redText}>{orderSummary.cancelled.yesterday}</span>
             </div>
           </section>
 
+          {/* TOTAL ORDERS */}
           <section className={s.statCard}>
             <p className={s.cardTitle}>Total Orders</p>
-            <h2 className={`${s.bigNumber} ${s.yellowText} ${s.textCenter}`}>{summary.totalOrders.count}</h2>
+            <h2 className={`${s.bigNumber} ${s.yellowText} ${s.textCenter}`}>{orderSummary.totalOrders.count}</h2>
             <div className={s.cardFooter}>
               <span>vs last month</span>
-              <span className={s.pill}><LuChevronUp /> {summary.totalOrders.growth}%</span>
+              <span className={s.pill}><LuChevronUp /> {orderSummary.totalOrders.growth}%</span>
             </div>
           </section>
         </div>
 
-        {/* Orders Table Container */}
+           {/* TABLE */}
         <div className={s.tableCard}>
           <div className={s.tableHeader}>
             <h1 className={s.title}>Orders</h1>
@@ -137,6 +157,7 @@ export default function OrderPage({ role = 'Admin', onLogout }: OrderProps) {
             </div>
           </div>
 
+
           <table className={s.table}>
             <thead>
               <tr>
@@ -147,7 +168,7 @@ export default function OrderPage({ role = 'Admin', onLogout }: OrderProps) {
                   { label: 'DATE', key: 'date' },
                   { label: 'QTY', key: 'qty' },
                   { label: 'UNIT PRICE', key: 'unitPrice' },
-                  { label: 'PRICE', key: 'status' }
+                  { label: 'STATUS', key: 'status' }
                 ].map((col) => (
                   <th key={col.label}>
                     <div className={s.sortableHeader}>
@@ -173,36 +194,44 @@ export default function OrderPage({ role = 'Admin', onLogout }: OrderProps) {
               </tr>
             </thead>
             <tbody>
-              {sortedOrders.map((order, idx) => (
-                <tr key={order.no} className={idx % 2 !== 0 ? s.rowOdd : ''}>
-                  <td>{order.no}</td>
-                  <td className={s.boldText}>{order.item}</td>
-                  <td>{order.brand}</td>
-                  <td>{order.date}</td>
-                  <td>{order.qty}</td>
-                  <td>₱ {order.unitPrice.toLocaleString()}</td>
-                  <td className={order.status === 'TO SHIP' ? s.statusToShip : s.statusReceived}>
-                    {order.status}
-                  </td>
-                  <td className={s.actionCell}>
-                    <div className={s.moreIcon} onClick={() => setOpenMenuId(openMenuId === order.no ? null : order.no)}>
-                      <LuEllipsisVertical size={20} />
-                    </div>
-                    {openMenuId === order.no && (
-                      <div className={s.popupMenu}>
-                        <button className={s.popBtnAdd}>ADD</button>
-                        <button className={s.popBtnEdit}><LuPencil size={14} /> Edit</button>
-                        <button className={s.popBtnArchive}><LuDownload size={14} /> Archive</button>
-                        <button className={s.closeX} onClick={() => setOpenMenuId(null)}>×</button>
+              {sortedOrders.length > 0 ? (
+                sortedOrders.map((order, idx) => (
+                  <tr key={order.no} className={idx % 2 !== 0 ? s.rowOdd : ''}>
+                    <td>{order.no}</td>
+                    <td className={s.boldText}>{order.item}</td>
+                    <td>{order.brand}</td>
+                    <td>{order.date}</td>
+                    <td>{order.qty}</td>
+                    <td>₱ {order.unitPrice.toLocaleString()}</td>
+                    <td className={order.status === 'TO SHIP' ? s.statusToShip : s.statusReceived}>
+                      {order.status}
+                    </td>
+                    <td className={s.actionCell}>
+                      <div className={s.moreIcon} onClick={() => setOpenMenuId(openMenuId === order.no ? null : order.no)}>
+                        <LuEllipsisVertical size={20} />
                       </div>
-                    )}
+                      {openMenuId === order.no && (
+                        <div className={s.popupMenu}>
+                          <button className={s.popBtnAdd}>ADD</button>
+                          <button className={s.popBtnEdit}><LuPencil size={14} /> Edit</button>
+                          <button className={s.popBtnArchive}><LuDownload size={14} /> Archive</button>
+                          <button className={s.closeX} onClick={() => setOpenMenuId(null)}>×</button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>
+                    No orders found.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
 
-          {/* Footer & Pagination */}
+               {/* FOOTER */}
           <div className={s.footer}>
             <div className={s.showData}>
               Show data <span className={s.badge}>{sortedOrders.length}</span> of {orders.length}
