@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import styles from '@/css/order.module.css';
 import TopHeader from '@/components/layout/TopHeader';
-
 import {
   LuSearch,
   LuEllipsisVertical,
@@ -14,9 +13,9 @@ import {
 } from 'react-icons/lu';
 
 /* ================= TYPES ================= */
-
 type Order = {
   id: number;
+  customer: string;
   date: string;
   status: string;
 };
@@ -37,59 +36,46 @@ type Summary = {
   };
 };
 
-type SortKey = 'id' | 'date' | 'status' | null;
+type SortKey = 'id' | 'customer' | 'date' | 'status' | null;
 
 /* ================= COMPONENT ================= */
-
 const OrderPage = ({ role, onLogout }: { role: string; onLogout: () => void }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
-
   const [sortConfig, setSortConfig] = useState<{
     key: SortKey;
     direction: 'asc' | 'desc' | null;
   }>({ key: null, direction: null });
 
   /* ================= FETCH ================= */
-
   useEffect(() => {
     fetchOrders();
     fetchSummary();
   }, []);
 
   const fetchOrders = async () => {
-    try {
-      const res = await fetch('http://127.0.0.1:5000/api/orders/list');
-      const data = await res.json();
-      setOrders(data);
-    } catch (err) {
-      console.error('Failed to fetch orders', err);
-    }
+    const res = await fetch('http://127.0.0.1:5000/api/orders/list');
+    const data = await res.json();
+    setOrders(data);
   };
 
   const fetchSummary = async () => {
-    try {
-      const res = await fetch('http://127.0.0.1:5000/api/orders/summary');
-      const data = await res.json();
-      setSummary(data);
-    } catch (err) {
-      console.error('Failed to fetch summary', err);
-    }
+    const res = await fetch('http://127.0.0.1:5000/api/orders/summary');
+    const data = await res.json();
+    setSummary(data);
   };
 
   /* ================= DERIVED ================= */
-
   const filteredOrders = orders.filter(o =>
-    `${o.id} ${o.date} ${o.status}`
+    `${o.id} ${o.customer} ${o.date} ${o.status}`
       .toLowerCase()
       .includes(searchTerm.toLowerCase())
   );
 
   const sortedOrders = [...filteredOrders].sort((a, b) => {
     if (!sortConfig.key || !sortConfig.direction) return 0;
-
     const aVal = a[sortConfig.key];
     const bVal = b[sortConfig.key];
 
@@ -103,7 +89,6 @@ const OrderPage = ({ role, onLogout }: { role: string; onLogout: () => void }) =
   };
 
   /* ================= UI ================= */
-
   return (
     <div className={styles.container}>
       <TopHeader role={role} onLogout={onLogout} />
@@ -111,10 +96,8 @@ const OrderPage = ({ role, onLogout }: { role: string; onLogout: () => void }) =
       <div className={styles.mainContent}>
         {/* ================= SUMMARY ================= */}
         <div className={styles.topGrid}>
-          {/* SHIPPED TODAY */}
           <section className={styles.statCard}>
             <p className={styles.cardTitle}>Shipped Today</p>
-
             <div className={styles.cardMainRow}>
               <LuTruck size={34} />
               <h2 className={`${styles.bigNumber} ${styles.greenText}`}>
@@ -123,7 +106,6 @@ const OrderPage = ({ role, onLogout }: { role: string; onLogout: () => void }) =
                   : '—'}
               </h2>
             </div>
-
             <div className={styles.cardFooter}>
               <span>Shipped Yesterday</span>
               <span className={styles.greenText}>
@@ -132,42 +114,18 @@ const OrderPage = ({ role, onLogout }: { role: string; onLogout: () => void }) =
             </div>
           </section>
 
-          {/* ORDERS CANCELLED */}
           <section className={styles.statCard}>
             <p className={styles.cardTitle}>Orders Cancelled</p>
-
-            <h2
-              className={`${styles.bigNumber} ${styles.redText} ${styles.textCenter}`}
-            >
+            <h2 className={`${styles.bigNumber} ${styles.redText} ${styles.textCenter}`}>
               {summary ? summary.cancelled.current : '—'}
             </h2>
-
-            <div className={styles.cardFooter}>
-              <span>Cancelled Yesterday</span>
-              <span className={styles.redText}>
-                {summary ? summary.cancelled.yesterday : '—'}
-              </span>
-            </div>
           </section>
 
-          {/* TOTAL ORDERS */}
           <section className={styles.statCard}>
             <p className={styles.cardTitle}>Total Orders</p>
-
-            <h2
-              className={`${styles.bigNumber} ${styles.yellowText} ${styles.textCenter}`}
-            >
-              {summary
-                ? summary.totalOrders.count.toLocaleString()
-                : '—'}
+            <h2 className={`${styles.bigNumber} ${styles.yellowText} ${styles.textCenter}`}>
+              {summary ? summary.totalOrders.count.toLocaleString() : '—'}
             </h2>
-
-            <div className={styles.cardFooter}>
-              <span>vs last month</span>
-              <span className={styles.pill}>
-                ↑ {summary ? summary.totalOrders.growth : '—'}%
-              </span>
-            </div>
           </section>
         </div>
 
@@ -198,21 +156,14 @@ const OrderPage = ({ role, onLogout }: { role: string; onLogout: () => void }) =
               <tr>
                 {[
                   { label: 'ID', key: 'id' },
+                  { label: 'CUSTOMER', key: 'customer' },
                   { label: 'DATE', key: 'date' },
                   { label: 'STATUS', key: 'status' }
                 ].map(col => (
                   <th key={col.key}>
                     {col.label}
-                    <LuChevronUp
-                      onClick={() =>
-                        requestSort(col.key as SortKey, 'asc')
-                      }
-                    />
-                    <LuChevronDown
-                      onClick={() =>
-                        requestSort(col.key as SortKey, 'desc')
-                      }
-                    />
+                    <LuChevronUp onClick={() => requestSort(col.key as SortKey, 'asc')} />
+                    <LuChevronDown onClick={() => requestSort(col.key as SortKey, 'desc')} />
                   </th>
                 ))}
                 <th className={styles.actionHeader}>Action</th>
@@ -227,6 +178,7 @@ const OrderPage = ({ role, onLogout }: { role: string; onLogout: () => void }) =
                     className={i % 2 === 0 ? styles.rowEven : styles.rowOdd}
                   >
                     <td>{order.id}</td>
+                    <td>{order.customer}</td>
                     <td>{order.date}</td>
                     <td
                       className={
@@ -241,9 +193,7 @@ const OrderPage = ({ role, onLogout }: { role: string; onLogout: () => void }) =
                       <LuEllipsisVertical
                         className={styles.moreIcon}
                         onClick={() =>
-                          setOpenMenuId(
-                            openMenuId === order.id ? null : order.id
-                          )
+                          setOpenMenuId(openMenuId === order.id ? null : order.id)
                         }
                       />
                     </td>
@@ -251,7 +201,7 @@ const OrderPage = ({ role, onLogout }: { role: string; onLogout: () => void }) =
                 ))
               ) : (
                 <tr>
-                  <td colSpan={4} style={{ textAlign: 'center', padding: '2rem' }}>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: '2rem' }}>
                     No orders found
                   </td>
                 </tr>

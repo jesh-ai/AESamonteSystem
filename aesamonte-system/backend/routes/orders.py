@@ -4,7 +4,6 @@ from datetime import date, timedelta
 
 orders_bp = Blueprint("orders", __name__, url_prefix="/api/orders")
 
-
 # ===================== SUMMARY =====================
 @orders_bp.route("/summary", methods=["GET"])
 def orders_summary():
@@ -82,13 +81,18 @@ def orders_list():
     conn = get_connection()
     cur = conn.cursor()
 
+    # 👇 CUSTOMER BEFORE DATE
     cur.execute("""
         SELECT
             ot.order_id,
+            c.customer_name,
             ot.order_date,
             os.order_status_name
         FROM order_transaction ot
-        JOIN order_status os ON ot.order_status_id = os.order_status_id
+        JOIN customer c
+            ON ot.customer_id = c.customer_id
+        JOIN order_status os
+            ON ot.order_status_id = os.order_status_id
         ORDER BY ot.order_id DESC
     """)
 
@@ -100,8 +104,9 @@ def orders_list():
     for r in rows:
         orders.append({
             "id": r[0],
-            "date": r[1].strftime("%m/%d/%y"),
-            "status": r[2]
+            "customer": r[1],                # 👈 customer first
+            "date": r[2].strftime("%m/%d/%y"),
+            "status": r[3]
         })
 
     return jsonify(orders)

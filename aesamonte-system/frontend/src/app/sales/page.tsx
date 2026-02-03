@@ -4,7 +4,16 @@ import React, { useState, useEffect } from 'react'
 import styles from '@/css/sales.module.css'
 import TopHeader from '@/components/layout/TopHeader'
 import ExportButton from '@/components/features/ExportButton'
-import { LuSearch, LuEllipsisVertical, LuChevronUp, LuChevronDown, LuChevronRight, LuArchive } from 'react-icons/lu'
+import {
+  LuSearch,
+  LuEllipsisVertical,
+  LuChevronUp,
+  LuChevronDown,
+  LuChevronRight,
+  LuArchive
+} from 'react-icons/lu'
+
+/* ================= TYPES ================= */
 
 interface SalesSummary {
   totalSales: number
@@ -32,36 +41,45 @@ interface SalesProps {
   onLogout: () => void
 }
 
+/* ================= COMPONENT ================= */
+
 export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
   const s = styles as Record<string, string>
-  
-  const [data, setData] = useState<SalesSummary | null>(null)
+
+  const [summary, setSummary] = useState<SalesSummary | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({ key: '', direction: null })
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
+
+  const [sortConfig, setSortConfig] = useState<{
+    key: keyof Transaction | ''
+    direction: 'asc' | 'desc' | null
+  }>({ key: '', direction: null })
+
+  /* ================= FETCH ================= */
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true)
-        
-        // Replace these URLs with your actual API endpoints
+
         const [summaryRes, transRes] = await Promise.all([
-          fetch('/api/sales/summary'),
-          fetch('/api/sales/transactions')
+          fetch('http://127.0.0.1:5000/api/sales/summary'),
+          fetch('http://127.0.0.1:5000/api/sales/transactions')
         ])
 
-        if (summaryRes.ok && transRes.ok) {
-          const summaryData = await summaryRes.json()
-          const transactionsData = await transRes.json()
-          
-          setData(summaryData)
-          setTransactions(transactionsData)
+        if (!summaryRes.ok || !transRes.ok) {
+          throw new Error('Failed to fetch sales data')
         }
+
+        const summaryData = await summaryRes.json()
+        const transactionsData = await transRes.json()
+
+        setSummary(summaryData)
+        setTransactions(transactionsData)
       } catch (error) {
-        console.error("Error connecting to database:", error)
+        console.error('Error connecting to database:', error)
       } finally {
         setIsLoading(false)
       }
@@ -70,31 +88,44 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
     fetchData()
   }, [])
 
-  if (isLoading) return <div className={s.loadingContainer}>Connecting to database...</div>
-  
-  // If no data returns, provide an empty object so the page doesn't crash
-  const summary = data || {
-    totalSales: 0, totalSalesChange: 0, weeklySales: 0, 
-    monthlySales: 0, yearlySales: 0, topClientName: 'None', 
-    topClientSales: 0, topClientChange: 0 
+  if (isLoading) {
+    return <div className={s.loadingContainer}>Connecting to database...</div>
   }
 
-  const filteredTx = transactions.filter((tx) =>
-    tx.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tx.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tx.no.toString().includes(searchTerm)
+  const safeSummary: SalesSummary = summary || {
+    totalSales: 0,
+    totalSalesChange: 0,
+    weeklySales: 0,
+    monthlySales: 0,
+    yearlySales: 0,
+    topClientName: 'None',
+    topClientSales: 0,
+    topClientChange: 0
+  }
+
+  /* ================= FILTER + SORT ================= */
+
+  const filteredTx = transactions.filter(tx =>
+    `${tx.no} ${tx.name} ${tx.address}`
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase())
   )
 
   const sortedTx = [...filteredTx].sort((a, b) => {
     if (!sortConfig.key || !sortConfig.direction) return 0
-    const aValue = a[sortConfig.key as keyof Transaction]
-    const bValue = b[sortConfig.key as keyof Transaction]
-    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1
-    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1
+    const aVal = a[sortConfig.key]
+    const bVal = b[sortConfig.key]
+
+    if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1
+    if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1
     return 0
   })
 
-  const requestSort = (key: string, direction: 'asc' | 'desc') => setSortConfig({ key, direction })
+  const requestSort = (key: keyof Transaction, direction: 'asc' | 'desc') => {
+    setSortConfig({ key, direction })
+  }
+
+  /* ================= UI ================= */
 
   return (
     <div className={s.container}>
@@ -105,51 +136,73 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
           <ExportButton />
         </div>
 
-         {/* HEADER */}
+        {/* ================= SUMMARY ================= */}
         <div className={s.topGrid}>
           <section className={s.statCard}>
             <p className={s.cardTitle}>Total Sales</p>
-            <h2 className={s.bigNumber}>{summary.totalSales.toLocaleString()}</h2>
+            <h2 className={s.bigNumber}>
+              ₱ {safeSummary.totalSales.toLocaleString()}
+            </h2>
             <div className={s.cardFooter}>
               <span className={s.subText}>vs last month</span>
-              <span className={s.pill}>↗ {summary.totalSalesChange}%</span>
+              <span className={s.pill}>↗ {safeSummary.totalSalesChange}%</span>
             </div>
           </section>
 
           <section className={s.statCard}>
             <p className={s.cardTitle}>Sales Report</p>
             <div className={s.list}>
-              <div className={`${s.listRow} ${s.altRow}`}><span>Weekly Sales</span><span className={s.green}>{summary.weeklySales.toLocaleString()}</span></div>
-              <div className={s.listRow}><span>Monthly Sales</span><span className={s.red}>{summary.monthlySales.toLocaleString()}</span></div>
-              <div className={`${s.listRow} ${s.altRow}`}><span>Yearly Sales</span><span className={s.blue}>{summary.yearlySales.toLocaleString()}</span></div>
+              <div className={`${s.listRow} ${s.altRow}`}>
+                <span>Weekly Sales</span>
+                <span className={s.green}>
+                  ₱ {safeSummary.weeklySales.toLocaleString()}
+                </span>
+              </div>
+              <div className={s.listRow}>
+                <span>Monthly Sales</span>
+                <span className={s.red}>
+                  ₱ {safeSummary.monthlySales.toLocaleString()}
+                </span>
+              </div>
+              <div className={`${s.listRow} ${s.altRow}`}>
+                <span>Yearly Sales</span>
+                <span className={s.blue}>
+                  ₱ {safeSummary.yearlySales.toLocaleString()}
+                </span>
+              </div>
             </div>
           </section>
 
           <section className={s.statCard}>
             <p className={s.cardTitle}>Top Client</p>
-            <h2 className={s.bigNumber}>{summary.topClientSales.toLocaleString()}</h2>
+            <h2 className={s.bigNumber}>
+              ₱ {safeSummary.topClientSales.toLocaleString()}
+            </h2>
             <div className={s.cardFooter}>
-              <span className={s.subText}>{summary.topClientName}</span>
-              <span className={s.pill}>↗ {summary.topClientChange}%</span>
+              <span className={s.subText}>{safeSummary.topClientName}</span>
+              <span className={s.pill}>↗ {safeSummary.topClientChange}%</span>
             </div>
           </section>
         </div>
 
-         {/* TABLE */}
+        {/* ================= TABLE ================= */}
         <div className={s.tableContainer}>
           <div className={s.header}>
             <h1 className={s.title}>Transactions</h1>
+
             <div className={s.controls}>
-              <button className={s.archiveIconBtn} title="View Archive"><LuArchive size={20} /></button>
+              <button className={s.archiveIconBtn}>
+                <LuArchive size={20} />
+              </button>
+
               <div className={s.searchWrapper}>
                 <input
-                  type="text"
-                  placeholder="Search..."
                   className={s.searchInput}
+                  placeholder="Search..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={e => setSearchTerm(e.target.value)}
                 />
-                <LuSearch size={18} color="#5f6368" />
+                <LuSearch size={18} />
               </div>
             </div>
           </div>
@@ -164,20 +217,18 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
                   { label: 'DATE', key: 'date' },
                   { label: 'QTY', key: 'qty' },
                   { label: 'AMOUNT', key: 'amount' },
-                  { label: 'STATUS', key: 'status' },
+                  { label: 'STATUS', key: 'status' }
                 ].map(col => (
                   <th key={col.key}>
                     <div className={s.sortableHeader}>
-                      <span className={s.columnLabel}>{col.label}</span>
+                      <span>{col.label}</span>
                       <div className={s.sortIconsStack}>
-                        <span
-                          className={`${s.arrowBtn} ${sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''}`}
-                          onClick={() => requestSort(col.key, 'asc')}
-                        ><LuChevronUp size={12} /></span>
-                        <span
-                          className={`${s.arrowBtn} ${sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''}`}
-                          onClick={() => requestSort(col.key, 'desc')}
-                        ><LuChevronDown size={12} /></span>
+                        <span onClick={() => requestSort(col.key as keyof Transaction, 'asc')}>
+                          <LuChevronUp size={12} />
+                        </span>
+                        <span onClick={() => requestSort(col.key as keyof Transaction, 'desc')}>
+                          <LuChevronDown size={12} />
+                        </span>
                       </div>
                     </div>
                   </th>
@@ -185,33 +236,31 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
                 <th className={s.actionHeader}>Action</th>
               </tr>
             </thead>
+
             <tbody>
-              {sortedTx.length > 0 ? (
-                sortedTx.map((tx, index) => (
-                  <tr key={tx.no} className={index % 2 !== 0 ? s.rowOdd : ''}>
+              {sortedTx.length ? (
+                sortedTx.map((tx, i) => (
+                  <tr key={tx.no} className={i % 2 !== 0 ? s.rowOdd : ''}>
                     <td>{tx.no}</td>
                     <td style={{ fontWeight: 600 }}>{tx.name}</td>
                     <td>{tx.address}</td>
                     <td>{tx.date}</td>
                     <td>{tx.qty}</td>
                     <td>₱ {tx.amount.toLocaleString()}</td>
-                    <td className={tx.status === 'PAID' ? s.statusPaid : s.statusPending}>{tx.status}</td>
+                    <td className={tx.status === 'PAID' ? s.statusPaid : s.statusPending}>
+                      {tx.status}
+                    </td>
                     <td className={s.actionCell}>
-                      <div className={s.moreIcon} onClick={() => setOpenMenuId(openMenuId === tx.no ? null : tx.no)}>
-                        <LuEllipsisVertical size={20} />
-                      </div>
-                      {openMenuId === tx.no && (
-                        <div className={s.popupMenu}>
-                          <button className={s.popBtnArchive}>Archive</button>
-                          <button className={s.closeX} onClick={() => setOpenMenuId(null)}>×</button>
-                        </div>
-                      )}
+                      <LuEllipsisVertical
+                        size={20}
+                        onClick={() => setOpenMenuId(openMenuId === tx.no ? null : tx.no)}
+                      />
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '2rem' }}>
                     No transactions available.
                   </td>
                 </tr>
@@ -219,19 +268,8 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
             </tbody>
           </table>
 
-               {/* FOOTER */}
           <div className={s.footer}>
-            <div className={s.showDataText}>
-              Show data <span className={s.countBadge}>{sortedTx.length}</span> of {transactions.length}
-            </div>
-            <div className={s.pagination}>
-              <button className={s.pageCircleActive}>1</button>
-              <button className={s.pageCircle}>2</button>
-              <button className={s.pageCircle}>3</button>
-              <button className={s.nextBtn}>
-                Next <LuChevronRight size={18} />
-              </button>
-            </div>
+            Showing {sortedTx.length} of {transactions.length}
           </div>
         </div>
       </main>
