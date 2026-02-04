@@ -30,7 +30,6 @@ type Summary = {
 type SortKey = 'id' | 'customer' | 'date' | 'status' | null;
 const ROWS_PER_PAGE = 10;
 
-/* COMPONENTS */
 export default function OrderPage({ role, onLogout }: { role: string; onLogout: () => void }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -45,16 +44,15 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
     'RECEIVED': 2,
     'CANCELLED': 3
   };
-
   const statusOrder: string[] = ['TO SHIP', 'RECEIVED', 'CANCELLED'];
 
-/* DATABASE FETCH */
+  /* FETCH DATA */
   useEffect(() => {
     fetch('http://127.0.0.1:5000/api/orders/list').then(res => res.json()).then(setOrders);
     fetch('http://127.0.0.1:5000/api/orders/summary').then(res => res.json()).then(setSummary);
   }, []);
 
-/* FILTER SORT */
+  /* SORT HANDLER */
   const handleSort = (key: Exclude<SortKey, null>) => {
     if (key === 'status') {
       setStatusCycleIndex((prev) => (prev + 1) % statusOrder.length);
@@ -67,6 +65,7 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
     }
   };
 
+  /* FILTER */
   const filtered = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     return orders.filter(o =>
@@ -77,34 +76,38 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
     );
   }, [orders, searchTerm]);
 
+  /* SORT */
   const sorted = useMemo(() => {
     const arr = [...filtered];
 
-    if (!sortConfig.key) {
-      return arr.sort((a, b) => statusPriority[a.status.toUpperCase()] - statusPriority[b.status.toUpperCase()] || a.id - b.id);
-    }
-
+    // Status cycling
     if (sortConfig.key === 'status') {
       const activeStatus = statusOrder[statusCycleIndex];
       return arr.sort((a, b) => {
         if (a.status === activeStatus && b.status !== activeStatus) return -1;
         if (b.status === activeStatus && a.status !== activeStatus) return 1;
-        const priA = statusPriority[a.status.toUpperCase()] ?? 99;
-        const priB = statusPriority[b.status.toUpperCase()] ?? 99;
-        if (priA !== priB) return priA - priB;
-        return a.id - b.id;
+        return statusPriority[a.status.toUpperCase()] - statusPriority[b.status.toUpperCase()] || a.id - b.id;
       });
     }
 
+    if (!sortConfig.key) {
+      return arr.sort((a, b) => statusPriority[a.status.toUpperCase()] - statusPriority[b.status.toUpperCase()] || a.id - b.id);
+    }
+
     const { key, direction } = sortConfig;
+
     return arr.sort((a, b) => {
-      const priA = statusPriority[a.status.toUpperCase()] ?? 99;
-      const priB = statusPriority[b.status.toUpperCase()] ?? 99;
-      if (priA !== priB) return priA - priB;
-      const A = a[key!];
-      const B = b[key!];
-      if (A === B) return 0;
-      return direction === 'asc' ? (A > B ? 1 : -1) : (A < B ? 1 : -1);
+      const A = a[key];
+      const B = b[key];
+
+      if (key === 'id') return direction === 'asc' ? (A as number) - (B as number) : (B as number) - (A as number);
+      if (key === 'date') return direction === 'asc' ? new Date(A as string).getTime() - new Date(B as string).getTime() : new Date(B as string).getTime() - new Date(A as string).getTime();
+
+      const strA = (A as string).toLowerCase();
+      const strB = (B as string).toLowerCase();
+      if (strA < strB) return direction === 'asc' ? -1 : 1;
+      if (strA > strB) return direction === 'asc' ? 1 : -1;
+      return 0;
     });
   }, [filtered, sortConfig, statusCycleIndex]);
 
@@ -181,7 +184,7 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
                     </div>
                   </th>
                 ))}
-                <th className={styles.actionHeader}>ACTION</th>
+                <th className={`${styles.actionHeader} text-center`}>ACTION</th>
               </tr>
             </thead>
 
@@ -192,7 +195,7 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
                   <td>{o.customer}</td>
                   <td>{o.date}</td>
                   <td><span className={getStatusStyle(o.status)}>{o.status}</span></td>
-                  <td className={styles.actionCell}>
+                  <td className={`${styles.actionCell} text-center`}>
                     <LuEllipsisVertical
                       className={styles.moreIcon}
                       onClick={() => setOpenMenuId(openMenuId === o.id ? null : o.id)}

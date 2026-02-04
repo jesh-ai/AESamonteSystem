@@ -101,11 +101,6 @@
   cursor: pointer;
 }
 
-.addButton:hover {
-  background-color: #3e73b1;
-  transform: translateY(-1px);
-}
-
 .archiveIconBtn {
   background: #fff;
   border: 1px solid #ddd;
