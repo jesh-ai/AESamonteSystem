@@ -5,16 +5,16 @@
   background-color: #F8F3D9;
   min-height: 100vh;
   width: 100%;
-  overflow: hidden; /* prevents page overflow */
+  overflow: hidden; 
 }
 
 .mainContent {
   flex: 1;
-  padding: 1.5rem 2rem; /* same as sales */
+  padding: 1.5rem 2rem;
   display: flex;
   flex-direction: column;
-  gap: 1rem; /* same as sales */
-  overflow-y: auto; /* scrollable */
+  gap: 1rem;
+  overflow-y: auto;
 }
 
 .headerActions {
@@ -27,14 +27,14 @@
 .topGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 1.25rem; /* same as sales */
+  gap: 1.25rem;
   align-items: stretch;
 }
 
 .statCard {
   background: #ffffff;
   border-radius: 12px;
-  padding: 1.5rem; /* same as sales */
+  padding: 1.5rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
@@ -86,10 +86,6 @@
   font-weight: 600;
 }
 
-.list {
-  margin-top: 0.75rem;
-}
-
 .listRow {
   display: flex;
   justify-content: space-between;
@@ -121,12 +117,7 @@
 
 /* ===== COLORS ===== */
 
-.listLabel {
-  color: #1f2937;
-  font-size: 14px;
-}
-
-.listValue {
+.listLabel, .listValue {
   color: #1f2937;
   font-size: 14px;
 }
@@ -140,18 +131,17 @@
 /* ===================== TABLE CONTAINER ===================== */
 .tableContainer {
   background-color: #ffffff;
-  margin: 2rem 0; /* same as sales */
-  padding: 2.5rem; /* same as sales */
+  margin: 2rem 0;
+  padding: 2.5rem;
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
-/* HEADER - ARCHIVE, SEARCH, ADD */
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem; /* same as sales */
+  margin-bottom: 2rem;
 }
 
 .title {
@@ -174,7 +164,7 @@
   padding: 8px 15px;
   border-radius: 8px;
   width: 250px;
-  gap: 8px; /* spacing between input & icon */
+  gap: 8px;
 }
 
 .searchInput {
@@ -189,7 +179,7 @@
   background: #1a4263 !important;
   color: white !important;
   border: none;
-  padding: 10px 25px; /* same as sales */
+  padding: 10px 25px;
   border-radius: 8px;
   font-weight: 700;
   cursor: pointer;
@@ -204,7 +194,7 @@
   background: white;
   border: 1px solid #ddd;
   border-radius: 8px;
-  padding: 8px; /* same as sales */
+  padding: 8px;
   cursor: pointer;
   display: flex;
 }
@@ -221,7 +211,7 @@
 }
 
 .table th {
-  padding: 15px; /* same as sales */
+  padding: 15px;
   text-align: left;
   border-bottom: 2px solid #f1f3f4;
   font-size: 0.85rem;
@@ -229,7 +219,7 @@
 }
 
 .table td {
-  padding: 15px; /* same as sales */
+  padding: 15px;
   border-bottom: 1px solid #f1f3f4;
   font-size: 0.9rem;
 }
@@ -250,15 +240,15 @@
   justify-content: center;
 }
 
-/* NEW: HOVER EFFECT FOR ARROWS ONLY */
+/* HOVER EFFECT FOR ARROWS ONLY */
 .sortIconsStack svg {
   transition: color 0.2s ease, transform 0.2s ease;
-  color: #cbd5e1; /* Default light color */
+  color: #cbd5e1;
 }
 
 .sortIconsStack svg:hover {
-  color: #1a4263; /* Dark blue on hover */
-  transform: scale(1.3); /* Pop effect on the specific arrow */
+  color: #1a4263;
+  transform: scale(1.3);
 }
 
 .activeSort {
@@ -266,13 +256,8 @@
 }
 
 /* ACTION COLUMN & CENTERING */
-.actionHeader {
+.actionHeader, .actionCell {
   text-align: center !important;
-}
-
-.actionCell {
-  position: relative;
-  text-align: center;
 }
 
 .moreIcon {
@@ -305,37 +290,32 @@
   font-weight: bold;
 }
 
-.popBtnEdit { 
-  background: white !important;
-  color: #1a4263 !important;
-  border: none;
+.popBtnEdit, .popBtnArchive { 
   padding: 6px 15px;
   border-radius: 6px;
   display: flex;
   align-items: center;
   gap: 5px;
 }
+
+.popBtnEdit { 
+  background: white !important; 
+  color: #1a4263 !important; 
+  border: none; }
 
 .popBtnArchive { 
-  background: #90A4AE !important;
-  color: white !important;
-  border: none;
-  padding: 6px 15px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
+  background: #90A4AE !important; 
+  color: white !important; 
+  border: none; }
 
-.closeX {
-  background: none;
-  border: none;
-  color: white;
-  cursor: pointer;
-  font-size: 1.2rem;
-}
+.closeX { 
+  background: none; 
+  border: none; 
+  color: white; 
+  cursor: pointer; 
+  font-size: 1.2rem; }
 
-/* FOOTER / PAGINATION */
+/* FOOTER  */
 .footer {
   display: flex;
   justify-content: space-between;
@@ -343,55 +323,199 @@
   margin-top: 2rem; 
 }
 
-.showDataText {
-  font-size: 0.9rem;
-}
+.showDataText { font-size: 0.9rem; }
+.countBadge { border: 1px solid #ccc; padding: 2px 8px; border-radius: 10px; }
 
-.countBadge {
-  border: 1px solid #ccc;
-  padding: 2px 8px;
-  border-radius: 10px;
-}
+.pagination { 
+  display: flex !important; 
+  gap: 8px; 
+  align-items: center; }
 
-.pagination {
-  display: flex !important;
-  flex-direction: row !important;
-  gap: 8px;
-  align-items: center;
-}
-
-.pageCircle, .pageCircleActive {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
+.pageCircle, .pageCircleActive { 
+  width: 32px; 
+  height: 32px; 
+  border-radius: 6px; 
+  display: flex; 
+  align-items: center; 
   justify-content: center;
-  font-size: 0.9rem;
-  cursor: pointer;
-}
+  cursor: pointer; }
 
-.pageCircle {
-  background: white;
-  border: 1px solid #ddd;
-  color: #333;
-}
+.pageCircle { 
+  background: white; 
+  border: 1px solid #ddd; 
+  color: #333; }
 
-.pageCircleActive {
-  background-color: #1a4263;
-  border: none;
-  font-weight: 600;
-  color: #ddd;
-}
+.pageCircleActive { 
+  background-color: #1a4263; 
+  border: none; 
+  font-weight: 600; 
+  color: #ddd; }
 
-.nextBtn {
+.nextBtn { 
+  display: flex; 
+  align-items: center; 
+  gap: 5px; 
+  background: white; 
+  border: 1px solid #ddd; 
+  padding: 0 15px; 
+  height: 32px; 
+  border-radius: 6px; 
+  cursor: pointer; }
+
+/* ===================== ADD FORMS STYLES ===================== */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
+  justify-content: center;
   align-items: center;
-  gap: 5px;
-  background: white;
-  border: 1px solid #ddd;
-  padding: 0 15px;
-  height: 32px;
-  border-radius: 6px;
+  z-index: 0000; 
+}
+
+.modalContent {
+  background: #ffffff;
+  width: 600px; 
+  border-radius: 12px;
+  padding: 1rem 1.25rem; 
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid #f1f3f4;
+  padding-bottom: 0.4rem;
+}
+.closeIcon{
   cursor: pointer;
+}
+
+.modalTitleGroup {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.formLabel {
+  font-size: 0.75rem; 
+  font-weight: 700;
+  color: #1a4263;
+  margin-bottom: 2px;
+}
+
+.itemNameInput {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.sectionTitle {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #164163;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 1px;
+  margin: 0.4rem 0 0.3rem; 
+}
+
+.formGroup {
+  margin-bottom: 0.4rem; 
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.formGroup label { 
+  font-size: 0.65rem; 
+  font-weight: 600; 
+  color: #64748b; 
+}
+
+.formGroup input, .formGroup select {
+  padding: 4px 7px; 
+  border: 1px solid #52575a;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  outline: none;
+}
+
+.formRow { 
+  display: grid; 
+  grid-template-columns: 1fr 1fr; 
+  gap: 0.5rem; 
+}
+
+.formRowThree { 
+  display: grid; 
+  grid-template-columns: 1fr 1fr 1fr; 
+  gap: 0.5rem; 
+}
+
+
+/* SUPPLIER DETAILS BOX */
+.supplierDetailsBox {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+  margin: 0.4rem 0;
+}
+
+.boxHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.3rem;
+}
+
+.boxHeader h4 { 
+  font-size: 0.75rem; 
+  color: #1e293b; 
+  margin: 0; 
+}
+
+.addSupplierLink { 
+  font-size: 0.6rem; 
+  color: #2563eb; 
+  cursor: pointer; 
+  display: flex; 
+  align-items: center; 
+  gap: 3px; 
+}
+
+.modalFooter { 
+  display: flex; 
+  justify-content: flex-end; 
+  gap: 0.5rem; 
+  margin-top: 0.5rem; 
+}
+
+.cancelBtn { 
+  background: #ff5722; 
+  color: white; 
+  border: none; 
+  padding: 5px 14px; 
+  border-radius: 20px; 
+  cursor: pointer; 
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.saveBtn { 
+  background: #1a4263; 
+  color: white; 
+  border: none; 
+  padding: 5px 20px; 
+  border-radius: 8px; 
+  cursor: pointer; 
+  font-weight: 600;
+  font-size: 0.75rem;
 }

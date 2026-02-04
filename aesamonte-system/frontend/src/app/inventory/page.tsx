@@ -6,7 +6,7 @@ import TopHeader from '@/components/layout/TopHeader';
 import ExportButton from '@/components/features/ExportButton';
 import {
   LuSearch, LuEllipsisVertical, LuChevronUp, LuChevronDown,
-  LuArchive, LuChevronRight
+  LuArchive, LuChevronRight, LuX, LuPlus
 } from "react-icons/lu";
 
 /* ================= TYPES ================= */
@@ -38,6 +38,7 @@ interface InventorySummary {
 const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
   const s = styles as Record<string, string>;
 
+  // --- MAIN STATE ---
   const [products, setProducts] = useState<Product[]>([]);
   const [data, setData] = useState<InventorySummary>({
     totalProducts: 0,
@@ -54,7 +55,27 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
     direction: 'asc' | 'desc' | null;
   }>({ key: '', direction: null });
 
-  /* ================= FETCH INVENTORY ================= */
+  // --- MODAL & FORM STATE ---
+  const [showModal, setShowModal] = useState(false);
+  const [formData, setFormData] = useState({
+    itemName: '',
+    supplierName: '',
+    brand: '',
+    internalSku: '',
+    qty: '',
+    uom: 'Select',
+    reorderPoint: '',
+    unitPrice: '',
+    sellingPrice: '',
+    detailSupplierName: 'Select',
+    detailContactPerson: '',
+    detailContactNumber: '',
+    detailCostPrice: '',
+    detailLeadTime: '',
+    detailMinOrder: ''
+  });
+
+  /* ================= FETCH DATA ================= */
 
   useEffect(() => {
     const fetchInventory = async () => {
@@ -92,6 +113,25 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
     setSortConfig({ key, direction });
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch("http://127.0.0.1:5000/api/inventory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      if (res.ok) {
+        setShowModal(false);
+        // Refresh data or show alert
+      }
+    } catch (err) { console.error(err); }
+  };
+
   /* ================= DATA PROCESSING ================= */
 
   const filteredProducts = products.filter(p =>
@@ -116,14 +156,11 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
       <div className={s.mainContent}>
         <div className={s.headerActions}><ExportButton /></div>
 
+        {/* TOP CARDS */}
         <div className={s.topGrid}>
           <section className={s.statCard}>
             <p className={s.cardTitle}>Total Products</p>
             <h2 className={s.bigNumber}>{data.totalProducts}</h2>
-            <div className={s.cardFooter}>
-              <span className={s.subText}>vs last month</span>
-              <span className={s.pillRed}>↘ {data.totalProductsChange}%</span>
-            </div>
           </section>
 
           <section className={s.statCard}>
@@ -145,6 +182,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
           </section>
         </div>
 
+        {/* TABLE SECTION */}
         <div className={s.tableContainer}>
           <div className={s.header}>
             <h1 className={s.title}>Product List</h1>
@@ -154,7 +192,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
                 <input className={s.searchInput} placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 <LuSearch size={18} />
               </div>
-              <button className={s.addButton} onClick={() => console.log("Add clicked")}>ADD</button>
+              <button className={s.addButton} onClick={() => setShowModal(true)}>ADD</button>
             </div>
           </div>
 
@@ -186,16 +224,9 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
             <tbody>
               {sortedProducts.map(p => (
                 <tr key={p.id}>
-                  <td>{p.id}</td>
-                  <td>{p.item}</td>
-                  <td>{p.brand}</td>
-                  <td>{p.qty}</td>
-                  <td>{p.uom}</td>
-                  <td>₱ {p.unitPrice?.toLocaleString()}</td>
-                  <td>₱ {p.price?.toLocaleString()}</td>
-                  <td className={s.actionCell}>
-                    <LuEllipsisVertical className={s.moreIcon} />
-                  </td>
+                  <td>{p.id}</td><td>{p.item}</td><td>{p.brand}</td><td>{p.qty}</td><td>{p.uom}</td>
+                  <td>₱ {p.unitPrice?.toLocaleString()}</td><td>₱ {p.price?.toLocaleString()}</td>
+                  <td className={s.actionCell}><LuEllipsisVertical className={s.moreIcon} /></td>
                 </tr>
               ))}
             </tbody>
@@ -209,6 +240,78 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
           </div>
         </div>
       </div>
+
+      {/* ================= ADD NEW  ================= */}
+      {showModal && (
+        <div className={s.modalOverlay}>
+          <div className={s.modalContent}>
+            <div className={s.modalHeader}>
+              <div className={s.modalTitleGroup}>
+                <label className={s.formLabel}>Item Name</label>
+                <input name="itemName" className={s.itemNameInput} onChange={handleInputChange} />
+              </div>
+              <LuX onClick={() => setShowModal(false)} className={s.closeIcon} style={{marginLeft: '15px'}} />
+            </div>
+
+            <form onSubmit={handleSave} className={s.modalForm}>
+              {/* Company Info */}
+              <h4 className={s.sectionTitle}>Company Information</h4>
+              <div className={s.formGroup}>
+                <label>Supplier Name</label>
+                <input name="supplierName" onChange={handleInputChange} />
+              </div>
+              <div className={s.formRow}>
+                <div className={s.formGroup}><label>Brand</label><input name="brand" onChange={handleInputChange} /></div>
+                <div className={s.formGroup}><label>Internal SKU</label><input name="internalSku" onChange={handleInputChange} /></div>
+              </div>
+
+              {/* Stocks */}
+              <h4 className={s.sectionTitle}>Stocks</h4>
+              <div className={s.formRowThree}>
+                <div className={s.formGroup}><label>Quantity</label><input type="number" name="qty" onChange={handleInputChange} /></div>
+                <div className={s.formGroup}>
+                  <label>Unit of Measure</label>
+                  <select name="uom" onChange={handleInputChange}>
+                    <option value="Select">Select</option>
+                    <option value="PCS">PCS</option>
+                  </select>
+                </div>
+                <div className={s.formGroup}><label>Reorder Point</label><input className={s.yellowInput} name="reorderPoint" onChange={handleInputChange} /></div>
+              </div>
+              <div className={s.formRow}>
+                <div className={s.formGroup}><label>Unit Price</label><input name="unitPrice" onChange={handleInputChange} /></div>
+                <div className={s.formGroup}><label>Selling Price</label><input name="sellingPrice" onChange={handleInputChange} /></div>
+              </div>
+
+              {/* Supplier Details Box */}
+              <div className={s.supplierDetailsBox}>
+                <div className={s.boxHeader}>
+                  <h4>Supplier Details</h4>
+                  <span className={s.addSupplierLink}><LuPlus /> Add New Supplier</span>
+                </div>
+                <div className={s.formRowThree}>
+                  <div className={s.formGroup}>
+                    <label>Supplier Name</label>
+                    <select name="detailSupplierName" onChange={handleInputChange}><option>Select</option></select>
+                  </div>
+                  <div className={s.formGroup}><label>Contact Person</label><input name="detailContactPerson" onChange={handleInputChange} /></div>
+                  <div className={s.formGroup}><label>Contact Number</label><input name="detailContactNumber" onChange={handleInputChange} /></div>
+                </div>
+                <div className={s.formRowThree}>
+                  <div className={s.formGroup}><label>Cost Price</label><input name="detailCostPrice" onChange={handleInputChange} /></div>
+                  <div className={s.formGroup}><label>Lead Time (Days)</label><input name="detailLeadTime" onChange={handleInputChange} /></div>
+                  <div className={s.formGroup}><label>Min. Order (MOQ)</label><input name="detailMinOrder" onChange={handleInputChange} /></div>
+                </div>
+              </div>
+
+              <div className={s.modalFooter}>
+                <button type="button" onClick={() => setShowModal(false)} className={s.cancelBtn}>Cancel</button>
+                <button type="submit" className={s.saveBtn}>Save</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
