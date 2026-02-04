@@ -13,17 +13,16 @@ def orders_summary():
     today = date.today()
     yesterday = today - timedelta(days=1)
 
-    # Shipped today (RECEIVED)
+    # ---------- SHIPPED ----------
     cur.execute("""
         SELECT COUNT(*)
         FROM order_transaction ot
         JOIN order_status os ON ot.order_status_id = os.order_status_id
         WHERE os.order_status_name = 'RECEIVED'
-        AND ot.order_date = %s
+        AND DATE(ot.order_date) = %s
     """, (today,))
     shipped_today = cur.fetchone()[0]
 
-    # Total shipped
     cur.execute("""
         SELECT COUNT(*)
         FROM order_transaction ot
@@ -32,26 +31,35 @@ def orders_summary():
     """)
     total_shipped = cur.fetchone()[0]
 
-    # Shipped yesterday
     cur.execute("""
         SELECT COUNT(*)
         FROM order_transaction ot
         JOIN order_status os ON ot.order_status_id = os.order_status_id
         WHERE os.order_status_name = 'RECEIVED'
-        AND ot.order_date = %s
+        AND DATE(ot.order_date) = %s
     """, (yesterday,))
     shipped_yesterday = cur.fetchone()[0]
 
-    # Cancelled
+    # ---------- CANCELLED ----------
     cur.execute("""
         SELECT COUNT(*)
         FROM order_transaction ot
         JOIN order_status os ON ot.order_status_id = os.order_status_id
         WHERE os.order_status_name = 'CANCELLED'
-    """)
-    cancelled = cur.fetchone()[0]
+        AND DATE(ot.order_date) = %s
+    """, (today,))
+    cancelled_today = cur.fetchone()[0]
 
-    # Total orders
+    cur.execute("""
+        SELECT COUNT(*)
+        FROM order_transaction ot
+        JOIN order_status os ON ot.order_status_id = os.order_status_id
+        WHERE os.order_status_name = 'CANCELLED'
+        AND DATE(ot.order_date) = %s
+    """, (yesterday,))
+    cancelled_yesterday = cur.fetchone()[0]
+
+    # ---------- TOTAL ----------
     cur.execute("SELECT COUNT(*) FROM order_transaction")
     total_orders = cur.fetchone()[0]
 
@@ -65,8 +73,8 @@ def orders_summary():
             "yesterday": shipped_yesterday
         },
         "cancelled": {
-            "current": cancelled,
-            "yesterday": 0
+            "current": cancelled_today,
+            "yesterday": cancelled_yesterday
         },
         "totalOrders": {
             "count": total_orders,
@@ -81,7 +89,7 @@ def orders_list():
     conn = get_connection()
     cur = conn.cursor()
 
-    # 👇 CUSTOMER BEFORE DATE
+    # Prioritize 'TO SHIP' at the top
     cur.execute("""
         SELECT
             ot.order_id,
@@ -93,7 +101,9 @@ def orders_list():
             ON ot.customer_id = c.customer_id
         JOIN order_status os
             ON ot.order_status_id = os.order_status_id
-        ORDER BY ot.order_id DESC
+        ORDER BY 
+            CASE WHEN os.order_status_name = 'TO SHIP' THEN 0 ELSE 1 END,
+            ot.order_id DESC
     """)
 
     rows = cur.fetchall()
@@ -104,7 +114,7 @@ def orders_list():
     for r in rows:
         orders.append({
             "id": r[0],
-            "customer": r[1],                # 👈 customer first
+            "customer": r[1],
             "date": r[2].strftime("%m/%d/%y"),
             "status": r[3]
         })

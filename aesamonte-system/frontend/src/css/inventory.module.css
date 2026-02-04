@@ -1,4 +1,4 @@
-/* ===================== MAIN CONTAINER ===================== */
+/* ===== MAIN CONTAINER ===== */
 .container {
   display: flex;
   flex-direction: column;
@@ -23,7 +23,7 @@
 }
 
 
-/* ===================== TOP CARDS GRID ===================== */
+/* ===== TOP CARDS GRID ===== */
 .topGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -128,7 +128,7 @@
 }
 
 
-/* ===================== TABLE CONTAINER ===================== */
+/* ===== TABLE CONTAINER ===== */
 .tableContainer {
   background-color: #ffffff;
   margin: 2rem 0;
@@ -204,7 +204,7 @@
   transform: translateY(-1px);
 }
 
-/* ===================== TABLE STYLING ===================== */
+/* ===== TABLE STYLING ===== */
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -362,7 +362,7 @@
   border-radius: 6px; 
   cursor: pointer; }
 
-/* ===================== ADD FORMS STYLES ===================== */
+/* ===== ADD FORMS STYLES ===== */
 .modalOverlay {
   position: fixed;
   top: 0;
