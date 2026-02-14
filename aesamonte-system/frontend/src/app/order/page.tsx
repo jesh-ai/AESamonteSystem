@@ -12,15 +12,26 @@ import {
   LuChevronRight,
   LuPencil,
   LuX,
-  LuPlus // Added for the Add Item button
+  LuPlus
 } from 'react-icons/lu';
 
-/* TYPES */
+/* ===================== TYPES ===================== */
+type OrderItemBackend = {
+  inventory_id: number;
+  order_quantity: number;
+  available_quantity: number;
+  item_status_id: number;
+  item_status?: string;
+  item_name?: string;
+};
+
 type Order = {
   id: number;
   customer: string;
   date: string;
   status: string;
+  availabilityStatus: string | null;
+  items?: OrderItemBackend[];
 };
 
 type Summary = {
@@ -29,8 +40,7 @@ type Summary = {
   totalOrders: { count: number; growth: number };
 };
 
-// Updated Type to handle multiple items
-interface OrderItem {
+interface OrderFormItem {
   item: string;
   itemDescription: string;
   quantity: string;
@@ -43,12 +53,13 @@ interface OrderFormData {
   name?: string;
   contact?: string;
   address?: string;
-  items: OrderItem[]; // Now an array
+  items: OrderFormItem[];
 }
 
 type SortKey = 'id' | 'customer' | 'date' | 'status' | null;
 const ROWS_PER_PAGE = 10;
 
+/* ===================== COMPONENT ===================== */
 export default function OrderPage({ role, onLogout }: { role: string; onLogout: () => void }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -58,8 +69,7 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [statusCycleIndex, setStatusCycleIndex] = useState(0);
   const [showModal, setShowModal] = useState(false);
-  
-  // Initial state now includes one empty item row
+
   const [formData, setFormData] = useState<OrderFormData>({
     name: '',
     contact: '',
@@ -67,7 +77,7 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
     items: [{ item: '', itemDescription: '', quantity: '', amount: '', orderStatus: '', paymentMethod: '' }]
   });
 
-  const s = styles; 
+  const s = styles;
 
   const statusPriority: Record<string, number> = {
     'TO SHIP': 1,
@@ -76,19 +86,48 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
   };
   const statusOrder: string[] = ['TO SHIP', 'RECEIVED', 'CANCELLED'];
 
-  /* FETCH DATA */
+  const itemStatusMap: Record<number, string> = {
+    1: 'AVAILABLE',
+    2: 'PARTIALLY_AVAILABLE',
+    3: 'OUT_OF_STOCK'
+  };
+
+  /* ===================== FETCH DATA ===================== */
   useEffect(() => {
-    fetch('http://127.0.0.1:5000/api/orders/list').then(res => res.json()).then(setOrders);
-    fetch('http://127.0.0.1:5000/api/orders/summary').then(res => res.json()).then(setSummary);
+    fetch('http://127.0.0.1:5000/api/orders/list')
+      .then(res => res.json())
+      .then((data: Order[]) => {
+        const mappedOrders = data.map(order => {
+          // Normalize item_status
+          const items = order.items?.map(item => ({
+            ...item,
+            item_status: (item.item_status || itemStatusMap[item.item_status_id] || 'NOT_AVAILABLE').toUpperCase()
+          }));
+
+          // Make availabilityStatus null for TO SHIP, RECEIVED, CANCELLED
+          let availabilityStatus = order.availabilityStatus;
+          if (['TO SHIP', 'RECEIVED', 'CANCELLED'].includes(order.status.toUpperCase())) {
+            availabilityStatus = null;
+          }
+
+          return { ...order, items, availabilityStatus };
+        });
+        setOrders(mappedOrders);
+      })
+      .catch(err => console.error('Error fetching orders:', err));
+
+    fetch('http://127.0.0.1:5000/api/orders/summary')
+      .then(res => res.json())
+      .then(setSummary)
+      .catch(err => console.error('Error fetching summary:', err));
   }, []);
 
-  /* HANDLERS */
+  /* ===================== HANDLERS ===================== */
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // New handler for item-specific fields
   const handleItemChange = (index: number, e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     const newItems = [...formData.items];
@@ -96,7 +135,6 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
     setFormData(prev => ({ ...prev, items: newItems }));
   };
 
-  // Logic to add a new item row
   const addItem = () => {
     setFormData(prev => ({
       ...prev,
@@ -104,7 +142,6 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
     }));
   };
 
-  // Logic to remove an item row
   const removeItem = (index: number) => {
     if (formData.items.length > 1) {
       const newItems = formData.items.filter((_, i) => i !== index);
@@ -114,14 +151,13 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Saving order data:", formData);
+    console.log('Saving order data:', formData);
     setShowModal(false);
   };
 
-  /* SORT HANDLER */
   const handleSort = (key: Exclude<SortKey, null>) => {
     if (key === 'status') {
-      setStatusCycleIndex((prev) => (prev + 1) % statusOrder.length);
+      setStatusCycleIndex(prev => (prev + 1) % statusOrder.length);
       setSortConfig({ key: 'status', direction: 'asc' });
     } else {
       setSortConfig(prev => {
@@ -131,7 +167,7 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
     }
   };
 
-  /* FILTER */
+  /* ===================== FILTER & SORT ===================== */
   const filtered = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     return orders.filter(o =>
@@ -142,7 +178,6 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
     );
   }, [orders, searchTerm]);
 
-  /* SORT */
   const sorted = useMemo(() => {
     const arr = [...filtered];
     if (sortConfig.key === 'status') {
@@ -150,7 +185,7 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
       return arr.sort((a, b) => {
         if (a.status === activeStatus && b.status !== activeStatus) return -1;
         if (b.status === activeStatus && a.status !== activeStatus) return 1;
-        return statusPriority[a.status.toUpperCase()] - statusPriority[b.status.toUpperCase()] || a.id - b.id;
+        return (statusPriority[a.status.toUpperCase()] || 0) - (statusPriority[b.status.toUpperCase()] || 0) || a.id - b.id;
       });
     }
     if (!sortConfig.key) {
@@ -177,103 +212,113 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
   const changePage = (page: number) => { if (page >= 1 && page <= totalPages) setCurrentPage(page); };
 
   const getStatusStyle = (status: string | undefined) => {
-    const baseClass = styles.statusBadge; 
-    if (!status || status === "" || status === "Select") return baseClass;
+    const baseClass = s.statusBadge;
+    if (!status || status.trim() === '' || status.toLowerCase() === 'select') return baseClass;
 
-    const normalized = status.toUpperCase();
-
-    if (normalized === 'RECEIVED') {
-      return `${baseClass} ${styles.pillGreen}`;
+    switch (status.toUpperCase()) {
+      case 'PREPARING': return `${baseClass} ${s.pillBlue}`;
+      case 'TO SHIP': return `${baseClass} ${s.pillYellow}`;
+      case 'RECEIVED': return `${baseClass} ${s.pillGreen}`;
+      case 'CANCELLED': return `${baseClass} ${s.pillRed}`;
+      default: return baseClass;
     }
-    if (normalized === 'CANCELLED') {
-      return `${baseClass} ${styles.pillRed}`;
-    }
-    if (normalized === 'TO SHIP' || normalized === 'PENDING') {
-      return `${baseClass} ${styles.pillYellow}`;
-    }
-
-    return baseClass;
   };
 
   const renderPageNumbers = () => Array.from({ length: totalPages }, (_, i) => (
     <div
       key={i + 1}
-      className={`${styles.pageCircle} ${currentPage === i + 1 ? styles.pageCircleActive : ''}`}
+      className={`${s.pageCircle} ${currentPage === i + 1 ? s.pageCircleActive : ''}`}
       onClick={() => changePage(i + 1)}
     >{i + 1}</div>
   ));
 
+  /* ===================== RENDER ===================== */
   return (
-    <div className={styles.container}>
+    <div className={s.container}>
       <TopHeader role={role} onLogout={onLogout} />
-      <div className={styles.mainContent}>
-        <div className={styles.topGrid}>
-          <section className={styles.statCard}>
-            <p className={styles.cardTitle}>Shipped Today</p>
-            <h2 className={styles.bigNumber}>{summary ? `${summary.shippedToday.current}/${summary.shippedToday.total}` : '—'}</h2>
+      <div className={s.mainContent}>
+        {/* === Summary Cards === */}
+        <div className={s.topGrid}>
+          <section className={s.statCard}>
+            <p className={s.cardTitle}>Shipped Today</p>
+            <h2 className={s.bigNumber}>{summary ? `${summary.shippedToday.current}/${summary.shippedToday.total}` : '—'}</h2>
           </section>
-          <section className={styles.statCard}>
-            <p className={styles.cardTitle}>Orders Cancelled</p>
-            <h2 className={styles.bigNumber}>{summary ? summary.cancelled.current : '—'}</h2>
+          <section className={s.statCard}>
+            <p className={s.cardTitle}>Orders Cancelled</p>
+            <h2 className={s.bigNumber}>{summary ? summary.cancelled.current : '—'}</h2>
           </section>
-          <section className={styles.statCard}>
-            <p className={styles.cardTitle}>Total Orders</p>
-            <h2 className={styles.bigNumber}>{summary ? summary.totalOrders.count.toLocaleString() : '—'}</h2>
+          <section className={s.statCard}>
+            <p className={s.cardTitle}>Total Orders</p>
+            <h2 className={s.bigNumber}>{summary ? summary.totalOrders.count.toLocaleString() : '—'}</h2>
           </section>
         </div>
 
-        <div className={styles.tableContainer}>
-          <div className={styles.header}>
-            <h2 className={styles.title}>Orders</h2>
-            <div className={styles.controls}>
-              <button className={styles.archiveIconBtn}><LuArchive size={20} /></button>
-              <div className={styles.searchWrapper}>
+        {/* === Orders Table === */}
+        <div className={s.tableContainer}>
+          <div className={s.header}>
+            <h2 className={s.title}>Orders</h2>
+            <div className={s.controls}>
+              <button className={s.archiveIconBtn}><LuArchive size={20} /></button>
+              <div className={s.searchWrapper}>
                 <input
-                  className={styles.searchInput}
+                  className={s.searchInput}
                   placeholder="Search..."
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
                 />
                 <LuSearch size={18} />
               </div>
-              <button className={styles.addButton} onClick={() => setShowModal(true)}>ADD</button>
+              <button className={s.addButton} onClick={() => setShowModal(true)}>ADD</button>
             </div>
           </div>
 
-          <table className={styles.table}>
+          <table className={s.table}>
             <thead>
               <tr>
-                {(['id','customer','date','status'] as const).map(k => (
-                  <th key={k} onClick={() => handleSort(k)} className={styles.sortableHeader}>
-                    <div className={styles.sortHeaderInner}>
+                {(['id','customer','date','status','availabilityStatus'] as const).map(k => (
+                  <th key={k} onClick={() => handleSort(k==='availabilityStatus'?'id':k)} className={s.sortableHeader}>
+                    <div className={s.sortHeaderInner}>
                       <span>{k.toUpperCase()}</span>
-                      <div className={styles.sortIconsStack}>
-                        <LuChevronUp className={sortConfig.key===k && sortConfig.direction==='asc'?styles.activeSort:''}/>
-                        <LuChevronDown className={sortConfig.key===k && sortConfig.direction==='desc'?styles.activeSort:''}/>
+                      <div className={s.sortIconsStack}>
+                        <LuChevronUp className={sortConfig.key===k && sortConfig.direction==='asc'?s.activeSort:''}/>
+                        <LuChevronDown className={sortConfig.key===k && sortConfig.direction==='desc'?s.activeSort:''}/>
                       </div>
                     </div>
                   </th>
                 ))}
-                <th className={`${styles.actionHeader} text-center`}>ACTION</th>
+                <th className={`${s.actionHeader} text-center`}>ACTION</th>
               </tr>
             </thead>
             <tbody>
               {paginated.map((o, i) => (
-                <tr key={o.id} className={i%2 ? styles.altRow : ''}>
+                <tr key={o.id} className={i%2 ? s.altRow : ''}>
                   <td>{o.id}</td>
                   <td>{o.customer}</td>
                   <td>{o.date}</td>
                   <td><span className={getStatusStyle(o.status)}>{o.status}</span></td>
-                  <td className={`${styles.actionCell} text-center`}>
+                  <td>
+                    <span>
+                      {o.availabilityStatus}
+                    </span>
+                    {o.availabilityStatus !== 'Available' && o.items && (
+                      <div style={{ fontSize: '0.75rem', color: '#555' }}>
+                        {o.items
+                          .filter(item => item.item_status !== 'AVAILABLE')
+                          .map(item => `${item.item_name || 'Item'} (${item.order_quantity}/${item.available_quantity})`)
+                          .join(', ')}
+                      </div>
+                    )}
+                  </td>
+                  <td className={`${s.actionCell} text-center`}>
                     <LuEllipsisVertical
-                      className={styles.moreIcon}
+                      className={s.moreIcon}
                       onClick={() => setOpenMenuId(openMenuId === o.id ? null : o.id)}
                     />
                     {openMenuId === o.id && (
-                      <div className={styles.popupMenu}>
-                        <button className={styles.popBtnEdit}><LuPencil size={14}/> Edit</button>
-                        <button className={styles.popBtnArchive}><LuArchive size={14}/> Archive</button>
-                        <button className={styles.closeX} onClick={() => setOpenMenuId(null)}>×</button>
+                      <div className={s.popupMenu}>
+                        <button className={s.popBtnEdit}><LuPencil size={14}/> Edit</button>
+                        <button className={s.popBtnArchive}><LuArchive size={14}/> Archive</button>
+                        <button className={s.closeX} onClick={() => setOpenMenuId(null)}>×</button>
                       </div>
                     )}
                   </td>
@@ -282,13 +327,13 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
             </tbody>
           </table>
 
-          <div className={styles.footer}>
-            <div className={styles.showDataText}>
-              Showing <span className={styles.countBadge}>{paginated.length}</span> of {sorted.length}
+          <div className={s.footer}>
+            <div className={s.showDataText}>
+              Showing <span className={s.countBadge}>{paginated.length}</span> of {sorted.length}
             </div>
-            <div className={styles.pagination}>
+            <div className={s.pagination}>
               {renderPageNumbers()}
-              <button className={styles.nextBtn} onClick={() => changePage(currentPage+1)} disabled={currentPage>=totalPages}>
+              <button className={s.nextBtn} onClick={() => changePage(currentPage+1)} disabled={currentPage>=totalPages}>
                 <LuChevronRight />
               </button>
             </div>
@@ -303,7 +348,6 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
             <div className={s.modalHeader}>
               <h3 className={s.headerTitle}>General Information</h3>
               <div className={s.headerActions}>
-                {/* Fixed reference to first item status for the badge */}
                 <span className={getStatusStyle(formData.items[0]?.orderStatus)}>
                   {formData.items[0]?.orderStatus ? formData.items[0].orderStatus.toUpperCase() : 'STATUS'}
                 </span>
@@ -380,10 +424,7 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
                 </div>
               ))}
 
-              <div className={s.modalFooter}>
-                <button type="button" onClick={() => setShowModal(false)} className={s.cancelBtn}>Cancel</button>
-                <button type="submit" className={s.saveBtn}>Save</button>
-              </div>
+              <button type="submit" className={s.saveBtn}>Save</button>
             </form>
           </div>
         </div>

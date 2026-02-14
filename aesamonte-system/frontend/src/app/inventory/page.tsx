@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import styles from "@/css/inventory.module.css";
 import TopHeader from '@/components/layout/TopHeader';
 import ExportButton from '@/components/features/ExportButton';
 import {
   LuSearch, LuEllipsisVertical, LuChevronUp, LuChevronDown,
-  LuArchive, LuChevronRight, LuX, LuPlus
+  LuArchive, LuChevronLeft, LuChevronRight, LuX, LuPlus
 } from "react-icons/lu";
 
 /* ================= TYPES ================= */
@@ -24,6 +24,7 @@ interface Product {
   uom: string;
   unitPrice: number;
   price: number;
+  status: string;
 }
 
 interface InventorySummary {
@@ -34,6 +35,8 @@ interface InventorySummary {
   yearlyInventory: number;
   outOfStockCount: number;
 }
+
+const ROWS_PER_PAGE = 10;
 
 const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
   const s = styles as Record<string, string>;
@@ -54,6 +57,9 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
     direction: 'asc' | 'desc' | null;
   }>({ key: '', direction: null });
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+
   const [showModal, setShowModal] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
 
@@ -69,7 +75,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
     sellingPrice: '',
     detailSupplierName: 'Select',
     detailContactPerson: '',
-    detailContactNumber: '', // Will be restricted to numbers
+    detailContactNumber: '', // Will be restricted to numbers 
     detailCostPrice: '',
     detailLeadTime: '',
     detailMinOrder: ''
@@ -79,7 +85,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
     supplierName: '',
     address: '',
     contactPerson: '',
-    contact: '', // Will be restricted to numbers
+    contact: '', // Will be restricted to numbers 
     email: '',
     paymentTerms: 'Cash on Delivery'
   });
@@ -87,29 +93,32 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
   /* ================= FETCH DATA ================= */
 
   useEffect(() => {
-    const fetchInventory = async () => {
-      try {
-        const res = await fetch("http://127.0.0.1:5000/api/inventory");
-        if (!res.ok) throw new Error("Failed to fetch");
-        const productData: Product[] = await res.json();
-        setProducts(productData);
+  const fetchInventory = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch("http://127.0.0.1:5000/api/inventory");
+      if (!res.ok) throw new Error("Failed to fetch");
+      const productData: Product[] = await res.json();
+      setProducts(productData);
 
-        const visible = productData.filter(p => p.qty > 0);
-        const outOfStock = productData.filter(p => p.qty === 0);
+      const visible = productData.filter(p => p.qty > 0);
+      const outOfStock = productData.filter(p => p.qty === 0);
 
-        setData({
-          totalProducts: productData.length,
-          totalProductsChange: 2.8,
-          weeklyInventory: visible.length,
-          monthlyInventory: visible.length * 10,
-          yearlyInventory: visible.length * 100,
-          outOfStockCount: outOfStock.length,
-        });
-      } catch (err) {
-        console.error("Inventory fetch error:", err);
-      }
-    };
-    fetchInventory();
+      setData({
+        totalProducts: productData.length,
+        totalProductsChange: 2.8,
+        weeklyInventory: visible.length,
+        monthlyInventory: visible.length * 10,
+        yearlyInventory: visible.length * 100,
+        outOfStockCount: outOfStock.length,
+      });
+    } catch (err) {
+      console.error("Failed to fetch Inventory", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  fetchInventory();
   }, []);
 
   /* ================= HANDLERS ================= */
@@ -121,9 +130,9 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
   // NEW: Restricted handler for numeric fields
   const handleNumericInputChange = (e: React.ChangeEvent<HTMLInputElement>, isSupplierReg = false) => {
     const { name, value } = e.target;
-    // Replace any character that is NOT a digit with an empty string
+     // Replace any character that is NOT a digit with an empty string
     const cleanValue = value.replace(/[^\d]/g, '');
-
+    
     if (isSupplierReg) {
       setSupplierFormData({ ...supplierFormData, [name]: cleanValue });
     } else {
@@ -133,9 +142,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
 
   const requestSort = (key: keyof Product) => {
     let direction: 'asc' | 'desc' = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
+    if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
     setSortConfig({ key, direction });
   };
 
@@ -161,14 +168,50 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
     p.id.toString().includes(searchTerm)
   );
 
-  const sortedProducts = [...filteredProducts].sort((a, b) => {
-    if (!sortConfig.key || !sortConfig.direction) return 0;
-    const aVal = a[sortConfig.key];
-    const bVal = b[sortConfig.key];
-    if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-    if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
-    return 0;
-  });
+  const sortedProducts = useMemo(() => {
+    const arr = [...filteredProducts];
+    if (!sortConfig.key || !sortConfig.direction) {
+      return arr.sort((a, b) => Number(a.id) - Number(b.id));
+    }
+
+    const key = sortConfig.key as keyof Product; // <-- Type narrowing
+    return arr.sort((a, b) => {
+      const A = a[key];
+      const B = b[key];
+      if (typeof A === 'number' && typeof B === 'number') {
+        return sortConfig.direction === 'asc' ? A - B : B - A;
+      }
+      const strA = String(A).toLowerCase();
+      const strB = String(B).toLowerCase();
+      if (strA < strB) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (strA > strB) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredProducts, sortConfig]);
+
+  /* ================= PAGINATION ================= */
+
+  const totalPages = Math.ceil(sortedProducts.length / ROWS_PER_PAGE);
+  const paginatedProducts = sortedProducts.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
+
+  useEffect(() => { setCurrentPage(1); }, [searchTerm]);
+
+  const changePage = (page: number) => {
+    if (page >= 1 && page <= totalPages) setCurrentPage(page);
+  };
+
+  const renderPageNumbers = () =>
+    Array.from({ length: totalPages }, (_, i) => (
+      <div
+        key={i + 1}
+        className={`${s.pageCircle} ${currentPage === i + 1 ? s.pageCircleActive : ''}`}
+        onClick={() => changePage(i + 1)}
+      >
+        {i + 1}
+      </div>
+    ));
+
+  if (isLoading) return <div className={s.loadingContainer}>Loading Inventory...</div>;  
 
   return (
     <div className={s.container}>
@@ -219,14 +262,15 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
             <thead>
               <tr>
                 {[
-                  { label: 'ID', key: 'id' },
-                  { label: 'ITEM', key: 'item' },
-                  { label: 'BRAND', key: 'brand' },
-                  { label: 'QTY', key: 'qty' },
-                  { label: 'UOM', key: 'uom' },
-                  { label: 'UNIT PRICE', key: 'unitPrice' },
-                  { label: 'PRICE', key: 'price' }
-                ].map((col) => (
+                { label: 'ID', key: 'id' },
+                { label: 'ITEM', key: 'item' }, 
+                { label: 'BRAND', key: 'brand' },
+                { label: 'QTY', key: 'qty' }, 
+                { label: 'UOM', key: 'uom' }, 
+                { label: 'UNIT PRICE', key: 'unitPrice' },
+                { label: 'PRICE', key: 'price' }, 
+                { label: 'STATUS', key: 'status' }
+                ].map(col => (
                   <th key={col.key} onClick={() => requestSort(col.key as keyof Product)}>
                     <div className={s.sortableHeader}>
                       <span>{col.label}</span>
@@ -241,22 +285,48 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
               </tr>
             </thead>
             <tbody>
-              {sortedProducts.map(p => (
+              {paginatedProducts.map(p => (
                 <tr key={p.id}>
-                  <td>{p.id}</td><td>{p.item}</td><td>{p.brand}</td><td>{p.qty}</td><td>{p.uom}</td>
-                  <td>₱ {p.unitPrice?.toLocaleString()}</td><td>₱ {p.price?.toLocaleString()}</td>
-                  <td className={s.actionCell}><LuEllipsisVertical className={s.moreIcon} /></td>
+                  <td>{p.id}</td>
+                  <td>{p.item}</td>
+                  <td>{p.brand}</td>
+                  <td>{p.qty}</td>
+                  <td>{p.uom}</td>
+                  <td>₱ {p.unitPrice?.toLocaleString()}</td>
+                  <td>₱ {p.price?.toLocaleString()}</td>
+                  <td>
+                    <span className={
+                      p.status === "Available" ? s.pillGreen :
+                      p.status === "Low Stock" ? s.pillYellow :
+                      p.status === "Out of Stock" ? s.pillRed :
+                      ""
+                    }>
+                      {p.status}
+                    </span>
+                  </td>
+                  <td className={s.actionCell}>
+                    <LuEllipsisVertical className={s.moreIcon} />
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
 
           <div className={s.footer}>
-            <div className={s.showDataText}>
-              Showing <span className={s.countBadge}>{sortedProducts.length}</span> of {products.length}
-            </div>
-            <LuChevronRight />
+          <div className={s.footerLeft}>
+            Showing <span className={s.countBadge}>{paginatedProducts.length}</span> of {sortedProducts.length}
           </div>
+          {totalPages > 1 && (
+            <div className={s.footerRight}>
+              <div className={s.pagination}>
+                <button className={s.nextBtn} onClick={() => changePage(currentPage - 1)} disabled={currentPage === 1}><LuChevronLeft /></button>
+                {renderPageNumbers()}
+                <button className={s.nextBtn} onClick={() => changePage(currentPage + 1)} disabled={currentPage === totalPages}><LuChevronRight /></button>
+              </div>
+            </div>
+          )}
+        </div>
+
         </div>
       </div>
 

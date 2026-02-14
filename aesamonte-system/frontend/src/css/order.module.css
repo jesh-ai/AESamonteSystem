@@ -306,38 +306,6 @@ th.actionHeader .sortHeaderInner {
   gap: 0;
 }
 
-
-/* ===== STATUS PILLS ===== */
-.pillGreen {
-  background: transparent;
-  color: #15803d;
-  padding: 2px 8px;
-  border-radius: 20px;
-  border: 1px solid #bbf7d0;
-  font-weight: 600;
-  font-size: 0.75rem;
-}
-
-.pillRed {
-  background: transparent;
-  color: #dc2626;
-  padding: 2px 8px;
-  border-radius: 20px;
-  border: 1px solid #fecaca;
-  font-weight: 600;
-  font-size: 0.75rem;
-}
-
-.pillYellow {
-  background: transparent;
-  color: #caa922;
-  padding: 2px 8px;
-  border-radius: 20px;
-  border: 1px solid #b5a94e;
-  font-weight: 600;
-  font-size: 0.75rem;
-}
-
 /* ===== OVERLAY & CONTENT ===== */
 .modalOverlay {
   position: fixed;
@@ -381,14 +349,71 @@ th.actionHeader .sortHeaderInner {
   gap: 1rem;
 }
 
+/* ===== STATUS PILLS ===== */
 .statusBadge {
-  background: #F8F3D9; 
   padding: 4px 12px;
   border-radius: 20px;
   font-size: 0.75rem;
   font-weight: 700;
-  border: 1px solid #e5dcad;
   letter-spacing: 0.5px;
+}
+
+.pillGreen {
+  background-color: #dcfce7; 
+  color: #15803d;
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px solid #bbf7d0;
+  font-weight: 600;
+  font-size: 0.75rem;
+  width: 100px;       
+  text-align: center; 
+}
+
+.pillRed {
+  background-color: #fee2e2; 
+  color: #dc2626;
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px solid #fecaca;
+  font-weight: 600;
+  font-size: 0.75rem;
+  width: 100px;
+  text-align: center;
+}
+
+.pillYellow {
+  background-color: #fff9c2; 
+  color: #a16207;       
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px solid #facc15; 
+  font-weight: 600;
+  font-size: 0.75rem;
+  width: 100px;
+  text-align: center;
+}
+
+.pillBlue {
+  background-color: #dbeafe; 
+  color: #2563eb;
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px solid #93c5fd;
+  font-weight: 600;
+  font-size: 0.75rem;
+  width: 100px;
+  text-align: center;
+}
+
+.pillGreen,
+.pillRed,
+.pillYellow,
+.pillBlue {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
 .closeIcon {

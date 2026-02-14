@@ -18,18 +18,16 @@ def sales_summary():
 
     # TOTAL SALES (PAID)
     cur.execute("""
-        SELECT COALESCE(SUM(ot.order_id), 0)
+        SELECT COALESCE(SUM(st.sales_id * 100), 0)  -- placeholder amount
         FROM sales_transaction st
-        JOIN order_transaction ot ON st.order_id = ot.order_id
         WHERE st.sales_status = 'PAID'
     """)
     total_sales = cur.fetchone()[0]
 
     # WEEKLY SALES
     cur.execute("""
-        SELECT COALESCE(SUM(ot.order_id), 0)
+        SELECT COALESCE(SUM(st.sales_id * 100), 0)
         FROM sales_transaction st
-        JOIN order_transaction ot ON st.order_id = ot.order_id
         WHERE st.sales_status = 'PAID'
         AND st.sales_date >= %s
     """, (week_ago,))
@@ -37,9 +35,8 @@ def sales_summary():
 
     # MONTHLY SALES
     cur.execute("""
-        SELECT COALESCE(SUM(ot.order_id), 0)
+        SELECT COALESCE(SUM(st.sales_id * 100), 0)
         FROM sales_transaction st
-        JOIN order_transaction ot ON st.order_id = ot.order_id
         WHERE st.sales_status = 'PAID'
         AND st.sales_date >= %s
     """, (month_ago,))
@@ -47,9 +44,8 @@ def sales_summary():
 
     # YEARLY SALES
     cur.execute("""
-        SELECT COALESCE(SUM(ot.order_id), 0)
+        SELECT COALESCE(SUM(st.sales_id * 100), 0)
         FROM sales_transaction st
-        JOIN order_transaction ot ON st.order_id = ot.order_id
         WHERE st.sales_status = 'PAID'
         AND st.sales_date >= %s
     """, (year_ago,))
@@ -96,7 +92,7 @@ def sales_transactions():
             c.customer_address,
             st.sales_date,
             COUNT(ot.order_id) AS qty,
-            st.sales_id * 100 AS amount,
+            st.sales_id * 100 AS amount,  -- placeholder amount
             st.sales_status
         FROM sales_transaction st
         JOIN order_transaction ot ON st.order_id = ot.order_id

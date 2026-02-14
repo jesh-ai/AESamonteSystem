@@ -71,6 +71,23 @@ def get_all_audit_logs():
             JOIN inventory i ON i.inventory_id = ial.inventory_id
             JOIN status_like sl ON sl.status_id = ial.audit_log_type_id
             JOIN employee performer ON performer.employee_id = ial.performed_by
+                
+            UNION ALL
+            
+            -- ORDER
+            SELECT
+                oal.order_audit_log_id AS id,
+                'ORDER' AS module,
+                ot.order_id::text AS record_name,  -- use order_id as record name
+                sl.status_name AS action_type,
+                performer.employee_name AS performed_by,
+                oal.order_audit_log_date AS action_date,
+                oal.changed_fields
+            FROM order_audit_log oal
+            JOIN order_transaction ot ON ot.order_id = oal.order_id
+            JOIN status_like sl ON sl.status_id = oal.audit_log_type_id
+            JOIN employee performer ON performer.employee_id = oal.performed_by
+                
         ) AS combined_logs
         ORDER BY action_date DESC;
     """)

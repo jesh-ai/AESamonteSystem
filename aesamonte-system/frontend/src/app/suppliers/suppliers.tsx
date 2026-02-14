@@ -72,7 +72,7 @@ export default function Suppliers({
     fetch('http://127.0.0.1:5000/api/suppliers')
       .then(res => res.json())
       .then(data => setSuppliers(data))
-      .catch(err => console.error('Failed to fetch suppliers', err))
+      .catch(err => console.error('Failed to fetch Suppliers', err))
       .finally(() => setIsLoading(false));
   }, []);
 

@@ -148,3 +148,14 @@
   padding: 0;
   gap: 0;
 }
+
+/* OLD VALUE NEW VALUE */
+.oldValue {
+  color: #777777;
+  font-style: italic;
+}
+
+.newValue {
+  color: #4A4A4A;  
+  font-weight: 600;
+}

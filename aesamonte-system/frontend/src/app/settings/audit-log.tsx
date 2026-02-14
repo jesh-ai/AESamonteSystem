@@ -11,7 +11,7 @@ type AuditLog = {
   actionType?: string;
   performedBy?: string;
   actionDate?: string;
-  changedFields?: Record<string, { new: any } | any>;
+  changedFields?: Record<string, { old?: any; new?: any } | any>;
 };
 
 type SortKey = keyof Omit<AuditLog, 'changedFields'>;
@@ -237,12 +237,24 @@ export default function AuditLog({
                     <td className={s.performedByCol}>{log.performedBy ?? '-'}</td>
                     <td className={s.changedFieldsCol}>
                       {log.changedFields
-                        ? Object.entries(log.changedFields).map(([field, value], idx) => (
-                            <div key={`field-${field}-${idx}`}>
-                              <strong>{field.replace(/_/g, ' ')}:</strong>{' '}
-                              {typeof value === 'object' && value?.new !== undefined ? value.new : value ?? '-'}
-                            </div>
-                          ))
+                        ? Object.entries(log.changedFields).map(([field, value], idx) => {
+                            const oldVal = typeof value === 'object' && value.old !== undefined ? value.old : '-';
+                            const newVal = typeof value === 'object' && value.new !== undefined ? value.new : value ?? '-';
+
+                            return log.actionType?.toUpperCase() === 'UPDATE' ? (
+                              <div key={`field-${field}-${idx}`} style={{ marginBottom: '0.5rem' }}>
+                                <div>
+                                  <strong>{field.replace(/_/g, ' ')}:</strong>{' '}
+                                  <span className={s.newValue}><em>{newVal}</em></span>
+                                </div>
+                                <div className={s.oldValue}>OLD: {oldVal}</div>
+                              </div>
+                            ) : (
+                              <div key={`field-${field}-${idx}`} style={{ marginBottom: '0.5rem' }}>
+                                <strong>{field.replace(/_/g, ' ')}:</strong> <span className={s.newValue}>{newVal}</span>
+                              </div>
+                            );
+                          })
                         : '-'}
                     </td>
                   </tr>

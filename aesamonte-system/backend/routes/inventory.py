@@ -26,62 +26,32 @@ def get_inventory():
     """)
 
     rows = cur.fetchall()
-
     cur.close()
     conn.close()
 
-    result = [
-        {
+    result = []
+    for r in rows:
+        stock_qty = r[3]  # physical stock
+        status_name = r[5]  # item status
+
+        # Determine display status
+        if stock_qty <= 0:
+            display_status = f"Out of Stock"
+        else:
+            display_status = f"Available"
+
+        # Optional: mark items as low stock if below reorder point
+        # display_status = display_status if stock_qty > 5 else f"Low Stock: {r[1]} ({stock_qty})"
+
+        result.append({
             "id": str(r[0]),
             "item": r[1],
             "brand": r[2],
-            "qty": r[3],
+            "qty": stock_qty,
             "uom": r[4],
-            "status": r[5],
+            "status": display_status,
             "unitPrice": float(r[6]),
             "price": float(r[7]),
-        }
-        for r in rows
-    ]
+        })
 
     return jsonify(result)
-
-@inventory_bp.route("/api/inventory/add", methods=["POST"])
-def add_inventory_item():
-    data = request.get_json()
-    conn = get_connection()
-    cur = conn.cursor()
-
-    try:
-        cur.execute("""
-            INSERT INTO suppliers (supplier_name, contact_person, contact_number)
-            VALUES (%s, %s, %s)
-            ON CONFLICT (supplier_name) DO UPDATE 
-            SET supplier_name = EXCLUDED.supplier_name
-            RETURNING supplier_id;
-        """, (data['supplierName'], data['detailContactPerson'], data['detailContactNumber']))
-        
-        supplier_id = cur.fetchone()[0]
-
-        cur.execute("""
-            INSERT INTO inventory (
-                inventory_item_name, brand, internal_sku, item_quantity, 
-                unit_of_measure, reorder_point, item_unit_price, 
-                item_selling_price, supplier_id, item_status_id
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (
-            data['itemName'], data['brand'], data['internalSku'],
-            data['qty'], 1,
-            data['reorderPoint'], data['unitPrice'], data['sellingPrice'], 
-            supplier_id, 1
-        ))
-
-        conn.commit()
-        return jsonify({"message": "Successfully added item and supplier"}), 201
-
-    except Exception as e:
-        conn.rollback()
-        return jsonify({"error": str(e)}), 500
-    finally:
-        cur.close()
-        conn.close()
