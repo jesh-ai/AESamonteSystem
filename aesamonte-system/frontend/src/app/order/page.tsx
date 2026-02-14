@@ -11,7 +11,8 @@ import {
   LuChevronDown,
   LuChevronRight,
   LuPencil,
-  LuX 
+  LuX,
+  LuPlus // Added for the Add Item button
 } from 'react-icons/lu';
 
 /* TYPES */
@@ -28,16 +29,21 @@ type Summary = {
   totalOrders: { count: number; growth: number };
 };
 
+// Updated Type to handle multiple items
+interface OrderItem {
+  item: string;
+  itemDescription: string;
+  quantity: string;
+  amount: string;
+  orderStatus: string;
+  paymentMethod: string;
+}
+
 interface OrderFormData {
   name?: string;
   contact?: string;
   address?: string;
-  item?: string;
-  itemDescription?: string;
-  quantity?: string;
-  amount?: string;
-  orderStatus?: string;
-  paymentMethod?: string;
+  items: OrderItem[]; // Now an array
 }
 
 type SortKey = 'id' | 'customer' | 'date' | 'status' | null;
@@ -52,7 +58,15 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [statusCycleIndex, setStatusCycleIndex] = useState(0);
   const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState<OrderFormData>({});
+  
+  // Initial state now includes one empty item row
+  const [formData, setFormData] = useState<OrderFormData>({
+    name: '',
+    contact: '',
+    address: '',
+    items: [{ item: '', itemDescription: '', quantity: '', amount: '', orderStatus: '', paymentMethod: '' }]
+  });
+
   const s = styles; 
 
   const statusPriority: Record<string, number> = {
@@ -72,6 +86,30 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  // New handler for item-specific fields
+  const handleItemChange = (index: number, e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    const newItems = [...formData.items];
+    newItems[index] = { ...newItems[index], [name]: value };
+    setFormData(prev => ({ ...prev, items: newItems }));
+  };
+
+  // Logic to add a new item row
+  const addItem = () => {
+    setFormData(prev => ({
+      ...prev,
+      items: [...prev.items, { item: '', itemDescription: '', quantity: '', amount: '', orderStatus: '', paymentMethod: '' }]
+    }));
+  };
+
+  // Logic to remove an item row
+  const removeItem = (index: number) => {
+    if (formData.items.length > 1) {
+      const newItems = formData.items.filter((_, i) => i !== index);
+      setFormData(prev => ({ ...prev, items: newItems }));
+    }
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -144,7 +182,7 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
 
     const normalized = status.toUpperCase();
 
-    if (normalized === 'RECEIVED' || normalized === 'RECEIVED') {
+    if (normalized === 'RECEIVED') {
       return `${baseClass} ${styles.pillGreen}`;
     }
     if (normalized === 'CANCELLED') {
@@ -265,8 +303,9 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
             <div className={s.modalHeader}>
               <h3 className={s.headerTitle}>General Information</h3>
               <div className={s.headerActions}>
-                <span className={getStatusStyle(formData.orderStatus)}>
-                  {formData.orderStatus ? formData.orderStatus.toUpperCase() : 'STATUS'}
+                {/* Fixed reference to first item status for the badge */}
+                <span className={getStatusStyle(formData.items[0]?.orderStatus)}>
+                  {formData.items[0]?.orderStatus ? formData.items[0].orderStatus.toUpperCase() : 'STATUS'}
                 </span>
                 <LuX onClick={() => setShowModal(false)} className={s.closeIcon} />
               </div>
@@ -276,49 +315,70 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
               <div className={s.formGridTwo}>
                 <div className={s.formGroup}>
                   <label>Name</label>
-                  <input name="name" onChange={handleInputChange} />
+                  <input name="name" value={formData.name} onChange={handleInputChange} />
                 </div>
                 <div className={s.formGroup}>
                   <label>Contact</label>
-                  <input name="contact" onChange={handleInputChange} />
+                  <input name="contact" value={formData.contact} onChange={handleInputChange} />
                 </div>
               </div>
               
               <div className={s.formGroupFull}>
                 <label>Address</label>
-                <input name="address" className={s.addressInput} onChange={handleInputChange} />
+                <input name="address" value={formData.address} className={s.addressInput} onChange={handleInputChange} />
               </div>
 
               <hr className={s.divider} />
 
-              <h4 className={s.sectionTitle}>Order</h4>
+              <div className={s.sectionHeader} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h4 className={s.sectionTitle}>Order</h4>
+                <button type="button" onClick={addItem} className={s.addLinkBtn} style={{ color: '#2563eb', cursor: 'pointer', background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <LuPlus size={14} /> Add Item
+                </button>
+              </div>
               
-              <div className={s.formGridThree}>
-                <div className={s.formGroup}><label>Item</label><input name="item" onChange={handleInputChange} /></div>
-                <div className={s.formGroup}><label>Item Description</label><input name="itemDescription" onChange={handleInputChange} /></div>
-                <div className={s.formGroup}><label>Quantity</label><input type="number" name="quantity" onChange={handleInputChange} /></div>
-              </div>
+              {formData.items.map((itemRow, index) => (
+                <div key={index} className={s.itemRowContainer} style={{ marginBottom: '20px', position: 'relative' }}>
+                  {index > 0 && <hr className={s.itemDivider} style={{ borderTop: '1px dashed #ccc', margin: '15px 0' }} />}
+                  
+                  <div className={s.formGridThree}>
+                    <div className={s.formGroup}><label>Item</label><input name="item" value={itemRow.item} onChange={(e) => handleItemChange(index, e)} /></div>
+                    <div className={s.formGroup}><label>Item Description</label><input name="itemDescription" value={itemRow.itemDescription} onChange={(e) => handleItemChange(index, e)} /></div>
+                    <div className={s.formGroup}><label>Quantity</label><input type="number" name="quantity" value={itemRow.quantity} onChange={(e) => handleItemChange(index, e)} /></div>
+                  </div>
 
-              <div className={s.formGridThree}>
-                <div className={s.formGroup}><label>Amount</label><input name="amount" onChange={handleInputChange} /></div>
-                <div className={s.formGroup}>
-                  <label>Status</label>
-                  <select name="orderStatus" onChange={handleInputChange}>
-                    <option value="">Select</option>
-                    <option value="To Ship">To Ship</option>
-                    <option value="Received">Received</option>
-                    <option value="Cancelled">Cancelled</option>
-                  </select>
+                  <div className={s.formGridThree}>
+                    <div className={s.formGroup}><label>Amount</label><input name="amount" value={itemRow.amount} onChange={(e) => handleItemChange(index, e)} /></div>
+                    <div className={s.formGroup}>
+                      <label>Status</label>
+                      <select name="orderStatus" value={itemRow.orderStatus} onChange={(e) => handleItemChange(index, e)}>
+                        <option value="">Select</option>
+                        <option value="To Ship">To Ship</option>
+                        <option value="Received">Received</option>
+                        <option value="Cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                    <div className={s.formGroup}>
+                      <label>Payment Method</label>
+                      <select name="paymentMethod" value={itemRow.paymentMethod} onChange={(e) => handleItemChange(index, e)}>
+                        <option value=""></option>
+                        <option value="cash">Cash</option>
+                        <option value="card">Card</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {formData.items.length > 1 && (
+                    <button 
+                      type="button" 
+                      onClick={() => removeItem(index)} 
+                      style={{ color: 'red', fontSize: '12px', background: 'none', border: 'none', cursor: 'pointer', marginTop: '5px' }}
+                    >
+                      Remove Item
+                    </button>
+                  )}
                 </div>
-                <div className={s.formGroup}>
-                  <label>Payment Method</label>
-                  <select name="paymentMethod" onChange={handleInputChange}>
-                    <option value=""></option>
-                    <option value="cash">Cash</option>
-                    <option value="card">Card</option>
-                  </select>
-                </div>
-              </div>
+              ))}
 
               <div className={s.modalFooter}>
                 <button type="button" onClick={() => setShowModal(false)} className={s.cancelBtn}>Cancel</button>

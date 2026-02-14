@@ -38,7 +38,6 @@ interface InventorySummary {
 const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
   const s = styles as Record<string, string>;
 
-  // --- MAIN STATE ---
   const [products, setProducts] = useState<Product[]>([]);
   const [data, setData] = useState<InventorySummary>({
     totalProducts: 0,
@@ -55,8 +54,9 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
     direction: 'asc' | 'desc' | null;
   }>({ key: '', direction: null });
 
-  // --- MODAL & FORM STATE ---
   const [showModal, setShowModal] = useState(false);
+  const [showSupplierModal, setShowSupplierModal] = useState(false);
+
   const [formData, setFormData] = useState({
     itemName: '',
     supplierName: '',
@@ -69,10 +69,19 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
     sellingPrice: '',
     detailSupplierName: 'Select',
     detailContactPerson: '',
-    detailContactNumber: '',
+    detailContactNumber: '', // Will be restricted to numbers
     detailCostPrice: '',
     detailLeadTime: '',
     detailMinOrder: ''
+  });
+
+  const [supplierFormData, setSupplierFormData] = useState({
+    supplierName: '',
+    address: '',
+    contactPerson: '',
+    contact: '', // Will be restricted to numbers
+    email: '',
+    paymentTerms: 'Cash on Delivery'
   });
 
   /* ================= FETCH DATA ================= */
@@ -105,16 +114,29 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
 
   /* ================= HANDLERS ================= */
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  // NEW: Restricted handler for numeric fields
+  const handleNumericInputChange = (e: React.ChangeEvent<HTMLInputElement>, isSupplierReg = false) => {
+    const { name, value } = e.target;
+    // Replace any character that is NOT a digit with an empty string
+    const cleanValue = value.replace(/[^\d]/g, '');
+
+    if (isSupplierReg) {
+      setSupplierFormData({ ...supplierFormData, [name]: cleanValue });
+    } else {
+      setFormData({ ...formData, [name]: cleanValue });
+    }
+  };
+
   const requestSort = (key: keyof Product) => {
     let direction: 'asc' | 'desc' = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
       direction = 'desc';
     }
     setSortConfig({ key, direction });
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -127,7 +149,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
       });
       if (res.ok) {
         setShowModal(false);
-        // Refresh data or show alert
       }
     } catch (err) { console.error(err); }
   };
@@ -156,7 +177,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
       <div className={s.mainContent}>
         <div className={s.headerActions}><ExportButton /></div>
 
-        {/* TOP CARDS */}
         <div className={s.topGrid}>
           <section className={s.statCard}>
             <p className={s.cardTitle}>Total Products</p>
@@ -182,7 +202,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
           </section>
         </div>
 
-        {/* TABLE SECTION */}
         <div className={s.tableContainer}>
           <div className={s.header}>
             <h1 className={s.title}>Product List</h1>
@@ -241,56 +260,63 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
         </div>
       </div>
 
-      {/* ================= ADD NEW  ================= */}
       {showModal && (
-        <div className={s.modalOverlay}>
+        <div className={s.modalOverlay} style={{ zIndex: 1000 }}>
           <div className={s.modalContent}>
             <div className={s.modalHeader}>
               <div className={s.modalTitleGroup}>
                 <label className={s.formLabel}>Item Name</label>
-                <input name="itemName" className={s.itemNameInput} onChange={handleInputChange} />
+                <input name="itemName" className={s.itemNameInput} value={formData.itemName} onChange={handleInputChange} />
               </div>
               <LuX onClick={() => setShowModal(false)} className={s.closeIcon} style={{marginLeft: '15px'}} />
             </div>
 
             <form onSubmit={handleSave} className={s.modalForm}>
-
-              {/* Stocks */}
               <h4 className={s.sectionTitle}>Stocks</h4>
               <div className={s.formRowThree}>
-                <div className={s.formGroup}><label>Quantity</label><input type="number" name="qty" onChange={handleInputChange} /></div>
+                <div className={s.formGroup}><label>Quantity</label><input type="number" name="qty" value={formData.qty} onChange={handleInputChange} /></div>
                 <div className={s.formGroup}>
                   <label>Unit of Measure</label>
-                  <select name="uom" onChange={handleInputChange}>
+                  <select name="uom" value={formData.uom} onChange={handleInputChange}>
                     <option value="Select">Select</option>
                     <option value="PCS">PCS</option>
                   </select>
                 </div>
-                <div className={s.formGroup}><label>Reorder Point</label><input className={s.yellowInput} name="reorderPoint" onChange={handleInputChange} /></div>
+                <div className={s.formGroup}><label>Reorder Point</label><input className={s.yellowInput} name="reorderPoint" value={formData.reorderPoint} onChange={handleInputChange} /></div>
               </div>
               <div className={s.formRow}>
-                <div className={s.formGroup}><label>Unit Price</label><input name="unitPrice" onChange={handleInputChange} /></div>
-                <div className={s.formGroup}><label>Selling Price</label><input name="sellingPrice" onChange={handleInputChange} /></div>
+                <div className={s.formGroup}><label>Unit Price</label><input name="unitPrice" value={formData.unitPrice} onChange={handleInputChange} /></div>
+                <div className={s.formGroup}><label>Selling Price</label><input name="sellingPrice" value={formData.sellingPrice} onChange={handleInputChange} /></div>
               </div>
 
-              {/* Supplier Details Box */}
               <div className={s.supplierDetailsBox}>
                 <div className={s.boxHeader}>
                   <h4>Supplier Details</h4>
-                  <span className={s.addSupplierLink}><LuPlus /> Add New Supplier</span>
+                  <span className={s.addSupplierLink} onClick={() => setShowSupplierModal(true)} style={{cursor: 'pointer'}}>
+                    <LuPlus /> Add New Supplier
+                  </span>
                 </div>
                 <div className={s.formRowThree}>
                   <div className={s.formGroup}>
                     <label>Supplier Name</label>
-                    <select name="detailSupplierName" onChange={handleInputChange}><option>Select</option></select>
+                    <select name="detailSupplierName" value={formData.detailSupplierName} onChange={handleInputChange}><option>Select</option></select>
                   </div>
-                  <div className={s.formGroup}><label>Contact Person</label><input name="detailContactPerson" onChange={handleInputChange} /></div>
-                  <div className={s.formGroup}><label>Contact Number</label><input name="detailContactNumber" onChange={handleInputChange} /></div>
+                  <div className={s.formGroup}><label>Contact Person</label><input name="detailContactPerson" value={formData.detailContactPerson} onChange={handleInputChange} /></div>
+                  
+                  {/* NUMERIC RESTRICTION*/}
+                  <div className={s.formGroup}>
+                    <label>Contact Number</label>
+                    <input 
+                      name="detailContactNumber" 
+                      value={formData.detailContactNumber} 
+                      onChange={handleNumericInputChange} 
+                    />
+                  </div>
                 </div>
                 <div className={s.formRowThree}>
-                  <div className={s.formGroup}><label>Cost Price</label><input name="detailCostPrice" onChange={handleInputChange} /></div>
-                  <div className={s.formGroup}><label>Lead Time (Days)</label><input name="detailLeadTime" onChange={handleInputChange} /></div>
-                  <div className={s.formGroup}><label>Min. Order (MOQ)</label><input name="detailMinOrder" onChange={handleInputChange} /></div>
+                  <div className={s.formGroup}><label>Cost Price</label><input name="detailCostPrice" value={formData.detailCostPrice} onChange={handleInputChange} /></div>
+                  <div className={s.formGroup}><label>Lead Time (Days)</label><input name="detailLeadTime" value={formData.detailLeadTime} onChange={handleInputChange} /></div>
+                  <div className={s.formGroup}><label>Min. Order (MOQ)</label><input name="detailMinOrder" value={formData.detailMinOrder} onChange={handleInputChange} /></div>
                 </div>
               </div>
 
@@ -299,6 +325,76 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
                 <button type="submit" className={s.saveBtn}>Save</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= REGISTER NEW SUPPLIER MODAL ================= */}
+      {showSupplierModal && (
+        <div className={s.modalOverlaySupplier}>
+          <div className={s.modalContentSupplier}>
+            <div className={s.modalHeader}>
+              <div className={s.modalTitleGroup}>
+                <h2 className={s.title}>Register New Supplier</h2>
+                <p className={s.subText}>Create a profile for a new supplier.</p>
+              </div>
+              <LuX onClick={() => setShowSupplierModal(false)} className={s.closeIcon} />
+            </div>
+
+            <div className={`${s.modalForm} ${s.mt_20}`}>
+              <h4 className={s.sectionTitle}>Company Information</h4>
+              <div className={s.formRow}>
+                <div className={s.formGroup}>
+                  <label>Supplier Name</label>
+                  <input name="supplierName" value={supplierFormData.supplierName} onChange={(e) => setSupplierFormData({...supplierFormData, supplierName: e.target.value})} />
+                </div>
+              </div>
+              
+              <div className={s.formGroupFull}>
+                <label>Address</label>
+                <input name="address" value={supplierFormData.address} onChange={(e) => setSupplierFormData({...supplierFormData, address: e.target.value})} />
+              </div>
+
+              <h4 className={s.sectionTitle}>Primary Contact</h4>
+              <div className={s.formRow}>
+                <div className={s.formGroup}>
+                  <label>Contact Person</label>
+                  <input name="contactPerson" value={supplierFormData.contactPerson} onChange={(e) => setSupplierFormData({...supplierFormData, contactPerson: e.target.value})} />
+                </div>
+                
+                <div className={s.formGroup}>
+                  <label>Contact No.</label>
+                  <input 
+                    name="contact" 
+                    value={supplierFormData.contact} 
+                    onChange={(e) => handleNumericInputChange(e, true)} 
+                  />
+                </div>
+              </div>
+
+              <div className={s.formGroupFull}>
+                <label>Email Address</label>
+                <input name="email" value={supplierFormData.email} onChange={(e) => setSupplierFormData({...supplierFormData, email: e.target.value})} />
+              </div>
+
+              <h4 className={s.sectionTitle}>Terms & Notes</h4>
+              <div className={s.formGroup}>
+                <label>Payment Terms</label>
+                <select name="paymentTerms" value={supplierFormData.paymentTerms} onChange={(e) => setSupplierFormData({...supplierFormData, paymentTerms: e.target.value})}>
+                  <option>Cash on Delivery</option>
+                  <option>Card</option>
+                </select>
+              </div>
+
+              <div className={s.modalFooter}>
+                <button type="button" onClick={() => setShowSupplierModal(false)} className={s.cancelBtn}>
+                  Cancel
+                </button>
+                <button type="button" onClick={() => setShowSupplierModal(false)} className={s.createBtn}>
+                  Create Supplier
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
