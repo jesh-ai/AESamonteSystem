@@ -133,8 +133,14 @@
   background: #EFF2F4;
 }
 
-.table th:nth-child(2), .table td:nth-child(2) { width: 40%; }
-.table th:nth-child(4), .table td:nth-child(4) { width: 15%; }
+.table th:nth-child(2), 
+.table td:nth-child(2) { 
+  width: 40%; 
+}
+.table th:nth-child(4), 
+.table td:nth-child(4) { 
+  width: 15%; 
+}
 
 /* SORTING */
 .sortableHeader {
@@ -145,7 +151,8 @@
 .sortHeaderInner {
   display: inline-flex;        
   align-items: center;
-  gap: 6px;                  
+  gap: 6px;      
+  padding-left: 4px;            
 }
 
 .sortIconsStack {

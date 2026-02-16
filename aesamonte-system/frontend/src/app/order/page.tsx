@@ -30,7 +30,6 @@ type Order = {
   customer: string;
   date: string;
   status: string;
-  availabilityStatus: string | null;
   items?: OrderItemBackend[];
 };
 
@@ -98,19 +97,12 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
       .then(res => res.json())
       .then((data: Order[]) => {
         const mappedOrders = data.map(order => {
-          // Normalize item_status
           const items = order.items?.map(item => ({
             ...item,
             item_status: (item.item_status || itemStatusMap[item.item_status_id] || 'NOT_AVAILABLE').toUpperCase()
           }));
 
-          // Make availabilityStatus null for TO SHIP, RECEIVED, CANCELLED
-          let availabilityStatus = order.availabilityStatus;
-          if (['TO SHIP', 'RECEIVED', 'CANCELLED'].includes(order.status.toUpperCase())) {
-            availabilityStatus = null;
-          }
-
-          return { ...order, items, availabilityStatus };
+          return { ...order, items };
         });
         setOrders(mappedOrders);
       })
@@ -237,7 +229,6 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
     <div className={s.container}>
       <TopHeader role={role} onLogout={onLogout} />
       <div className={s.mainContent}>
-        {/* === Summary Cards === */}
         <div className={s.topGrid}>
           <section className={s.statCard}>
             <p className={s.cardTitle}>Shipped Today</p>
@@ -253,7 +244,6 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
           </section>
         </div>
 
-        {/* === Orders Table === */}
         <div className={s.tableContainer}>
           <div className={s.header}>
             <h2 className={s.title}>Orders</h2>
@@ -275,13 +265,13 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
           <table className={s.table}>
             <thead>
               <tr>
-                {(['id','customer','date','status','availabilityStatus'] as const).map(k => (
-                  <th key={k} onClick={() => handleSort(k==='availabilityStatus'?'id':k)} className={s.sortableHeader}>
+                {(['id', 'customer', 'date', 'status'] as const).map(k => (
+                  <th key={k} onClick={() => handleSort(k)} className={s.sortableHeader}>
                     <div className={s.sortHeaderInner}>
                       <span>{k.toUpperCase()}</span>
                       <div className={s.sortIconsStack}>
-                        <LuChevronUp className={sortConfig.key===k && sortConfig.direction==='asc'?s.activeSort:''}/>
-                        <LuChevronDown className={sortConfig.key===k && sortConfig.direction==='desc'?s.activeSort:''}/>
+                        <LuChevronUp className={sortConfig.key === k && sortConfig.direction === 'asc' ? s.activeSort : ''} />
+                        <LuChevronDown className={sortConfig.key === k && sortConfig.direction === 'desc' ? s.activeSort : ''} />
                       </div>
                     </div>
                   </th>
@@ -291,24 +281,11 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
             </thead>
             <tbody>
               {paginated.map((o, i) => (
-                <tr key={o.id} className={i%2 ? s.altRow : ''}>
+                <tr key={o.id} className={i % 2 ? s.altRow : ''}>
                   <td>{o.id}</td>
                   <td>{o.customer}</td>
                   <td>{o.date}</td>
                   <td><span className={getStatusStyle(o.status)}>{o.status}</span></td>
-                  <td>
-                    <span>
-                      {o.availabilityStatus}
-                    </span>
-                    {o.availabilityStatus !== 'Available' && o.items && (
-                      <div style={{ fontSize: '0.75rem', color: '#555' }}>
-                        {o.items
-                          .filter(item => item.item_status !== 'AVAILABLE')
-                          .map(item => `${item.item_name || 'Item'} (${item.order_quantity}/${item.available_quantity})`)
-                          .join(', ')}
-                      </div>
-                    )}
-                  </td>
                   <td className={`${s.actionCell} text-center`}>
                     <LuEllipsisVertical
                       className={s.moreIcon}
@@ -316,8 +293,8 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
                     />
                     {openMenuId === o.id && (
                       <div className={s.popupMenu}>
-                        <button className={s.popBtnEdit}><LuPencil size={14}/> Edit</button>
-                        <button className={s.popBtnArchive}><LuArchive size={14}/> Archive</button>
+                        <button className={s.popBtnEdit}><LuPencil size={14} /> Edit</button>
+                        <button className={s.popBtnArchive}><LuArchive size={14} /> Archive</button>
                         <button className={s.closeX} onClick={() => setOpenMenuId(null)}>×</button>
                       </div>
                     )}
@@ -333,7 +310,7 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
             </div>
             <div className={s.pagination}>
               {renderPageNumbers()}
-              <button className={s.nextBtn} onClick={() => changePage(currentPage+1)} disabled={currentPage>=totalPages}>
+              <button className={s.nextBtn} onClick={() => changePage(currentPage + 1)} disabled={currentPage >= totalPages}>
                 <LuChevronRight />
               </button>
             </div>
@@ -366,7 +343,7 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
                   <input name="contact" value={formData.contact} onChange={handleInputChange} />
                 </div>
               </div>
-              
+
               <div className={s.formGroupFull}>
                 <label>Address</label>
                 <input name="address" value={formData.address} className={s.addressInput} onChange={handleInputChange} />
@@ -380,11 +357,11 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
                   <LuPlus size={14} /> Add Item
                 </button>
               </div>
-              
+
               {formData.items.map((itemRow, index) => (
                 <div key={index} className={s.itemRowContainer} style={{ marginBottom: '20px', position: 'relative' }}>
                   {index > 0 && <hr className={s.itemDivider} style={{ borderTop: '1px dashed #ccc', margin: '15px 0' }} />}
-                  
+
                   <div className={s.formGridThree}>
                     <div className={s.formGroup}><label>Item</label><input name="item" value={itemRow.item} onChange={(e) => handleItemChange(index, e)} /></div>
                     <div className={s.formGroup}><label>Item Description</label><input name="itemDescription" value={itemRow.itemDescription} onChange={(e) => handleItemChange(index, e)} /></div>
@@ -413,9 +390,9 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
                   </div>
 
                   {formData.items.length > 1 && (
-                    <button 
-                      type="button" 
-                      onClick={() => removeItem(index)} 
+                    <button
+                      type="button"
+                      onClick={() => removeItem(index)}
                       style={{ color: 'red', fontSize: '12px', background: 'none', border: 'none', cursor: 'pointer', marginTop: '5px' }}
                     >
                       Remove Item
