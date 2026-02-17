@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import styles from '@/css/order.module.css';
 import TopHeader from '@/components/layout/TopHeader';
+import OrderEditModal from './editOrderModal';
 import {
   LuSearch,
   LuEllipsisVertical,
@@ -68,6 +69,8 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [statusCycleIndex, setStatusCycleIndex] = useState(0);
   const [showModal, setShowModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<any>(null);
 
   const [formData, setFormData] = useState<OrderFormData>({
     name: '',
@@ -145,6 +148,30 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
     e.preventDefault();
     console.log('Saving order data:', formData);
     setShowModal(false);
+  };
+
+// HANDLER FOR EDITING
+  const handleOpenEdit = (order: Order) => {
+    setSelectedOrderForEdit({
+      id: order.id,
+      name: order.customer,
+      contact: '', 
+      address: '', 
+      item: order.items?.[0]?.item_name || '', 
+      quantity: order.items?.[0]?.order_quantity || 0,
+      amount: 0, 
+      status: order.status,
+      paymentMethod: ''
+    });
+    setOpenMenuId(null);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateSave = (updatedOrder: any) => {
+    console.log('Update saved:', updatedOrder);
+    // Optimistic Update UI - ensured customerName maps to customer
+    setOrders(prev => prev.map(o => o.id === updatedOrder.id ? { ...o, customer: updatedOrder.customerName, status: updatedOrder.status } : o));
+    setShowEditModal(false);
   };
 
   const handleSort = (key: Exclude<SortKey, null>) => {
@@ -293,7 +320,10 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
                     />
                     {openMenuId === o.id && (
                       <div className={s.popupMenu}>
-                        <button className={s.popBtnEdit}><LuPencil size={14} /> Edit</button>
+                        {/* ADDED handleOpenEdit HERE */}
+                        <button className={s.popBtnEdit} onClick={() => handleOpenEdit(o)}>
+                          <LuPencil size={14} /> Edit
+                        </button>
                         <button className={s.popBtnArchive}><LuArchive size={14} /> Archive</button>
                         <button className={s.closeX} onClick={() => setOpenMenuId(null)}>×</button>
                       </div>
@@ -406,6 +436,15 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
           </div>
         </div>
       )}
+
+{/* ================= EDIT MODAL ================= */}
+      <OrderEditModal 
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        orderData={selectedOrderForEdit}
+        onSave={handleUpdateSave}
+      />
+
     </div>
   );
 }
