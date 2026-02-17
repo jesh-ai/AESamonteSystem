@@ -5,9 +5,10 @@ import styles from "@/css/inventory.module.css";
 import TopHeader from '@/components/layout/TopHeader';
 import ExportButton from '@/components/features/ExportButton';
 import AddInventoryModal from './addInventoryModal';
+import EditInventoryModal from './editInventoryModal'; 
 import {
   LuSearch, LuEllipsisVertical, LuChevronUp, LuChevronDown,
-  LuArchive, LuChevronLeft, LuChevronRight, LuX, LuPencil
+  LuArchive, LuChevronLeft, LuChevronRight, LuPencil
 } from "react-icons/lu";
 
 /* ================= TYPES ================= */
@@ -76,6 +77,8 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
   // Modal States
   const [showModal, setShowModal] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false); 
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null); 
   
   // Action Menu State
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -110,37 +113,36 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
 
   /* ================= EFFECTS ================= */
 
-  // Fetch Inventory
+  const fetchInventory = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch("http://127.0.0.1:5000/api/inventory");
+      if (!res.ok) throw new Error("Failed to fetch");
+      const productData: Product[] = await res.json();
+      setProducts(productData);
+
+      const visible = productData.filter(p => p.qty > 0);
+      const outOfStock = productData.filter(p => p.qty === 0);
+
+      setData({
+        totalProducts: productData.length,
+        totalProductsChange: 2.8,
+        weeklyInventory: visible.length,
+        monthlyInventory: visible.length * 10,
+        yearlyInventory: visible.length * 100,
+        outOfStockCount: outOfStock.length,
+      });
+    } catch (err) {
+      console.error("Failed to fetch Inventory", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchInventory = async () => {
-      setIsLoading(true);
-      try {
-        const res = await fetch("http://127.0.0.1:5000/api/inventory");
-        if (!res.ok) throw new Error("Failed to fetch");
-        const productData: Product[] = await res.json();
-        setProducts(productData);
-
-        const visible = productData.filter(p => p.qty > 0);
-        const outOfStock = productData.filter(p => p.qty === 0);
-
-        setData({
-          totalProducts: productData.length,
-          totalProductsChange: 2.8,
-          weeklyInventory: visible.length,
-          monthlyInventory: visible.length * 10,
-          yearlyInventory: visible.length * 100,
-          outOfStockCount: outOfStock.length,
-        });
-      } catch (err) {
-        console.error("Failed to fetch Inventory", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchInventory();
   }, []);
   
-  // Fetch Suppliers for Dropdown
   useEffect(() => {
     const fetchSuppliers = async () => {
       try {
@@ -156,7 +158,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
     fetchSuppliers();
   }, []);
 
-  // Click Outside to close menu
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -190,8 +191,33 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
     setSortConfig({ key, direction });
   };
 
-  // --- NEW HANDLE SAVE (ACCEPTS ARRAY) ---
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleEditClick = (product: Product) => {
+    setSelectedProduct(product);
+    setShowEditModal(true);
+    setActiveMenuId(null);
+  };
+
+  const handleUpdate = async (updatedItem: any) => {
+    try {
+      const res = await fetch(`http://127.0.0.1:5000/api/inventory/update/${updatedItem.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedItem),
+      });
+
+      if (res.ok) {
+        setShowEditModal(false);
+        alert("Item updated successfully!");
+        fetchInventory(); 
+      } else {
+        const err = await res.json();
+        alert(`Error updating: ${err.error}`);
+      }
+    } catch (err) {
+      console.error("Update error:", err);
+    }
+  };
+
   const handleSave = async (items: any[]) => {
     try {
       for (const item of items) {
@@ -199,49 +225,36 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            // Core Item Details
             itemName: item.itemName,
             brand: item.brand,
             internalSku: item.internalSku,
             itemDescription: item.itemDescription,
-            
-            // Stock & Pricing
             qty: Number(item.qty),
             uom: item.uom,
             reorderPoint: Number(item.reorderPoint),
-            unitPrice: Number(item.unitPrice), // Cost Price
+            unitPrice: Number(item.unitPrice),
             sellingPrice: Number(item.sellingPrice),
-            
-            // Supplier Identity
             supplierName: item.detailSupplierName, 
             detailContactPerson: item.detailContactPerson,
             detailContactNumber: item.detailContactNumber,
-
-            // Supply Constraints (Restored)
             detailLeadTime: item.detailLeadTime,
             detailMinOrder: item.detailMinOrder,
-            detailCostPrice: item.unitPrice // Mapping Cost Price here as well if backend expects it
+            detailCostPrice: item.unitPrice
           }),
         });
 
         if (!res.ok) {
           const err = await res.json();
           alert(`Error saving ${item.itemName}: ${err.error}`);
-          return; // Stop on error
+          return;
         }
       }
-
-      // If loop completes successfully
       setShowModal(false);
       alert("All items saved successfully!");
-
+      fetchInventory();
     } catch (err) {
       console.error("Submission error:", err);
     }
-  };
-
-  const handleItemNumericInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    handleNumericInputChange(e, false);
   };
 
   /* ================= DATA PROCESSING ================= */
@@ -257,7 +270,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
     if (!sortConfig.key || !sortConfig.direction) {
       return arr.sort((a, b) => Number(a.id) - Number(b.id));
     }
-
     const key = sortConfig.key as keyof Product;
     return arr.sort((a, b) => {
       const A = a[key];
@@ -295,7 +307,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
       </div>
     ));
 
-  if (isLoading) return <div className={s.loadingContainer}>Loading Inventory...</div>;  
+  if (isLoading) return <div className={s.loadingContainer}>Loading Inventory...</div>; 
 
   return (
     <div className={s.container}>
@@ -323,7 +335,8 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
             <p className={s.cardTitle}>Out of Stock</p>
             <div className={s.outOfStockList}>
               {products.filter(p => p.qty === 0).length > 0 ? (
-                products.filter(p => p.qty === 0).map(p => <div key={p.id} className={s.outOfStockBadge}>{p.item_name}</div>)
+                products.filter(p => p.qty === 0).map(p => <div key={p.id} 
+                  className={s.outOfStockBadge}>{p.item_name}</div>)
               ) : ( <p className={s.subText}>All items in stock</p> )}
             </div>
           </section>
@@ -410,10 +423,9 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
                     {activeMenuId === p.id && (
                       <div className={s.popoverMenu} ref={menuRef}>
                         <button className={s.popAddBtn} onClick={() => setShowModal(true)}>ADD</button>
-                        <button className={s.popEditBtn}><LuPencil size={12}/> Edit</button>
+                        <button className={s.popEditBtn} onClick={() => handleEditClick(p)}><LuPencil size={12}/> Edit</button>
                         <button className={s.popArchiveBtn}><LuArchive size={12}/> Archive</button>
-                        <LuX className={s.popCloseIcon} onClick={() => setActiveMenuId(null)} />
-                      </div>
+                        </div>
                     )}
                   </td>
                 </tr>
@@ -422,33 +434,38 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
           </table>
 
           <div className={s.footer}>
-          <div className={s.footerLeft}>
-            Showing <span className={s.countBadge}>{paginatedProducts.length}</span> of {sortedProducts.length}
-          </div>
-          {totalPages > 1 && (
-            <div className={s.footerRight}>
-              <div className={s.pagination}>
-                <button className={s.nextBtn} onClick={() => changePage(currentPage - 1)} disabled={currentPage === 1}><LuChevronLeft /></button>
-                {renderPageNumbers()}
-                <button className={s.nextBtn} onClick={() => changePage(currentPage + 1)} disabled={currentPage === totalPages}><LuChevronRight /></button>
-              </div>
+            <div className={s.footerLeft}>
+              Showing <span className={s.countBadge}>{paginatedProducts.length}</span> of {sortedProducts.length}
             </div>
-          )}
-        </div>
-
+            {totalPages > 1 && (
+              <div className={s.footerRight}>
+                <div className={s.pagination}>
+                  <button className={s.nextBtn} onClick={() => changePage(currentPage - 1)} disabled={currentPage === 1}><LuChevronLeft /></button>
+                  {renderPageNumbers()}
+                  <button className={s.nextBtn} onClick={() => changePage(currentPage + 1)} disabled={currentPage === totalPages}><LuChevronRight /></button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* --- REPLACE THE OLD MODAL BLOCK WITH THIS --- */}
       <AddInventoryModal 
         isOpen={showModal}
         onClose={() => setShowModal(false)}
-        onSave={handleSave} // Now matches the expected signature
+        onSave={handleSave}
         onOpenSupplierModal={() => setShowSupplierModal(true)}
         suppliers={suppliers} 
       />
 
-      {/* --- REGISTER NEW SUPPLIER MODAL --- */}
+      <EditInventoryModal 
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        itemData={selectedProduct}
+        onSave={handleUpdate}
+        suppliers={suppliers}
+      />
+
       {showSupplierModal && (
         <div className={s.modalOverlaySupplier}>
           <div className={s.modalContentSupplier}>
@@ -456,9 +473,8 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
               <div className={s.modalTitleGroup}>
                 <h2 className={s.title}>Register New Supplier</h2>
                 <p className={s.subText}>Create a profile for a new supplier.</p>
-                </div>
-                <LuX onClick={() => setShowSupplierModal(false)} className={s.closeIcon} />
-            </div>
+              </div>
+             </div>
             <div className={`${s.modalForm} ${s.mt_20}`}>
               <h4 className={s.sectionTitle}>Company Information</h4>
               <div className={s.formRow}>
@@ -492,14 +508,14 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
                 <select name="paymentTerms" value={supplierFormData.paymentTerms} onChange={(e) => setSupplierFormData({...supplierFormData, paymentTerms: e.target.value})}>
                   <option>Cash on Delivery</option>
                   <option>Card</option>
-                  </select>
-                  </div>
-                  <div className={s.modalFooter}>
-                    <button type="button" onClick={() => setShowSupplierModal(false)} className={s.cancelBtn}>Cancel</button>
-                    <button type="button" onClick={() => setShowSupplierModal(false)} className={s.createBtn}>Create Supplier</button>
-                  </div>
-                </div>
+                </select>
               </div>
+              <div className={s.modalFooter}>
+                <button type="button" onClick={() => setShowSupplierModal(false)} className={s.cancelBtn}>Cancel</button>
+                <button type="button" onClick={() => setShowSupplierModal(false)} className={s.createBtn}>Create Supplier</button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

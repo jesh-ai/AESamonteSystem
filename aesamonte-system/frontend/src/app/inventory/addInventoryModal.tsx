@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from 'react';
 import styles from "@/css/inventory.module.css";
-import { LuX, LuPlus, LuTrash2 } from "react-icons/lu";
+import {LuPlus, LuTrash2 } from "react-icons/lu";
 
 // Update interface to include contact info for auto-filling
 interface Supplier {
@@ -134,12 +134,11 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
             <h2 className={s.title} style={{ fontSize: '1.25rem', marginBottom: '4px' }}>Add Inventory Items</h2>
             <p className={s.subText}>Details entered here will apply to the selected supplier.</p>
           </div>
-          <LuX onClick={onClose} className={s.closeIcon} style={{ cursor: 'pointer', color: '#666' }} />
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', backgroundColor: '#f9fafb' }}>
           
-          {/* --- SHARED SUPPLIER SECTION (FIXED) --- */}
+          {/* --- SHARED SUPPLIER SECTION --- */}
           <div style={{ padding: '20px 24px', backgroundColor: '#fff', borderBottom: '1px solid #eaeaea', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', zIndex: 10 }}>
              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                 <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: '#333' }}>Supplier Details</h4>
