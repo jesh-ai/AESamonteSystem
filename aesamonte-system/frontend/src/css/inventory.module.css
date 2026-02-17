@@ -510,6 +510,7 @@
   margin-top: 20px;
 }
 
+<<<<<<< Updated upstream
 /*==== Edit readOnly ===*/
 .readOnlyInput {
   background-color: #f8fafc !important; 
@@ -517,4 +518,28 @@
   border: 1px solid #e2e8f0 !important; 
   cursor: default;                      
   outline: none;                        
+=======
+/* Add these utility classes if not present to support the new cleaner look */
+.cleanInput {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.cleanInput:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+.miniLabel {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+>>>>>>> Stashed changes
 }
