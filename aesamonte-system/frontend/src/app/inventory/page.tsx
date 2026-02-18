@@ -7,6 +7,7 @@ import TopHeader from '@/components/layout/TopHeader';
 import ExportButton from '@/components/features/ExportButton';
 import AddInventoryModal from './addInventoryModal';
 import EditInventoryModal from './editInventoryModal'; 
+import ExportModal from './exportModal'; 
 import {
   LuSearch, LuEllipsisVertical, LuChevronUp, LuChevronDown,
   LuArchive, LuChevronLeft, LuChevronRight, LuPencil
@@ -89,6 +90,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false); 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null); 
+  const [showExportModal, setShowExportModal] = useState(false);
   
   // Action Menu State
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -343,7 +345,10 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
       <TopHeader role={role} onLogout={onLogout} />
 
       <div className={s.mainContent}>
-        <div className={s.headerActions}><ExportButton /></div>
+        <div className={s.headerActions} 
+         onClick={() => setShowExportModal(true)}>
+         <ExportButton />
+      </div>
 
         <div className={s.topGrid}>
           <section className={s.statCard}>
@@ -479,6 +484,14 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
         </div>
       </div>
 
+
+      {/* --- ADDED: Export Modal --- */}
+      <ExportModal 
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+      />
+
+      
       <AddInventoryModal 
         isOpen={showModal}
         onClose={() => setShowModal(false)}
