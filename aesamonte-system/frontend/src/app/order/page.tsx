@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -16,6 +17,23 @@ import {
   LuPlus
 } from 'react-icons/lu';
 
+/* ===================== CONSTANTS (Moved Outside to Fix Lint Errors) ===================== */
+const STATUS_PRIORITY: Record<string, number> = {
+  'TO SHIP': 1,
+  'RECEIVED': 2,
+  'CANCELLED': 3
+};
+
+const STATUS_ORDER: string[] = ['TO SHIP', 'RECEIVED', 'CANCELLED'];
+
+const ITEM_STATUS_MAP: Record<number, string> = {
+  1: 'AVAILABLE',
+  2: 'PARTIALLY_AVAILABLE',
+  3: 'OUT_OF_STOCK'
+};
+
+const ROWS_PER_PAGE = 10;
+
 /* ===================== TYPES ===================== */
 type OrderItemBackend = {
   inventory_id: number;
@@ -29,8 +47,12 @@ type OrderItemBackend = {
 type Order = {
   id: number;
   customer: string;
+  address: string;
   date: string;
   status: string;
+  paymentMethod: string;
+  totalQty: number;
+  totalAmount: number;
   items?: OrderItemBackend[];
 };
 
@@ -57,7 +79,6 @@ interface OrderFormData {
 }
 
 type SortKey = 'id' | 'customer' | 'date' | 'status' | null;
-const ROWS_PER_PAGE = 10;
 
 /* ===================== COMPONENT ===================== */
 export default function OrderPage({ role, onLogout }: { role: string; onLogout: () => void }) {
@@ -81,19 +102,6 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
 
   const s = styles;
 
-  const statusPriority: Record<string, number> = {
-    'TO SHIP': 1,
-    'RECEIVED': 2,
-    'CANCELLED': 3
-  };
-  const statusOrder: string[] = ['TO SHIP', 'RECEIVED', 'CANCELLED'];
-
-  const itemStatusMap: Record<number, string> = {
-    1: 'AVAILABLE',
-    2: 'PARTIALLY_AVAILABLE',
-    3: 'OUT_OF_STOCK'
-  };
-
   /* ===================== FETCH DATA ===================== */
   useEffect(() => {
     fetch('http://127.0.0.1:5000/api/orders/list')
@@ -102,7 +110,7 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
         const mappedOrders = data.map(order => {
           const items = order.items?.map(item => ({
             ...item,
-            item_status: (item.item_status || itemStatusMap[item.item_status_id] || 'NOT_AVAILABLE').toUpperCase()
+            item_status: (item.item_status || ITEM_STATUS_MAP[item.item_status_id] || 'NOT_AVAILABLE').toUpperCase()
           }));
 
           return { ...order, items };
@@ -118,6 +126,13 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
   }, []);
 
   /* ===================== HANDLERS ===================== */
+  
+  // FIX: Reset page here instead of using useEffect
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1); 
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -150,18 +165,17 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
     setShowModal(false);
   };
 
-// HANDLER FOR EDITING
   const handleOpenEdit = (order: Order) => {
     setSelectedOrderForEdit({
       id: order.id,
       name: order.customer,
       contact: '', 
-      address: '', 
+      address: order.address, 
       item: order.items?.[0]?.item_name || '', 
-      quantity: order.items?.[0]?.order_quantity || 0,
-      amount: 0, 
+      quantity: order.totalQty,
+      amount: order.totalAmount, 
       status: order.status,
-      paymentMethod: ''
+      paymentMethod: order.paymentMethod
     });
     setOpenMenuId(null);
     setShowEditModal(true);
@@ -169,14 +183,13 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
 
   const handleUpdateSave = (updatedOrder: any) => {
     console.log('Update saved:', updatedOrder);
-    // Optimistic Update UI - ensured customerName maps to customer
     setOrders(prev => prev.map(o => o.id === updatedOrder.id ? { ...o, customer: updatedOrder.customerName, status: updatedOrder.status } : o));
     setShowEditModal(false);
   };
 
   const handleSort = (key: Exclude<SortKey, null>) => {
     if (key === 'status') {
-      setStatusCycleIndex(prev => (prev + 1) % statusOrder.length);
+      setStatusCycleIndex(prev => (prev + 1) % STATUS_ORDER.length);
       setSortConfig({ key: 'status', direction: 'asc' });
     } else {
       setSortConfig(prev => {
@@ -200,15 +213,15 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
   const sorted = useMemo(() => {
     const arr = [...filtered];
     if (sortConfig.key === 'status') {
-      const activeStatus = statusOrder[statusCycleIndex];
+      const activeStatus = STATUS_ORDER[statusCycleIndex];
       return arr.sort((a, b) => {
         if (a.status === activeStatus && b.status !== activeStatus) return -1;
         if (b.status === activeStatus && a.status !== activeStatus) return 1;
-        return (statusPriority[a.status.toUpperCase()] || 0) - (statusPriority[b.status.toUpperCase()] || 0) || a.id - b.id;
+        return (STATUS_PRIORITY[a.status.toUpperCase()] || 0) - (STATUS_PRIORITY[b.status.toUpperCase()] || 0) || a.id - b.id;
       });
     }
     if (!sortConfig.key) {
-      return arr.sort((a, b) => (statusPriority[a.status.toUpperCase()] || 0) - (statusPriority[b.status.toUpperCase()] || 0) || a.id - b.id);
+      return arr.sort((a, b) => (STATUS_PRIORITY[a.status.toUpperCase()] || 0) - (STATUS_PRIORITY[b.status.toUpperCase()] || 0) || a.id - b.id);
     }
     const { key, direction } = sortConfig;
     return arr.sort((a, b) => {
@@ -227,7 +240,6 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
   const totalPages = Math.ceil(sorted.length / ROWS_PER_PAGE) || 1;
   const paginated = sorted.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
 
-  useEffect(() => setCurrentPage(1), [searchTerm]);
   const changePage = (page: number) => { if (page >= 1 && page <= totalPages) setCurrentPage(page); };
 
   const getStatusStyle = (status: string | undefined) => {
@@ -281,7 +293,7 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
                   className={s.searchInput}
                   placeholder="Search..."
                   value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
+                  onChange={handleSearchChange}
                 />
                 <LuSearch size={18} />
               </div>
@@ -292,27 +304,105 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
           <table className={s.table}>
             <thead>
               <tr>
-                {(['id', 'customer', 'date', 'status'] as const).map(k => (
-                  <th key={k} onClick={() => handleSort(k)} className={s.sortableHeader}>
-                    <div className={s.sortHeaderInner}>
-                      <span>{k.toUpperCase()}</span>
-                      <div className={s.sortIconsStack}>
-                        <LuChevronUp className={sortConfig.key === k && sortConfig.direction === 'asc' ? s.activeSort : ''} />
-                        <LuChevronDown className={sortConfig.key === k && sortConfig.direction === 'desc' ? s.activeSort : ''} />
-                      </div>
+                {/* ID: Center */}
+                <th onClick={() => handleSort('id')} className={s.sortableHeader} style={{ textAlign: 'center' }}>
+                  <div className={s.sortHeaderInner} style={{ justifyContent: 'center' }}>
+                    <span>ID</span>
+                    <div className={s.sortIconsStack}>
+                      <LuChevronUp className={sortConfig.key === 'id' && sortConfig.direction === 'asc' ? s.activeSort : ''} />
+                      <LuChevronDown className={sortConfig.key === 'id' && sortConfig.direction === 'desc' ? s.activeSort : ''} />
                     </div>
-                  </th>
-                ))}
+                  </div>
+                </th>
+
+                {/* CUSTOMER: Left */}
+                <th onClick={() => handleSort('customer')} className={s.sortableHeader} style={{ textAlign: 'left', paddingLeft: '0rem' }}>
+                  <div className={s.sortHeaderInner} style={{ justifyContent: 'flex-start' }}>
+                    <span>CUSTOMER</span>
+                    <div className={s.sortIconsStack}>
+                       <LuChevronUp className={sortConfig.key === 'customer' && sortConfig.direction === 'asc' ? s.activeSort : ''} />
+                       <LuChevronDown className={sortConfig.key === 'customer' && sortConfig.direction === 'desc' ? s.activeSort : ''} />
+                    </div>
+                  </div>
+                </th>
+
+                {/* ADDRESS: Left (Matches data) */}
+                <th className={s.headerText} style={{ textAlign: 'left' }}>ADDRESS</th>
+
+                {/* QTY: Center */}
+                <th className={s.headerText} style={{ textAlign: 'center' }}>QTY</th>
+
+                {/* TOTAL: Right (Standard for currency) */}
+                <th className={s.headerText} style={{ textAlign: 'right' }}>TOTAL</th>
+
+                {/* PAYMENT: Center */}
+                <th className={s.headerText} style={{ textAlign: 'center' }}>PAYMENT</th>
+
+                {/* DATE: Center */}
+                <th onClick={() => handleSort('date')} className={s.sortableHeader} style={{ textAlign: 'center' }}>
+                   <div className={s.sortHeaderInner} style={{ justifyContent: 'center' }}>
+                    <span>DATE</span>
+                    <div className={s.sortIconsStack}>
+                       <LuChevronUp className={sortConfig.key === 'date' && sortConfig.direction === 'asc' ? s.activeSort : ''} />
+                       <LuChevronDown className={sortConfig.key === 'date' && sortConfig.direction === 'desc' ? s.activeSort : ''} />
+                    </div>
+                  </div>
+                </th>
+
+                {/* STATUS: Center */}
+                <th onClick={() => handleSort('status')} className={s.sortableHeader} style={{ textAlign: 'center' }}>
+                  <div className={s.sortHeaderInner} style={{ justifyContent: 'center' }}>
+                    <span>STATUS</span>
+                    <div className={s.sortIconsStack}>
+                       <LuChevronUp className={sortConfig.key === 'status' && sortConfig.direction === 'asc' ? s.activeSort : ''} />
+                       <LuChevronDown className={sortConfig.key === 'status' && sortConfig.direction === 'desc' ? s.activeSort : ''} />
+                    </div>
+                  </div>
+                </th>
+
                 <th className={`${s.actionHeader} text-center`}>ACTION</th>
               </tr>
             </thead>
+
             <tbody>
               {paginated.map((o, i) => (
                 <tr key={o.id} className={i % 2 ? s.altRow : ''}>
-                  <td>{o.id}</td>
-                  <td>{o.customer}</td>
-                  <td>{o.date}</td>
-                  <td><span className={getStatusStyle(o.status)}>{o.status}</span></td>
+                  
+                  {/* ID */}
+                  <td style={{ textAlign: 'center' }}>{o.id}</td>
+
+                  {/* Customer */}
+                  <td style={{ textAlign: 'left', paddingLeft: '1rem' }}>
+                    <div className="font-bold">{o.customer}</div>
+                  </td>
+
+                  {/* Address */}
+                  <td style={{ 
+                    textAlign: 'left', 
+                    maxWidth: '200px', 
+                    whiteSpace: 'nowrap', 
+                    overflow: 'hidden', 
+                    textOverflow: 'ellipsis' 
+                  }}>
+                    {o.address}
+                  </td>
+
+                  {/* Qty */}
+                  <td style={{ textAlign: 'center' }}>{o.totalQty}</td>
+
+                  {/* Total */}
+                  <td style={{ textAlign: 'right', fontWeight: 'bold' }}>₱{o.totalAmount?.toLocaleString()}</td>
+
+                  {/* Payment */}
+                  <td style={{ textAlign: 'center' }}>{o.paymentMethod}</td>
+
+                  {/* Date */}
+                  <td style={{ textAlign: 'center' }}>{o.date}</td>
+
+                  {/* Status */}
+                  <td style={{ textAlign: 'center' }}><span className={getStatusStyle(o.status)}>{o.status}</span></td>
+
+                  {/* Action */}
                   <td className={`${s.actionCell} text-center`}>
                     <LuEllipsisVertical
                       className={s.moreIcon}
@@ -320,7 +410,6 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
                     />
                     {openMenuId === o.id && (
                       <div className={s.popupMenu}>
-                        {/* ADDED handleOpenEdit HERE */}
                         <button className={s.popBtnEdit} onClick={() => handleOpenEdit(o)}>
                           <LuPencil size={14} /> Edit
                         </button>
@@ -348,7 +437,7 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
         </div>
       </div>
 
-      {/* ================= MODAL ================= */}
+      {/* ================= ADD ORDER MODAL ================= */}
       {showModal && (
         <div className={s.modalOverlay}>
           <div className={s.modalContent}>
@@ -437,14 +526,12 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
         </div>
       )}
 
-{/* ================= EDIT MODAL ================= */}
       <OrderEditModal 
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}
         orderData={selectedOrderForEdit}
         onSave={handleUpdateSave}
       />
-
     </div>
   );
 }
