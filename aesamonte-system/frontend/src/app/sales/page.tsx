@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import styles from '@/css/sales.module.css'
 import TopHeader from '@/components/layout/TopHeader'
 import ExportButton from '@/components/features/ExportButton'
+import ExportModal from './exportModal' // Ensure the filename casing matches your file system
 import {
   LuSearch,
   LuChevronUp,
@@ -48,6 +49,9 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  
+  // FIXED: Added missing state for the Export Modal
+  const [showExportModal, setShowExportModal] = useState(false)
 
   const [sortConfig, setSortConfig] = useState<{
     key: keyof Transaction | ''
@@ -60,7 +64,6 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
     const fetchData = async () => {
       try {
         setIsLoading(true)
-
         const [summaryRes, transRes] = await Promise.all([
           fetch('http://127.0.0.1:5000/api/sales/summary'),
           fetch('http://127.0.0.1:5000/api/sales/transactions')
@@ -102,11 +105,10 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
 
   /* ================= FILTER + SORT ================= */
 
-  const filteredTx = transactions.filter(tx =>
-    `${tx.no} ${tx.name} ${tx.address}`
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase())
-  )
+  const filteredTx = transactions.filter(tx => {
+    const searchStr = `${tx.no} ${tx.name} ${tx.address}`.toLowerCase()
+    return searchStr.includes(searchTerm.toLowerCase())
+  })
 
   const sortedTx = [...filteredTx].sort((a, b) => {
     if (!sortConfig.key || !sortConfig.direction) return 0
@@ -130,7 +132,10 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
 
       <main className={s.mainContent}>
         <div className={s.headerActions}>
-          <ExportButton />
+          {/* IMPROVEMENT: Pass the setter to the ExportButton if it controls the modal */}
+          <div onClick={() => setShowExportModal(true)}>
+            <ExportButton />
+          </div>
         </div>
 
         {/* ================= SUMMARY ================= */}
@@ -220,10 +225,16 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
                     <div className={s.sortableHeader}>
                       <span>{col.label}</span>
                       <div className={s.sortIconsStack}>
-                        <span onClick={() => requestSort(col.key as keyof Transaction, 'asc')}>
+                        <span 
+                          className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''}
+                          onClick={() => requestSort(col.key as keyof Transaction, 'asc')}
+                        >
                           <LuChevronUp size={12} />
                         </span>
-                        <span onClick={() => requestSort(col.key as keyof Transaction, 'desc')}>
+                        <span 
+                          className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''}
+                          onClick={() => requestSort(col.key as keyof Transaction, 'desc')}
+                        >
                           <LuChevronDown size={12} />
                         </span>
                       </div>
@@ -275,6 +286,11 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
           </div>
         </div>
       </main>
+
+      <ExportModal 
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+      />
     </div>
   )
 }
