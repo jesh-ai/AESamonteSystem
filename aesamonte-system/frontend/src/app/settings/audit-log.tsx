@@ -44,10 +44,19 @@ export default function AuditLog({
   useEffect(() => {
     fetch('http://127.0.0.1:5000/api/audit-log')
       .then(res => res.json())
-      .then(data => setLogs(data))
-      .catch(err => console.error(err))
+      .then(data => {
+        if (Array.isArray(data)) setLogs(data);
+        else {
+          console.error('Audit log response invalid:', data);
+          setLogs([]);
+        }
+      })
+      .catch(err => {
+        console.error('Fetch error:', err);
+        setLogs([]);
+      })
       .finally(() => setIsLoading(false));
-  }, []);
+    }, []);
 
   const handleSort = (key: SortKey) => {
     setSortConfig(prev => ({
@@ -238,8 +247,13 @@ export default function AuditLog({
                     <td className={s.changedFieldsCol}>
                       {log.changedFields
                         ? Object.entries(log.changedFields).map(([field, value], idx) => {
-                            const oldVal = typeof value === 'object' && value.old !== undefined ? value.old : '-';
-                            const newVal = typeof value === 'object' && value.new !== undefined ? value.new : value ?? '-';
+                            const oldVal = typeof value === 'object' && value.old !== undefined ? JSON.stringify(value.old) : '-';
+                            const newVal =
+                              typeof value === 'object' && value.new !== undefined
+                                ? JSON.stringify(value.new)
+                                : typeof value === 'object'
+                                ? JSON.stringify(value)
+                                : value ?? '-';
 
                             return log.actionType?.toUpperCase() === 'UPDATE' ? (
                               <div key={`field-${field}-${idx}`} style={{ marginBottom: '0.5rem' }}>

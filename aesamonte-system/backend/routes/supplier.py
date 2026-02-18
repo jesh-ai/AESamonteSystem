@@ -20,7 +20,7 @@ def get_suppliers():
             s.supplier_address,
             st.status_name AS supplier_status
         FROM supplier s
-        LEFT JOIN status_like st 
+        LEFT JOIN static_status st 
             ON s.supplier_status_id = st.status_id
         WHERE st.status_scope = 'SUPPLIER_STATUS'
         ORDER BY s.supplier_id DESC

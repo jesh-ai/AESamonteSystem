@@ -18,7 +18,7 @@ def orders_summary():
         query = """
             SELECT COUNT(*)
             FROM order_transaction ot
-            JOIN status_like sl ON ot.order_status_id = sl.status_id
+            JOIN static_status sl ON ot.order_status_id = sl.status_id
             WHERE sl.status_scope = 'ORDER_STATUS'
               AND sl.status_code = %s
         """
@@ -88,7 +88,7 @@ def orders_list():
             ) FILTER (WHERE od.order_id IS NOT NULL), '[]') AS items_json
         FROM order_transaction ot
         JOIN customer c ON ot.customer_id = c.customer_id
-        JOIN status_like sl ON ot.order_status_id = sl.status_id
+        JOIN static_status sl ON ot.order_status_id = sl.status_id
         -- LEFT JOIN payment_method pm ON ot.payment_id = pm.payment_method_id -- <--- COMMENT THIS OUT
         LEFT JOIN order_details od ON od.order_id = ot.order_id
         LEFT JOIN inventory i ON i.inventory_id = od.inventory_id

@@ -24,7 +24,7 @@ def get_inventory():
             i.item_selling_price
         FROM inventory i
         LEFT JOIN unit_of_measure u ON i.unit_of_measure = u.uom_id
-        LEFT JOIN status_like s ON i.item_status_id = s.status_id AND s.status_scope='INVENTORY_STATUS'
+        LEFT JOIN static_status s ON i.item_status_id = s.status_id AND s.status_scope='INVENTORY_STATUS'
         ORDER BY i.inventory_id ASC;
     """)
 
