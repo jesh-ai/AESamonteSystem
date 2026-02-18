@@ -1,17 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import styles from "@/css/inventory.module.css"; 
+import styles from "@/css/sales.module.css";
 
-interface ExportModalProps {
+interface SalesExportModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
+const SalesExportModal: React.FC<SalesExportModalProps> = ({ isOpen, onClose }) => {
+  const s = styles as Record<string, string>;
+  
   const [format, setFormat] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const s = styles as Record<string, string>;
 
   if (!isOpen) return null;
 
@@ -20,7 +21,8 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
       alert("Please select a format");
       return;
     }
-    console.log(`Downloading ${format} file...`);
+    console.log(`Exporting Sales Report as ${format}...`);
+    setFormat(""); 
     onClose(); 
   };
 
@@ -41,7 +43,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
                 setIsDropdownOpen(false); 
               }}
               className={s.exportSelect}
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              onFocus={() => setIsDropdownOpen(true)}
               onBlur={() => setIsDropdownOpen(false)}
             >
               <option value="" disabled>Select</option>
@@ -66,4 +68,4 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
   );
 };
 
-export default ExportModal;
+export default SalesExportModal;
