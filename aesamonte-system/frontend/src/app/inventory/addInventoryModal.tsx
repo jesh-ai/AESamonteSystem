@@ -18,6 +18,7 @@ interface AddInventoryModalProps {
   onSave: (items: any[]) => void;
   onOpenSupplierModal: () => void;
   suppliers: Supplier[];
+  uoms: { id: number; code: string; name: string }[];
 }
 
 // Fields specific to an Item
@@ -47,7 +48,8 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
   onClose,
   onSave,
   onOpenSupplierModal,
-  suppliers = []
+  suppliers = [],
+  uoms = []
 }) => {
   const s = styles as Record<string, string>;
 
@@ -263,19 +265,20 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
                     />
                   </div>
                   <div className={s.formGroup}>
-                    <label className={s.miniLabel}>Unit (UOM)</label>
-                    <select 
-                      className={s.cleanInput} 
-                      value={item.uom} 
-                      onChange={(e) => handleItemChange(index, 'uom', e.target.value)}
-                    >
-                      <option value="Select">Select</option>
-                      <option value="PCS">PCS</option>
-                      <option value="PAD">PAD</option>
-                      <option value="BOX">BOX</option>
-                      <option value="ROLL">ROLL</option>
-                    </select>
-                  </div>
+                      <label className={s.miniLabel}>Unit (UOM)</label>
+                      <select 
+                        className={s.cleanInput} 
+                        value={item.uom} 
+                        onChange={(e) => handleItemChange(index, 'uom', e.target.value)}
+                      >
+                        <option value="Select">Select</option>
+                        {uoms.map((u) => (
+                          <option key={u.id} value={u.code}>
+                            {u.name} ({u.code})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   <div className={s.formGroup}>
                     <label className={s.miniLabel}>Reorder Point</label>
                     <input 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
@@ -22,6 +23,12 @@ interface Supplier {
   supplierName: string;
   contactPerson?: string;
   contactNumber?: string;
+}
+
+interface UOM {
+  id: number;
+  code: string;
+  name: string;
 }
 
 interface Product {
@@ -73,6 +80,9 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
 
   //Supplier States
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+
+  // UOM States
+  const [uoms, setUoms] = useState<UOM[]>([]);
 
   // Modal States
   const [showModal, setShowModal] = useState(false);
@@ -159,6 +169,21 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
   }, []);
 
   useEffect(() => {
+    const fetchUOMs = async () => {
+      try {
+        const res = await fetch("http://127.0.0.1:5000/api/uom");
+        if (res.ok) {
+          const data = await res.json();
+          setUoms(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch UOMs", err);
+      }
+    };
+    fetchUOMs();
+  }, []);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setActiveMenuId(null);
@@ -218,39 +243,43 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
     }
   };
 
+  // NEW: Bulk Save Function
   const handleSave = async (items: any[]) => {
     try {
-      for (const item of items) {
-        const res = await fetch("http://127.0.0.1:5000/api/inventory/add", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            itemName: item.itemName,
-            brand: item.brand,
-            internalSku: item.internalSku,
-            itemDescription: item.itemDescription,
-            qty: Number(item.qty),
-            uom: item.uom,
-            reorderPoint: Number(item.reorderPoint),
-            unitPrice: Number(item.unitPrice),
-            sellingPrice: Number(item.sellingPrice),
-            supplierName: item.detailSupplierName, 
-            detailContactPerson: item.detailContactPerson,
-            detailContactNumber: item.detailContactNumber,
-            detailLeadTime: item.detailLeadTime,
-            detailMinOrder: item.detailMinOrder,
-            detailCostPrice: item.unitPrice
-          }),
-        });
+      // 1. Format the data to match Backend expectations
+      const formattedItems = items.map(item => ({
+        itemName: item.itemName,
+        brand: item.brand,
+        internalSku: item.internalSku,
+        itemDescription: item.itemDescription,
+        qty: Number(item.qty),
+        uom: item.uom,
+        reorderPoint: Number(item.reorderPoint),
+        unitPrice: Number(item.unitPrice),    // Cost Price
+        sellingPrice: Number(item.sellingPrice),
+        supplierName: item.detailSupplierName, // Shared Supplier
+        detailLeadTime: Number(item.detailLeadTime) || 0,
+        detailMinOrder: Number(item.detailMinOrder) || 0
+      }));
 
-        if (!res.ok) {
-          const err = await res.json();
-          alert(`Error saving ${item.itemName}: ${err.error}`);
-          return;
-        }
+      // 2. Send ONE request with the array
+      const res = await fetch("http://127.0.0.1:5000/api/inventory/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formattedItems), // Send the list directly
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        alert(result.message); // "Successfully added X items"
+        setShowModal(false);
+        await fetchInventory(); // Refresh the table
+      } else {
+        const err = await res.json();
+        alert(`Error: ${err.error}`);
       }
       setShowModal(false);
-      alert("All items saved successfully!");
+      alert("All items saved successfully!"); // Changed message to reflect multiple items
       fetchInventory();
     } catch (err) {
       console.error("Submission error:", err);
@@ -455,7 +484,8 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
         onClose={() => setShowModal(false)}
         onSave={handleSave}
         onOpenSupplierModal={() => setShowSupplierModal(true)}
-        suppliers={suppliers} 
+        suppliers={suppliers}
+        uoms={uoms} // <--- Pass the data here
       />
 
       <EditInventoryModal 

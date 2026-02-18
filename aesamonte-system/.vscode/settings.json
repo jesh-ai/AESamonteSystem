@@ -15,5 +15,8 @@
             "database": "postgres",
             "username": "postgres.uxrpwoeffdczfxxscqnc"
         }
+    ],
+    "cSpell.words": [
+        "uoms"
     ]
 }

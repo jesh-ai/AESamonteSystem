@@ -510,15 +510,6 @@
   margin-top: 20px;
 }
 
-<<<<<<< Updated upstream
-/*==== Edit readOnly ===*/
-.readOnlyInput {
-  background-color: #f8fafc !important; 
-  color: #94a3b8 !important;            
-  border: 1px solid #e2e8f0 !important; 
-  cursor: default;                      
-  outline: none;                        
-=======
 /* Add these utility classes if not present to support the new cleaner look */
 .cleanInput {
   width: 100%;
@@ -541,5 +532,4 @@
   margin-bottom: 4px;
   text-transform: uppercase;
   letter-spacing: 0.02em;
->>>>>>> Stashed changes
 }
