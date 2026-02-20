@@ -92,8 +92,6 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<any>(null);
-
-  /* ALERT STATES */
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastTitle, setToastTitle] = useState('');

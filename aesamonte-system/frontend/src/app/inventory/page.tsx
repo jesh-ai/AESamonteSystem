@@ -9,8 +9,14 @@ import AddInventoryModal from './addInventoryModal';
 import EditInventoryModal from './editInventoryModal'; 
 import ExportModal from './exportModal'; 
 import {
-  LuSearch, LuEllipsisVertical, LuChevronUp, LuChevronDown,
-  LuArchive, LuChevronLeft, LuChevronRight, LuPencil
+  LuSearch, 
+  LuEllipsisVertical, 
+  LuChevronUp, 
+  LuChevronDown,
+  LuArchive, 
+  LuChevronLeft, 
+  LuChevronRight, 
+  LuPencil
 } from "react-icons/lu";
 
 /* ================= TYPES ================= */
