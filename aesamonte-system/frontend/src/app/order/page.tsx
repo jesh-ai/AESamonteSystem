@@ -48,6 +48,7 @@ type OrderItemBackend = {
 type Order = {
   id: number;
   customer: string;
+  contact?: string;
   address: string;
   date: string;
   status: string;
@@ -95,6 +96,7 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<any>(null);
   const [orderStatuses, setOrderStatuses] = useState<any[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<any[]>([]);
 
   const [formData, setFormData] = useState<OrderFormData>({
     name: '',
@@ -146,6 +148,26 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
     fetchDropdowns();
   }, []);
 
+  useEffect(() => {
+    const fetchDropdowns = async () => {
+      try {
+        const statusRes = await fetch("http://127.0.0.1:5000/api/orders/status?scope=ORDER_STATUS");
+        if (statusRes.ok) setOrderStatuses(await statusRes.json());
+
+        const paymentRes = await fetch("http://127.0.0.1:5000/api/orders/status?scope=PAYMENT_METHOD");
+        if (paymentRes.ok) setPaymentMethods(await paymentRes.json());
+
+        // ---> NEW: Fetch Inventory Items for the Dropdowns
+        const invRes = await fetch("http://127.0.0.1:5000/api/inventory");
+        if (invRes.ok) setInventoryItems(await invRes.json());
+
+      } catch (err) {
+        console.error("Failed to fetch dropdowns", err);
+      }
+    };
+    fetchDropdowns();
+  }, []);
+
   /* ===================== HANDLERS ===================== */
   
   // FIX: Reset page here instead of using useEffect
@@ -180,32 +202,95 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log('Saving order data:', formData);
-    setShowModal(false);
+  const handleSave = async (newOrderData: any) => {
+    try {
+      // 1. Send the newly created order data to Python
+      const response = await fetch(`http://127.0.0.1:5000/api/orders/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newOrderData),
+      });
+
+      if (response.ok) {
+        // 2. Re-fetch instantly to update table visually
+        const listRes = await fetch('http://127.0.0.1:5000/api/orders/list');
+        const data: Order[] = await listRes.json();
+        const mappedOrders = data.map(order => {
+          const items = order.items?.map(item => ({
+            ...item,
+            item_status: (item.item_status || ITEM_STATUS_MAP[item.item_status_id] || 'NOT_AVAILABLE').toUpperCase()
+          }));
+          return { ...order, items };
+        });
+        setOrders(mappedOrders);
+        
+        // 3. Close the modal
+        setShowModal(false);
+      } else {
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          alert(`Failed to save: ${errorData.error}`);
+        } else {
+          alert("Server error. Check your Python terminal!");
+        }
+      }
+    } catch (err) {
+      console.error("Error adding order:", err);
+      alert("Network Error: Is Flask running?");
+    }
   };
 
   const handleOpenEdit = (order: Order) => {
     setSelectedOrderForEdit({
       id: order.id,
       name: order.customer,
-      contact: '', 
+      contact: order.contact || '', // <--- FIXED mapping
       address: order.address, 
-      item: order.items?.[0]?.item_name || '', 
-      quantity: order.totalQty,
-      amount: order.totalAmount, 
       status: order.status,
-      paymentMethod: order.paymentMethod
+      paymentMethod: order.paymentMethod,
+      items: order.items 
     });
     setOpenMenuId(null);
     setShowEditModal(true);
   };
+  
+  const handleUpdateSave = async (updatedOrder: any) => {
+    try {
+      // 1. Send the edited data to Python
+      const response = await fetch(`http://127.0.0.1:5000/api/orders/update/${updatedOrder.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedOrder),
+      });
 
-  const handleUpdateSave = (updatedOrder: any) => {
-    console.log('Update saved:', updatedOrder);
-    setOrders(prev => prev.map(o => o.id === updatedOrder.id ? { ...o, customer: updatedOrder.customerName, status: updatedOrder.status } : o));
-    setShowEditModal(false);
+      if (response.ok) {
+        // 2. If successful, instantly re-fetch the table list so the screen updates!
+        fetch('http://127.0.0.1:5000/api/orders/list')
+          .then(res => res.json())
+          .then((data: Order[]) => {
+            const mappedOrders = data.map(order => {
+              const items = order.items?.map(item => ({
+                ...item,
+                item_status: (item.item_status || ITEM_STATUS_MAP[item.item_status_id] || 'NOT_AVAILABLE').toUpperCase()
+              }));
+              return { ...order, items };
+            });
+            setOrders(mappedOrders);
+          });
+          
+        // 3. Close the modal
+        setShowEditModal(false);
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to save: ${errorData.error}`);
+      }
+    } catch (err) {
+      console.error("Error updating order:", err);
+      alert("Something went wrong while saving.");
+    }
   };
 
   const handleSort = (key: Exclude<SortKey, null>) => {
@@ -466,6 +551,7 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
         onSave={handleSave}
         statuses={orderStatuses} 
         paymentMethods={paymentMethods} 
+        inventoryItems={inventoryItems} /* <--- ADD THIS LINE */
       />
 
       <OrderEditModal 
@@ -475,6 +561,7 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
         onSave={handleUpdateSave}
         statuses={orderStatuses} 
         paymentMethods={paymentMethods} 
+        inventoryItems={inventoryItems}
       />
     </div>
   );
