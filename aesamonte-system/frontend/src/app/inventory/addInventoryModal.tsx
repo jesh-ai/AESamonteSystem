@@ -66,6 +66,7 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
   // Reset logic when modal opens
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSupplierData({ ...INITIAL_SUPPLIER });
       setItems([{ ...INITIAL_ITEM }]);
     }

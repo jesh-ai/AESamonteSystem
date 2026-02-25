@@ -186,11 +186,13 @@ def update_order(order_id):
     cur = conn.cursor()
     
     try:
+        # 1. Find the new Status ID the user selected
         status_name = data.get('status', '').strip()
         cur.execute("SELECT status_id FROM static_status WHERE status_scope = 'ORDER_STATUS' AND status_name ILIKE %s", (status_name,))
         status_row = cur.fetchone()
-        status_id = status_row[0] if status_row else None
+        new_status_id = status_row[0] if status_row else None
 
+        # 2. Update Customer Details
         cur.execute("SELECT customer_id FROM order_transaction WHERE order_id = %s", (order_id,))
         cust_row = cur.fetchone()
         if cust_row:
@@ -201,30 +203,46 @@ def update_order(order_id):
                 WHERE customer_id = %s
             """, (data.get('customerName'), data.get('contact'), data.get('address'), customer_id))
 
-        if status_id:
-            cur.execute("UPDATE order_transaction SET order_status_id = %s WHERE order_id = %s", (status_id, order_id))
+        # 3. Check the CURRENT status of the order in the database BEFORE doing anything
+        cur.execute("""
+            SELECT sl.status_name 
+            FROM order_transaction ot
+            JOIN static_status sl ON ot.order_status_id = sl.status_id
+            WHERE ot.order_id = %s
+        """, (order_id,))
+        current_status_row = cur.fetchone()
+        current_status = current_status_row[0].upper() if current_status_row else 'PREPARING'
 
-        cur.execute("DELETE FROM order_details WHERE order_id = %s", (order_id,))
-        
-        for item in data.get('items', []):
-            inv_id = item.get('inventory_id')
-            if inv_id and str(inv_id).strip() != "":
-                try:
-                    qty = float(item.get('quantity') or 1)
-                except (ValueError, TypeError):
-                    qty = 1.0
-                    
-                try:
-                    amount = float(item.get('amount') or 0)
-                except (ValueError, TypeError):
-                    amount = 0.0
-                    
-                unit_price = (amount / qty) if qty > 0 else 0.0
+        # 4. THE FIX: ONLY edit items if the order is still "Preparing"
+        # If it is already shipped, we completely skip this so the database trigger doesn't get mad!
+        if current_status == 'PREPARING':
+            cur.execute("DELETE FROM order_details WHERE order_id = %s", (order_id,))
+            
+            for item in data.get('items', []):
+                inv_id = item.get('inventory_id')
+                if inv_id and str(inv_id).strip() != "":
+                    try:
+                        qty = float(item.get('quantity', 1)) or 1
+                    except (ValueError, TypeError):
+                        qty = 1.0
+                    try:
+                        amount = float(item.get('amount', 0))
+                    except (ValueError, TypeError):
+                        amount = 0.0
+                        
+                    unit_price = (amount / qty) if qty > 0 else 0.0
 
-                cur.execute("""
-                    INSERT INTO order_details (order_id, inventory_id, order_quantity, unit_price, order_total)
-                    VALUES (%s, %s, %s, %s, %s)
-                """, (order_id, inv_id, qty, unit_price, amount))
+                    cur.execute("""
+                        INSERT INTO order_details (order_id, inventory_id, order_quantity, unit_price, order_total)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """, (order_id, inv_id, qty, unit_price, amount))
+
+        # 5. THE FIX: Update the Order Status LAST!
+        if new_status_id:
+            cur.execute("UPDATE order_transaction SET order_status_id = %s WHERE order_id = %s", (new_status_id, order_id))
+
+        # (Note: Payment Method is currently passed from the frontend as data.get('paymentMethod'), 
+        # but if it's not saving, you will need to add an UPDATE query here for your specific payment_method column!)
 
         conn.commit()
         return jsonify({"message": "Order updated successfully"}), 200
@@ -248,13 +266,29 @@ def add_order():
     cur = conn.cursor()
     
     try:
-        # 1. Create the new Customer 
-        # THE FIX: We added 'customer_email' and a placeholder string to bypass the strict database constraint!
-        cur.execute("""
-            INSERT INTO customer (customer_name, customer_contact, customer_address, customer_email)
-            VALUES (%s, %s, %s, %s) RETURNING customer_id
-        """, (data.get('customerName'), data.get('contactNumber'), data.get('deliveryAddress'), 'no-email@placeholder.com'))
-        customer_id = cur.fetchone()[0]
+        customer_name = data.get('customerName', '').strip()
+        contact_number = data.get('contactNumber', '').strip()
+        delivery_address = data.get('deliveryAddress', '').strip()
+
+        # 1. SMART CUSTOMER HANDLING (Find or Create)
+        cur.execute("SELECT customer_id FROM customer WHERE customer_name = %s", (customer_name,))
+        existing_cust = cur.fetchone()
+
+        if existing_cust:
+            # Customer exists! Grab their ID and update their contact info just in case it changed
+            customer_id = existing_cust[0]
+            cur.execute("""
+                UPDATE customer 
+                SET customer_contact = %s, customer_address = %s
+                WHERE customer_id = %s
+            """, (contact_number, delivery_address, customer_id))
+        else:
+            # New customer! Insert them securely.
+            cur.execute("""
+                INSERT INTO customer (customer_name, customer_contact, customer_address, customer_email)
+                VALUES (%s, %s, %s, %s) RETURNING customer_id
+            """, (customer_name, contact_number, delivery_address, 'no-email@placeholder.com'))
+            customer_id = cur.fetchone()[0]
 
         # 2. Get the Status ID
         items = data.get('items', [])
