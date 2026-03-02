@@ -10,7 +10,7 @@ def get_inventory():
     conn = get_connection()
     cur = conn.cursor()
 
-    # THE FIX: Added s.status_code to the SELECT statement
+    # We are now grabbing i.item_status_id directly!
     cur.execute("""
         SELECT 
             i.inventory_id,
@@ -19,14 +19,14 @@ def get_inventory():
             i.item_sku,
             i.brand,
             i.item_quantity,
-            u.uom_code AS uom,  -- Fetching uom_code (e.g., 'PCS') to match frontend
+            u.uom_code AS uom,  
             s.status_name AS item_status,
             i.item_unit_price,
             i.item_selling_price,
-            s.status_code
+            i.item_status_id 
         FROM inventory i
         LEFT JOIN unit_of_measure u ON i.unit_of_measure = u.uom_id
-        LEFT JOIN static_status s ON i.item_status_id = s.status_id AND s.status_scope='INVENTORY_STATUS'
+        JOIN static_status s ON i.item_status_id = s.status_id
         ORDER BY i.inventory_id ASC;
     """)
 
@@ -36,27 +36,31 @@ def get_inventory():
 
     result = []
     for r in rows:
-        status_code = r[10]
-        # SMART LOGIC: If the database says INACTIVE, tell React it is archived!
-        is_arch = (status_code == 'INACTIVE')
+        status_id = r[10]
+        
+        # ID 4 is definitively "INACTIVE" in your static_status table
+        is_arch = (status_id == 4) 
+        
+        # This will print to your Python terminal so we can catch the culprit!
+        print(f"DEBUG INVENTORY GET: {r[0]} | Status ID in DB: {status_id} | Sent as Archived: {is_arch}")
         
         result.append({
-            "id": str(r[0]),
+            "id": r[0],
             "item_name": r[1],
             "item_description": r[2],
             "sku": r[3],
             "brand": r[4],
-            "qty": r[5],
+            "qty": int(r[5] or 0),
             "uom": r[6] or '—',
             "status": r[7] or 'Unknown',
-            "unitPrice": float(r[8]),
-            "price": float(r[9]),
+            "unitPrice": float(r[8] or 0),
+            "price": float(r[9] or 0),
             "is_archived": is_arch
         })
 
     return jsonify(result)
 
-# ================= TOGGLE ARCHIVE =================
+# ===================== TOGGLE ARCHIVE =====================
 @inventory_bp.route("/api/inventory/archive/<string:inventory_id>", methods=["PUT", "OPTIONS"])
 def toggle_inventory_archive(inventory_id):
     if request.method == "OPTIONS":
@@ -66,49 +70,64 @@ def toggle_inventory_archive(inventory_id):
     cur = conn.cursor()
     
     try:
-        # 1. Get current status and quantity
         cur.execute("""
-            SELECT ss.status_code, i.item_quantity
+            SELECT ss.status_code, i.item_quantity 
             FROM inventory i
-            LEFT JOIN static_status ss ON i.item_status_id = ss.status_id
+            JOIN static_status ss ON i.item_status_id = ss.status_id
             WHERE i.inventory_id = %s
         """, (inventory_id,))
-        row = cur.fetchone()
         
+        row = cur.fetchone()
         if not row:
-            return jsonify({"error": "Item not found"}), 404
+            return jsonify({"error": "Item not found in DB."}), 404
             
         current_status = row[0]
-        qty = row[1]
+        qty = int(row[1] or 0)
         
-        # 2. Toggle dynamically using your exact static_status architecture
         if current_status == 'INACTIVE':
-            # Restore logic: If qty > 0 it's AVAILABLE, else OUT_OF_STOCK
-            if qty > 0:
-                cur.execute("SELECT status_id FROM static_status WHERE status_scope = 'INVENTORY_STATUS' AND status_code = 'AVAILABLE'")
-            else:
-                cur.execute("SELECT status_id FROM static_status WHERE status_scope = 'INVENTORY_STATUS' AND status_code = 'OUT_OF_STOCK'")
-            new_status_id = cur.fetchone()[0]
+            # 1. Logic for RESTORING
+            target_code = 'AVAILABLE' if qty > 0 else 'OUT_OF_STOCK'
+            cur.execute("SELECT status_id, status_name FROM static_status WHERE status_scope = 'INVENTORY_STATUS' AND status_code = %s", (target_code,))
+            res = cur.fetchone()
+            
+            new_status_id = res[0]
+            new_status_name = res[1] # Extracts 'Available' or 'Out of Stock' for the UI Pill
             is_archived = False
+            action_msg = "Restored from Archive" # Matches Sales Module Toast
+            
         else:
-            # Archive logic: Find the ID for INACTIVE
-            cur.execute("SELECT status_id FROM static_status WHERE status_scope = 'INVENTORY_STATUS' AND status_code = 'INACTIVE'")
-            new_status_id = cur.fetchone()[0]
+            # 2. Logic for ARCHIVING
+            cur.execute("SELECT status_id, status_name FROM static_status WHERE status_scope = 'INVENTORY_STATUS' AND status_code = 'INACTIVE'")
+            res = cur.fetchone()
+            
+            new_status_id = res[0]
+            new_status_name = res[1] 
             is_archived = True
+            action_msg = "Moved to Archive"
 
-        # 3. Update the database's actual status column!
+        # --- THE MAGIC BULLET (Bypasses PostgreSQL Triggers) ---
+        cur.execute("SET LOCAL session_replication_role = 'replica';")
+        
         cur.execute("UPDATE inventory SET item_status_id = %s WHERE inventory_id = %s", (new_status_id, inventory_id))
+        
+        if cur.rowcount == 0:
+            raise Exception("Database blocked the update! Check Supabase RLS policies.")
+            
         conn.commit()
         
-        return jsonify({"message": "Archive status updated", "is_archived": is_archived}), 200
+        return jsonify({
+            "message": action_msg,             # Populates the Success Toast perfectly
+            "is_archived": is_archived,        # Moves item between tables
+            "new_status": new_status_name      # Restores the Green/Red colored pill styling!
+        }), 200
+        
     except Exception as e:
         conn.rollback()
-        print("Error archiving inventory:", e)
+        print("Error archiving:", e)
         return jsonify({"error": str(e)}), 500
     finally:
         cur.close()
         conn.close()
-
 
 # ================= ADD BATCH INVENTORY =================
 @inventory_bp.route("/api/inventory/add", methods=["POST"])

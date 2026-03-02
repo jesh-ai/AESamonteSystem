@@ -5,7 +5,7 @@ import styles from '@/css/sales.module.css'
 import TopHeader from '@/components/layout/TopHeader'
 import ExportButton from '@/components/features/ExportButton'
 import ExportModal from './exportModal' 
-import ArchiveTable from './archiveModal'
+import ArchiveTable from './archiveSalesModal'
 import {
   LuSearch,
   LuChevronUp,
@@ -85,7 +85,7 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
         // 2. Update the React state with the TRUE database status
         setTransactions(prev => 
           prev.map(tx => 
-            tx.no === txNo ? { ...tx, is_archived: data.is_archived } : tx
+            tx.no === txNo ? { ...tx, is_archived: data.is_archived, status: data.new_status } : tx
           )
         );
 
@@ -105,7 +105,6 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
   const actionMsg = targetTx?.is_archived ? "Restored from Archive" : "Moved to Archive";
   handleExportSuccess(actionMsg);
 };
-
 
 
   /* ================= FETCH ================= */

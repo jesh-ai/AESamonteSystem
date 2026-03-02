@@ -8,7 +8,7 @@ import ExportButton from '@/components/features/ExportButton';
 import AddInventoryModal from './addInventoryModal';
 import EditInventoryModal from './editInventoryModal'; 
 import ExportModal from './exportModal'; 
-import ArchiveTable from './archiveModal'; // <--- IMPORTED ARCHIVE TABLE
+import ArchiveTable from './archiveInvModal';
 import {
   LuSearch, 
   LuEllipsisVertical, 
@@ -148,7 +148,16 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
   const fetchInventory = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("http://127.0.0.1:5000/api/inventory");
+      // The "?t=" timestamp forces the browser to bypass the cache
+      const res = await fetch(`http://127.0.0.1:5000/api/inventory?t=${new Date().getTime()}`, {
+        method: "GET",
+        headers: {
+          "Cache-Control": "no-cache",
+          "Pragma": "no-cache"
+        },
+        cache: "no-store" 
+      });
+      
       if (!res.ok) throw new Error("Failed to fetch");
       const productData: Product[] = await res.json();
       setProducts(productData);
@@ -160,7 +169,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
 
       setData({
         totalProducts: activeProducts.length,
-        totalProductsChange: 2.8,
+        totalProductsChange: 2.8, // Assuming this is static for now
         weeklyInventory: visible.length,
         monthlyInventory: visible.length * 10,
         yearlyInventory: visible.length * 100,
@@ -172,7 +181,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
       setIsLoading(false);
     }
   };
-
   useEffect(() => {
     fetchInventory();
   }, []);
@@ -229,15 +237,22 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
         
         setProducts(prev => 
           prev.map(p => 
-            p.id === id ? { ...p, is_archived: apiData.is_archived } : p
+            p.id === id ? { 
+              ...p, 
+              is_archived: apiData.is_archived,
+              status: apiData.new_status
+            } : p
           )
         );
 
+        // The correct toast message pulled directly from the successful backend flip!
         const actionMsg = apiData.is_archived ? "Moved to Archive" : "Restored from Archive";
         handleExportSuccess(actionMsg, 'success');
         setActiveMenuId(null);
+        
       } else {
-        handleExportSuccess("Failed to update archive status.", "error");
+        const errorData = await response.json();
+        handleExportSuccess(`Failed: ${errorData.error}`, "error");
       }
     } catch (error) {
       handleExportSuccess("Network error. Is Flask running?", "error");
@@ -344,10 +359,13 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
   /* ================= DATA PROCESSING ================= */
 
   const filteredProducts = products.filter(p => {
-    if (p.is_archived) return false; // Filter out archived items
-    return p.item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           p.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           p.id.toString().includes(searchTerm);
+    // OLD: const matchesArchiveView = isArchiveView ? p.is_archived === true : !p.is_archived;
+    // NEW: Use Boolean() to safely evaluate truthy/falsy values
+    const matchesArchiveView = isArchiveView ? Boolean(p.is_archived) : !p.is_archived;
+    
+    const searchStr = `${p.id} ${p.item_name} ${p.brand}`.toLowerCase();
+    const matchesSearch = searchStr.includes(searchTerm.toLowerCase());
+    return matchesArchiveView && matchesSearch;
   });
 
   const sortedProducts = useMemo(() => {

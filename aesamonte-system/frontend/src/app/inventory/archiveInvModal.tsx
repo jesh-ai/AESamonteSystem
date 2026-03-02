@@ -67,13 +67,13 @@ export default function ArchiveTable({ products, onRestore, onBack }: ArchiveTab
         <h1 className={s.title} style={{ color: '#64748b' }}>Archived Inventory</h1>
 
         <div className={s.controls}>
-          {/* Back Button */}
+          {/* Back Button matching Sales layout */}
           <button 
-            className={s.addButton} 
-            style={{ backgroundColor: '#64748b', display: 'flex', alignItems: 'center', gap: '8px' }}
+            className={s.archiveIconBtn} 
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#64748b', color: '#fff', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 600 }}
             onClick={onBack}
           >
-            <LuArrowLeft size={18} /> BACK TO ACTIVE
+            <LuArrowLeft size={18} /> Back to Active
           </button>
 
           <div className={s.searchWrapper}>
@@ -126,19 +126,28 @@ export default function ArchiveTable({ products, onRestore, onBack }: ArchiveTab
                 <td style={{ color: '#94a3b8' }}>{p.qty}</td>
                 <td style={{ color: '#94a3b8' }}>{p.uom || '—'}</td>
                 <td style={{ color: '#94a3b8' }}>₱ {p.price?.toLocaleString()}</td>
+                <td>
+                   <span style={{ backgroundColor: '#e2e8f0', color: '#64748b', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>ARCHIVED</span>
+                </td>
+                
+                {/* THE FIX: Matching Sales UI perfectly! */}
                 <td className={s.actionCell}>
+                  <div className={s.actionWrapper}>
                     <button 
+                      className={s.archiveBtn}
+                      style={{ color: '#10b981', backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }}
                       onClick={() => onRestore(p.id)}
-                      style={{ border: '1px solid #a7f3d0', color: '#10b981', backgroundColor: '#ecfdf5', padding: '6px 12px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
                     >
-                      <LuArchiveRestore size={16} /> Restore
+                      <LuArchiveRestore size={16} />
+                      <span>Restore</span>
                     </button>
+                  </div>
                 </td>
               </tr>
             ))
           ) : (
             <tr>
-              <td colSpan={9} style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
+              <td colSpan={10} style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
                 No archived inventory found.
               </td>
             </tr>

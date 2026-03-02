@@ -118,7 +118,6 @@ def sales_transactions():
 
 
 # ===================== TOGGLE ARCHIVE =====================
-# THE FIX: Changed <int:sales_id> to <string:sales_id>
 @sales_bp.route("/archive/<string:sales_id>", methods=["PUT", "OPTIONS"])
 def toggle_archive(sales_id):
     if request.method == "OPTIONS":
@@ -128,7 +127,6 @@ def toggle_archive(sales_id):
     cur = conn.cursor()
     
     try:
-        # 1. Find out the current status of the transaction
         cur.execute("""
             SELECT ss.status_code 
             FROM sales_transaction st
@@ -137,23 +135,30 @@ def toggle_archive(sales_id):
         """, (sales_id,))
         current_status = cur.fetchone()[0]
         
-        # 2. Toggle the logic dynamically using your exact static_status architecture
         if current_status == 'INACTIVE':
-            # It's currently archived. Restore it by finding the ID for 'PENDING'
+            # It's currently archived. Restore it to 'PENDING'
             cur.execute("SELECT status_id FROM static_status WHERE status_scope = 'SALES_STATUS' AND status_code = 'PENDING'")
             new_status_id = cur.fetchone()[0]
             is_archived = False
+            new_status_code = 'PENDING' # <--- ADD THIS
         else:
-            # It's active. Archive it by finding the ID for 'INACTIVE'
+            # It's active. Archive it to 'INACTIVE'
             cur.execute("SELECT status_id FROM static_status WHERE status_scope = 'SALES_STATUS' AND status_code = 'INACTIVE'")
             new_status_id = cur.fetchone()[0]
             is_archived = True
+            new_status_code = 'INACTIVE' # <--- ADD THIS
 
-        # 3. Update the database's actual status column!
+        # Update the database
         cur.execute("UPDATE sales_transaction SET sales_status_id = %s WHERE sales_id = %s", (new_status_id, sales_id))
         conn.commit()
         
-        return jsonify({"message": "Archive status updated", "is_archived": is_archived}), 200
+        # RETURN THE NEW STATUS CODE TO REACT!
+        return jsonify({
+            "message": "Archive status updated", 
+            "is_archived": is_archived,
+            "new_status": new_status_code 
+        }), 200
+        
     except Exception as e:
         conn.rollback()
         print("Error archiving:", e)
