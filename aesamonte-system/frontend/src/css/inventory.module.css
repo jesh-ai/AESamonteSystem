@@ -36,7 +36,6 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1.25rem;
-  align-items: stretch;
 }
 
 .statCard {
@@ -47,12 +46,14 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  min-height: 140px;
 }
 
 .cardTitle {
   font-size: 0.95rem;
   font-weight: 600;
   color: #0f172a;
+  margin: 0;
 }
 
 .bigNumber {
@@ -60,11 +61,48 @@
   font-weight: 700;
   color: #164163;
   line-height: 1.1;
+  margin: 0.5rem 0;
+}
+
+.cardFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.5rem;
 }
 
 .subText {
   font-size: 0.75rem;
   color: #6b7280;
+}
+
+.pill {
+  font-size: 0.75rem;
+  background: #dcfce7;
+  color: #15803d;
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px solid #bbf7d0;
+  font-weight: 600;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 0.75rem;
+}
+
+.listRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.altRow {
+  background: #EFF2F4;
 }
 
 /* ===== TABLE CONTAINER ===== */
@@ -760,4 +798,35 @@
 @keyframes toastPop {
   0% { transform: scale(0.9); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
+}
+
+.green { color: #16a34a; font-weight: 700; }
+.red { color: #dc2626; font-weight: 700; }
+.blue { color: #2563eb; font-weight: 700; }
+
+/*restore btn*/
+
+.archiveBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #a7f3d0;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  background-color: #ecfdf5;
+  color: #10b981;
+}
+
+.archiveBtn:hover {
+  background-color: #d1fae5;
+}
+
+.actionWrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }

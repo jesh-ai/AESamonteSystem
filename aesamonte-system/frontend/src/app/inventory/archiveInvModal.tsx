@@ -135,7 +135,6 @@ export default function ArchiveTable({ products, onRestore, onBack }: ArchiveTab
                   <div className={s.actionWrapper}>
                     <button 
                       className={s.archiveBtn}
-                      style={{ color: '#10b981', backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }}
                       onClick={() => onRestore(p.id)}
                     >
                       <LuArchiveRestore size={16} />

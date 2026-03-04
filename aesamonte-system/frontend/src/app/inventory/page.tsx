@@ -60,6 +60,7 @@ interface InventorySummary {
   monthlyInventory: number;
   yearlyInventory: number;
   outOfStockCount: number;
+  outOfStockItems: Product[];
 }
 
 const ROWS_PER_PAGE = 10;
@@ -76,6 +77,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
     monthlyInventory: 0,
     yearlyInventory: 0,
     outOfStockCount: 0,
+    outOfStockItems: [], 
   });
   
   const [searchTerm, setSearchTerm] = useState('');
@@ -164,25 +166,48 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
 
       // ONLY count active items!
       const activeProducts = productData.filter(p => !p.is_archived);
-      const visible = activeProducts.filter(p => p.qty > 0);
       const outOfStock = activeProducts.filter(p => p.qty === 0);
 
-      setData({
+      setData(prev => ({
+        ...prev,
         totalProducts: activeProducts.length,
-        totalProductsChange: 2.8, // Assuming this is static for now
-        weeklyInventory: visible.length,
-        monthlyInventory: visible.length * 10,
-        yearlyInventory: visible.length * 100,
+        totalProductsChange: 2.8,
         outOfStockCount: outOfStock.length,
-      });
+        outOfStockItems: outOfStock,
+      }));
+
     } catch (err) {
       console.error("Failed to fetch Inventory", err);
     } finally {
       setIsLoading(false);
     }
   };
+
+  const fetchInventorySummary = async () => {
+    try {
+      const res = await fetch("http://127.0.0.1:5000/api/inventory/summary", {
+        cache: "no-store"
+      });
+
+      if (!res.ok) throw new Error("Failed to fetch summary");
+
+      const summary = await res.json();
+
+      setData(prev => ({
+        ...prev,
+        weeklyInventory: summary.weekly,
+        monthlyInventory: summary.monthly,
+        yearlyInventory: summary.yearly,
+      }));
+
+    } catch (err) {
+      console.error("Failed to fetch summary", err);
+    }
+  };
+
   useEffect(() => {
     fetchInventory();
+    fetchInventorySummary();
   }, []);
   
   useEffect(() => {
@@ -244,6 +269,8 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
             } : p
           )
         );
+
+        fetchInventorySummary();
 
         // The correct toast message pulled directly from the successful backend flip!
         const actionMsg = apiData.is_archived ? "Moved to Archive" : "Restored from Archive";
@@ -309,7 +336,8 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
       if (res.ok) {
         setShowEditModal(false);
         handleExportSuccess("Item updated successfully!");
-        fetchInventory(); 
+        await fetchInventory();
+        await fetchInventorySummary(); 
       } else {
         const err = await res.json();
         handleExportSuccess(`Error updating: ${err.error}`, 'error');
@@ -346,7 +374,8 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
         const result = await res.json();
         handleExportSuccess(result.message); 
         setShowModal(false);
-        await fetchInventory(); 
+        await fetchInventory();
+        await fetchInventorySummary(); 
       } else {
         const err = await res.json();
         handleExportSuccess(`Error: ${err.error}`, 'error');
@@ -447,29 +476,71 @@ const Inventory: React.FC<InventoryProps> = ({ role, onLogout }) => {
       </div>
 
         <div className={s.topGrid}>
+
+          {/* TOTAL PRODUCTS CARD */}
           <section className={s.statCard}>
-            <p className={s.cardTitle}>Total Active Products</p>
-            <h2 className={s.bigNumber}>{data.totalProducts}</h2>
+            <p className={s.cardTitle}>Total Products</p>
+
+            <h2 className={s.bigNumber}>
+              {data.totalProducts.toLocaleString()}
+            </h2>
+
+            <div className={s.cardFooter}>
+              <span className={s.subText}>
+                vs last month
+              </span>
+
+              <span className={s.pill}>
+                +{data.totalProductsChange}%
+              </span>
+            </div>
           </section>
 
+
+          {/* INVENTORY REPORT CARD */}
           <section className={s.statCard}>
             <p className={s.cardTitle}>Inventory Report</p>
+
             <div className={s.list}>
-              <div className={`${s.listRow} ${s.altRow}`}>Weekly Inventory <span>{data.weeklyInventory}</span></div>
-              <div className={s.listRow}>Monthly Inventory <span>{data.monthlyInventory}</span></div>
-              <div className={`${s.listRow} ${s.altRow}`}>Yearly Inventory <span>{data.yearlyInventory}</span></div>
+              <div className={`${s.listRow} ${s.altRow}`}>
+                <span>Weekly</span>
+                <span className={s.green}>
+                  {data.weeklyInventory.toLocaleString()}
+                </span>
+              </div>
+
+              <div className={s.listRow}>
+                <span>Monthly</span>
+                <span className={s.red}>
+                  {data.monthlyInventory.toLocaleString()}
+                </span>
+              </div>
+
+              <div className={`${s.listRow} ${s.altRow}`}>
+                <span>Yearly</span>
+                <span className={s.blue}>
+                  {data.yearlyInventory.toLocaleString()}
+                </span>
+              </div>
             </div>
           </section>
 
+
+          {/* OUT OF STOCK CARD */}
           <section className={s.statCard}>
             <p className={s.cardTitle}>Out of Stock</p>
-            <div className={s.outOfStockList}>
-              {products.filter(p => !p.is_archived && p.qty === 0).length > 0 ? (
-                products.filter(p => !p.is_archived && p.qty === 0).map(p => <div key={p.id} 
-                  className={s.outOfStockBadge}>{p.item_name}</div>)
-              ) : ( <p className={s.subText}>All active items in stock</p> )}
+
+            <h2 className={s.bigNumber}>
+              {data.outOfStockCount}
+            </h2>
+
+            <div className={s.cardFooter}>
+              <span className={s.subText}>
+                Products currently unavailable
+              </span>
             </div>
           </section>
+
         </div>
 
         {/* ================= CONDITIONAL RENDERING ================= */}
