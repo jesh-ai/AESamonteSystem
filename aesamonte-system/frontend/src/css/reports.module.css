@@ -1,91 +1,303 @@
+/* ─── reports.module.css ─────────────────────────────────────────────────── */
+
+/* Outer container — assumes sidebar is already rendered by the parent layout */
 .container {
   display: flex;
   flex-direction: column;
-  background-color: #F8F3D9; /* Cream background from goal UI */
-  min-height: 100vh;
-  width: 100%;
-  overflow: hidden;
+  height: 100%;
+  background: #f8f3d9;
+  overflow-y: auto;
 }
 
+/* ─── MAIN CONTENT ──────────────────────────────────────────────────────── */
+.mainContent {
+  flex: 1;
+  padding: 8px 28px 32px;
+}
+
+/* Header row: welcome text left, Export button right */
+.headerActions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.welcomeText {
+  font-size: 1.15rem;
+  font-weight: 400;
+  color: #2d3748;
+  margin: 0;
+}
+
+/* ─── REPORTS GRID ──────────────────────────────────────────────────────── */
+.reportsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 300px;
+  gap: 18px;
+  align-items: start;
+}
+
+/* ─── CARD BASE ─────────────────────────────────────────────────────────── */
+.reportCard {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 20px 22px;
+  border: 1px solid #e8dcc8;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.cardTitle {
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: #1e293b;
+  margin: 0 0 16px 0;
+}
+
+.cardSubtitle {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin: -10px 0 18px 0;
+}
+
+/* Span helpers */
+.spanTwo {
+  grid-column: span 2;
+}
+
+/* Yearly Sales: column 3, rows 2–3 */
+.yearlyCard {
+  grid-column: 3;
+  grid-row: 2 / span 2;
+}
+
+/* ─── SALES / INVENTORY LIST ROWS ───────────────────────────────────────── */
+.listGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.listRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 10px;
+  border-radius: 7px;
+}
+
+.listRowAlt {
+  background: #f8f4ec;
+}
+
+.listLabel {
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+/* Value colour utilities */
+.valRed    { color: #e74c3c; font-weight: 600; font-size: 0.95rem; }
+.valBlue   { color: #3b82f6; font-weight: 600; font-size: 0.95rem; }
+.valYellow { color: #f0ad4e; font-weight: 600; font-size: 0.95rem; }
+.valDark   { color: #334155; font-weight: 500; font-size: 0.95rem; }
+
+/* ─── STAT MINI-CARDS (Total Orders / Total Sales) ───────────────────────── */
 .statsColumn {
   display: flex;
   flex-direction: column;
-  gap: 2rem; /* Adds space between Total Orders and Total Sales */
-  height: 100%;
+  gap: 14px;
 }
 
 .miniCard {
-  background: white;
-  padding: 2rem; /* Compact padding */
-  border-radius: 12px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.topNav {
-  height: 60px;
-  background-color: #ffffff;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 1rem;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.mainContent {
-  flex: 1;
-  padding: 1.5rem 2rem; /* Matches professional margins */
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem
-}
-
-.headerActions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.pageTitle {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #164163;
-}
-
-.tallCard {
-  grid-column: 3;    /* Always stays in the 3rd column */
-  grid-row: 2 / 4;   /* Starts at row 2 and spans until row 4 (covering two rows) */
-  display: flex;
-  flex-direction: column;
-}
-
-.headerActions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.reportsGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: auto; 
-  grid-auto-rows: auto;
-  gap: 1rem;
-  height: calc(100vh - 100px); /* Adjusts to fit within viewport */
-}
-
-.reportCard, .miniCard {
   background: #ffffff;
-  border-radius: 12px;
-  padding: 1rem; /* Reduced from 2rem to save vertical space */
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-  display: flex;
-  flex-direction: column;
+  border-radius: 14px;
+  padding: 18px 20px;
+  border: 1px solid #e8dcc8;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
+.miniLabel {
+  color: #64748b;
+  font-size: 0.88rem;
+  margin: 0 0 8px 0;
+}
+
+.miniRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.bigNum {
+  font-size: 2.5rem;
+  font-weight: 300;
+  line-height: 1;
+  margin: 0;
+}
+
+.bigNumBlue   { color: #1e3a5f; }
+.bigNumYellow { color: #f59e0b; }
+
+.growthWrap {
+  text-align: right;
+}
+
+.vsLabel {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  margin-bottom: 5px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.badgeUp   { background: #dcfce7; color: #16a34a; }
+.badgeDown { background: #fee2e2; color: #dc2626; }
+
+/* ─── TOP CLIENTS BAR CHART ─────────────────────────────────────────────── */
+.barArea {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 6px;
+}
+
+.barRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.barLabel {
+  width: 88px;
+  font-size: 0.88rem;
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+.barTrack {
+  flex: 1;
+  background: #f1f5f9;
+  border-radius: 6px;
+  height: 26px;
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.9s ease-in-out;
+}
+
+.barAxis {
+  display: flex;
+  justify-content: space-between;
+  padding-left: 100px;
+  margin-top: 6px;
+  color: #94a3b8;
+  font-size: 0.76rem;
+}
+
+/* ─── MOST STOCK ITEMS BARS ─────────────────────────────────────────────── */
+.hbarArea {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.hbarRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hbarLabel {
+  width: 110px;
+  font-size: 0.88rem;
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+.hbarTrack {
+  flex: 1;
+  background: #f1f5f9;
+  border-radius: 8px;
+  height: 18px;
+  overflow: hidden;
+}
+
+.hbarFill {
+  height: 100%;
+  border-radius: 8px;
+  background: #1e3a5f;
+  transition: width 0.9s ease-in-out;
+}
+
+.hbarPct {
+  width: 40px;
+  text-align: right;
+  font-size: 0.88rem;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+/* ─── YEARLY SALES BARS ─────────────────────────────────────────────────── */
+.yrArea {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.yrRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.yrLabel {
+  width: 36px;
+  font-size: 0.88rem;
+  color: #334155;
+  flex-shrink: 0;
+}
+
+.yrTrack {
+  flex: 1;
+  background: #f1f5f9;
+  border-radius: 6px;
+  height: 13px;
+  overflow: hidden;
+}
+
+.yrFill {
+  height: 100%;
+  border-radius: 6px;
+  background: #3b82f6;
+  transition: width 0.9s ease-in-out;
+}
+
+.yrValue {
+  width: 76px;
+  text-align: right;
+  font-size: 0.82rem;
+  color: #334155;
+  flex-shrink: 0;
+}
+
+/* ─── EXPORT BUTTON ─────────────────────────────────────────────────────── */
 /* Base Export Button (Navy/Dark Gray) */
 .exportBtn {
   background-color: #1a4263; 
@@ -114,36 +326,4 @@
   background-color: #ffd54f !important; /* Yellow bg from your pic */
   color: #000000 !important; /* Black text for visibility */
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.spanTwo {
-  grid-column: span 2;
-}
-
-.placeholderList .row {
-  display: flex;
-  justify-content: space-between;
-  padding: 10px;
-  border-radius: 6px;
-  font-size: 0.875rem;
-}
-
-.chartPlaceholder {
-  height: 160px;
-  background: #f8fafc;
-  border: 1px dashed #cbd5e1;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #94a3b8;
-}
-
-.pill {
-  font-size: 0.75rem;
-  background: #dcfce7;
-  color: #15803d;
-  padding: 2px 8px;
-  border-radius: 20px;
-  border: 1px solid #bbf7d0;
 }

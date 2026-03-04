@@ -1,9 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 
 import React, { useState, useEffect } from 'react'
 import styles from '@/css/sales.module.css'
 import TopHeader from '@/components/layout/TopHeader'
-import ExportButton from '@/components/features/ExportButton'
 import ExportModal from './exportModal' 
 import ArchiveTable from './archiveSalesModal'
 import {
@@ -11,7 +11,8 @@ import {
   LuChevronUp,
   LuChevronDown,
   LuChevronRight,
-  LuArchive
+  LuArchive,
+  LuDownload
 } from 'react-icons/lu'
 
 /* ================= TYPES ================= */
@@ -28,13 +29,14 @@ interface SalesSummary {
 }
 
 interface Transaction {
-  no: number
+  no: string 
   name: string
   address: string
   date: string
   qty: number
   amount: number
-  status: 'PAID' | 'PENDING'
+  status: 'PAID' | 'PENDING' | 'INACTIVE'
+  paymentMethod: string 
   is_archived?: boolean
 }
 
@@ -53,7 +55,6 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
   const [showExportModal, setShowExportModal] = useState(false)
   const [isArchiveView, setIsArchiveView] = useState(false)
   
-  // Pagination State
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
 
@@ -74,7 +75,58 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
     setShowToast(true)
   }
 
-  const handleToggleArchive = async (txNo: number) => {
+  // THE FIX: Added 'isBackground' to prevent screen flashes, and a cache-busting timestamp!
+  const fetchSalesData = async (isBackground = false) => {
+    try {
+      if (!isBackground) setIsLoading(true)
+      
+      const t = new Date().getTime(); // Forces browser to pull fresh DB data
+      
+      const [summaryRes, transRes] = await Promise.all([
+        fetch(`http://127.0.0.1:5000/api/sales/summary?t=${t}`, { cache: 'no-store' }),
+        fetch(`http://127.0.0.1:5000/api/sales/transactions?t=${t}`, { cache: 'no-store' })
+      ])
+      
+      if (summaryRes.ok && transRes.ok) {
+        setSummary(await summaryRes.json())
+        setTransactions(await transRes.json())
+      }
+    } catch (error) {
+      console.error('Error:', error)
+    } finally {
+      if (!isBackground) setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchSalesData()
+  }, [])
+
+  const handleTogglePaymentStatus = async (tx: Transaction) => {
+    if (!tx.paymentMethod?.toLowerCase().includes('bank')) return;
+    if (tx.status === 'INACTIVE' || tx.is_archived) return;
+
+    try {
+      const response = await fetch(`http://127.0.0.1:5000/api/sales/toggle-status/${tx.no}`, {
+        method: 'PUT',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        handleExportSuccess(data.message, 'success');
+        
+        // THE FIX: Refresh in background! (True = no loading screen flash)
+        await fetchSalesData(true);
+      } else {
+        const errorData = await response.json();
+        handleExportSuccess(errorData.error || "Failed to update status.", "error");
+      }
+    } catch (error) {
+      handleExportSuccess("Network error. Is Flask running?", "error");
+    }
+  };
+
+  const handleToggleArchive = async (txNo: string) => {
     try {
       const response = await fetch(`http://127.0.0.1:5000/api/sales/archive/${txNo}`, {
         method: 'PUT',
@@ -84,11 +136,14 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
         const data = await response.json();
         setTransactions(prev => 
           prev.map(tx => 
-            tx.no === txNo ? { ...tx, is_archived: data.is_archived } : tx
+            tx.no === txNo ? { ...tx, is_archived: data.is_archived, status: data.new_status } : tx
           )
         );
         const actionMsg = data.is_archived ? "Moved to Archive" : "Restored from Archive";
         handleExportSuccess(actionMsg, 'success');
+        
+        // THE FIX: Refresh cards in background!
+        await fetchSalesData(true); 
       } else {
         handleExportSuccess("Failed to update archive status.", "error");
       }
@@ -97,34 +152,11 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
     }
   };
 
-  /* ================= FETCH ================= */
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true)
-        const [summaryRes, transRes] = await Promise.all([
-          fetch('http://127.0.0.1:5000/api/sales/summary'),
-          fetch('http://127.0.0.1:5000/api/sales/transactions')
-        ])
-        if (summaryRes.ok && transRes.ok) {
-          setSummary(await summaryRes.json())
-          setTransactions(await transRes.json())
-        }
-      } catch (error) {
-        console.error('Error:', error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    fetchData()
-  }, [])
-
   /* ================= FILTER + SORT + PAGINATION ================= */
 
   const filteredTx = transactions.filter(tx => {
     const matchesArchiveView = isArchiveView ? tx.is_archived === true : !tx.is_archived;
-    const searchStr = `${tx.no} ${tx.name} ${tx.address}`.toLowerCase();
+    const searchStr = `${tx.no} ${tx.name} ${tx.address} ${tx.paymentMethod || ''}`.toLowerCase();
     return matchesArchiveView && searchStr.includes(searchTerm.toLowerCase());
   });
 
@@ -154,7 +186,7 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
       <TopHeader role={role} onLogout={onLogout} />
 
       {showToast && (
-        <div className={s.toastOverlay}>
+        <div className={s.toastOverlay} style={{ zIndex: 10000 }}>
           <div className={s.alertBox}>
             <div className={`${s.alertHeader} ${isError ? s.alertHeaderError : ''}`}>
               <div className={`${s.checkCircle} ${isError ? s.checkCircleError : ''}`}>
@@ -171,8 +203,18 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
       )}
 
       <main className={s.mainContent}>
-        <div className={s.headerActions}>
-          <div onClick={() => setShowExportModal(true)}><ExportButton /></div>
+        
+        <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', marginBottom: '20px' }}>
+          <button 
+            onClick={() => setShowExportModal(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#1e3a8a', 
+              color: 'white', padding: '10px 20px', borderRadius: '6px', border: 'none', 
+              cursor: 'pointer', fontWeight: 500, fontSize: '0.95rem', boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}
+          >
+            <LuDownload size={18} /> Export
+          </button>
         </div>
 
         {/* SUMMARY CARDS */}
@@ -225,6 +267,7 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
                     { label: 'DATE', key: 'date' },
                     { label: 'QTY', key: 'qty' },
                     { label: 'AMOUNT', key: 'amount' },
+                    { label: 'PAYMENT', key: 'paymentMethod' },
                     { label: 'STATUS', key: 'status' }
                   ].map((col) => (
                     <th key={col.key}>
@@ -241,25 +284,43 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
                 </tr>
               </thead>
               <tbody>
-                {paginatedTx.map((tx, i) => (
-                  <tr key={tx.no} className={i % 2 !== 0 ? s.rowOdd : ''}>
-                    <td>{tx.no}</td>
-                    <td style={{ fontWeight: 600 }}>{tx.name}</td>
-                    <td>{tx.address}</td>
-                    <td>{tx.date}</td>
-                    <td>{tx.qty}</td>
-                    <td>₱ {tx.amount.toLocaleString()}</td>
-                    <td className={tx.status === 'PAID' ? s.statusPaid : s.statusPending}>{tx.status}</td>
-                    <td className={s.actionCell}>
-                      <div className={s.actionWrapper}>
-                        <button className={s.archiveBtn} onClick={() => handleToggleArchive(tx.no)}>
-                          <LuArchive size={16} />
-                          <span>Archive</span>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {paginatedTx.map((tx, i) => {
+                  const isBank = tx.paymentMethod?.toLowerCase().includes('bank');
+                  
+                  return (
+                    <tr key={tx.no} className={i % 2 !== 0 ? s.rowOdd : ''}>
+                      <td>{tx.no}</td>
+                      <td style={{ fontWeight: 600 }}>{tx.name}</td>
+                      <td>{tx.address}</td>
+                      <td>{tx.date}</td>
+                      <td>{tx.qty}</td>
+                      <td>₱ {tx.amount.toLocaleString()}</td>
+                      <td style={{ color: '#64748b' }}>{tx.paymentMethod}</td>
+                      <td>
+                        <span 
+                          className={tx.status === 'PAID' ? s.statusPaid : s.statusPending}
+                          style={{
+                            cursor: isBank ? 'pointer' : 'default',
+                            textDecoration: isBank && tx.status === 'PENDING' ? 'underline' : 'none',
+                            transition: 'all 0.2s'
+                          }}
+                          onClick={() => handleTogglePaymentStatus(tx)}
+                          title={isBank ? "Click to toggle payment status" : "Non-bank payments process automatically"}
+                        >
+                          {tx.status}
+                        </span>
+                      </td>
+                      <td className={s.actionCell}>
+                        <div className={s.actionWrapper}>
+                          <button className={s.archiveBtn} onClick={() => handleToggleArchive(tx.no)}>
+                            <LuArchive size={16} />
+                            <span>Archive</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
             
@@ -290,7 +351,11 @@ export default function SalesPage({ role = 'Admin', onLogout }: SalesProps) {
         )}
       </main>
 
-      <ExportModal isOpen={showExportModal} onClose={() => setShowExportModal(false)} onSuccess={handleExportSuccess} />
+      <ExportModal 
+        isOpen={showExportModal} 
+        onClose={() => setShowExportModal(false)} 
+        onSuccess={handleExportSuccess} 
+      />
     </div>
   )
 }

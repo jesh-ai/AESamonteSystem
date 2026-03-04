@@ -1,81 +1,81 @@
 'use client';
 
+import React, { useEffect, useState } from 'react';
 import styles from "@/css/reports.module.css";
 import TopHeader from '@/components/layout/TopHeader';
 import ExportButton from "@/components/features/ExportButton";
 
-interface ReportsPageProps {
-  role?: string;
-  onLogout: () => void;
+interface SalesReportData {
+  weekly: number;
+  monthly: number;
+  yearly: number;
 }
 
-export default function ReportsPage({ role = "Admin", onLogout }: ReportsPageProps) {
+export default function ReportsPage({ role = "Admin", onLogout }: { role?: string, onLogout: () => void }) {
+  const [salesData, setSalesData] = useState<SalesReportData | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchSales = async () => {
+      try {
+        const res = await fetch("http://127.0.0.1:5000/api/reports/sales", { cache: 'no-store' });
+        if (res.ok) {
+          setSalesData(await res.json());
+        } else {
+          const err = await res.json();
+          setErrorMsg(err.error || "Failed to load report data.");
+        }
+      } catch (e) {
+        setErrorMsg("Network error. Is Flask running?");
+      }
+    };
+    fetchSales();
+  }, []);
+
   return (
     <div className={styles.container}>
-      {/* Use roleOrName to match TopHeader internal prop requirements */}
       <TopHeader role={role} onLogout={onLogout} />
 
-      <main className={styles.mainContent}>
-        <div className={styles.headerActions}>
-          <div className={styles.pageTitle}></div>
+      <main className={styles.mainContent} style={{ padding: '30px' }}>
+        <div className={styles.headerActions} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
           <ExportButton />
         </div>
 
-        <div className={styles.reportsGrid}>
-          {/* Row 1 */}
-          <section className={styles.reportCard}>
-            <h3>Sales Report</h3>
-            <div className={styles.placeholderList}>
-              <div className={styles.row}><span>Weekly Sales</span> <span style={{color: '#d9534f'}}>0</span></div>
-              <div className={styles.row} style={{backgroundColor: '#f1f5f9'}}><span>Monthly Sales</span> <span>0</span></div>
-              <div className={styles.row}><span>Yearly Sales</span> <span style={{color: '#f0ad4e'}}>0</span></div>
-            </div>
-          </section>
-
-          <section className={styles.reportCard}>
-            <h3>Inventory Report</h3>
-            <div className={styles.placeholderList}>
-              <div className={styles.row}><span>Weekly Inventory</span> <span>0</span></div>
-              <div className={styles.row} style={{backgroundColor: '#f1f5f9'}}><span>Monthly Inventory</span> <span>0</span></div>
-              <div className={styles.row}><span>Yearly Inventory</span> <span>0</span></div>
-            </div>
-          </section>
-
-          <div className={styles.statsColumn}>
-            <div className={styles.miniCard}>
-              <p>Total Orders</p>
-              <h2>0 <span className={styles.pill}>+0%</span></h2>
-            </div>
-            <div className={styles.miniCard}>
-              <p>Total Sales</p>
-              <h2 style={{color: '#f0ad4e'}}>0 <span className={styles.pill}>+0%</span></h2>
-            </div>
+        {errorMsg ? (
+          <div style={{ color: '#ef4444', padding: '20px', backgroundColor: '#fee2e2', borderRadius: '8px', border: '1px solid #fca5a5' }}>
+            <strong>Database Error:</strong> {errorMsg}
           </div>
-
-          {/* Row 2: Top Clients Ordered */}
-          <section className={`${styles.reportCard} ${styles.spanTwo}`}>
-            <h3>Top Clients Ordered</h3>
-            <div className={styles.chartPlaceholder}>[Bar Chart Placeholder]</div>
-          </section>
-
-          {/* Tall Card Spanning Row 2 and 3 */}
-          <section className={`${styles.reportCard} ${styles.tallCard}`}>
-            <h3>Yearly Sales</h3>
-            <div className={styles.yearlyList}>
-              {[2024, 2023, 2022, 2021, 2020].map(year => (
-                <div key={year} className={styles.yearRow}>
-                  <strong>{year}</strong> <span>₱0.00</span>
+        ) : !salesData ? (
+          <div style={{ color: '#64748b' }}>Loading Sales Data...</div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
+            
+            {/* EXACT MATCH: SALES REPORT CARD */}
+            <section style={{ backgroundColor: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0', height: 'fit-content' }}>
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '1.5rem', fontWeight: 400, color: '#1e3a5f' }}>Sales Report</h3>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 10px' }}>
+                  <span style={{ color: '#475569', fontSize: '0.95rem' }}>Weekly Sales</span> 
+                  <span style={{ color: '#ef4444', fontWeight: 600 }}>{salesData.weekly.toLocaleString()}</span>
                 </div>
-              ))}
-            </div>
-          </section>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 10px', backgroundColor: '#f1f5f9', borderRadius: '6px' }}>
+                  <span style={{ color: '#475569', fontSize: '0.95rem' }}>Monthly Sales</span> 
+                  <span style={{ color: '#3b82f6', fontWeight: 600 }}>{salesData.monthly.toLocaleString()}</span>
+                </div>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 10px' }}>
+                  <span style={{ color: '#475569', fontSize: '0.95rem' }}>Yearly Sales</span> 
+                  <span style={{ color: '#f59e0b', fontWeight: 600 }}>{salesData.yearly.toLocaleString()}</span>
+                </div>
+              </div>
+            </section>
 
-          {/* Row 3: Most Stock Items */}
-          <section className={`${styles.reportCard} ${styles.spanTwo}`}>
-            <h3>Most Stock Items</h3>
-            <div className={styles.chartPlaceholder}>[Stock Levels Bar Chart]</div>
-          </section>
-        </div>
+            {/* We will add the other cards here next! */}
+
+          </div>
+        )}
       </main>
     </div>
   );

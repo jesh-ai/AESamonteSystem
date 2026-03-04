@@ -64,7 +64,6 @@ def orders_list():
     cur = conn.cursor()
     
     try:
-        # THE FIX: Removed the hardcoded 'Cash' and joined the static_status table for Payment Methods
         cur.execute("""
             SELECT
                 ot.order_id,
@@ -257,19 +256,16 @@ def update_order(order_id):
     cur = conn.cursor()
     
     try:
-        # 1. Find the new Status & Payment IDs
         status_name = data.get('status', '').strip()
         cur.execute("SELECT status_id FROM static_status WHERE status_scope = 'ORDER_STATUS' AND status_name ILIKE %s", (status_name,))
         status_row = cur.fetchone()
         new_status_id = status_row[0] if status_row else None
 
-        # THE FIX: Find the correct ID for the selected Payment Method
         pm_name = data.get('paymentMethod', '').strip()
         cur.execute("SELECT status_id FROM static_status WHERE status_scope = 'PAYMENT_METHOD' AND status_name ILIKE %s", (pm_name,))
         pm_row = cur.fetchone()
         new_pm_id = pm_row[0] if pm_row else None
 
-        # 2. Update Customer Details
         cur.execute("SELECT customer_id FROM order_transaction WHERE order_id = %s", (order_id,))
         cust_row = cur.fetchone()
         if cust_row:
@@ -280,7 +276,6 @@ def update_order(order_id):
                 WHERE customer_id = %s
             """, (data.get('customerName'), data.get('contact'), data.get('address'), customer_id))
 
-        # 3. Check the CURRENT status 
         cur.execute("""
             SELECT sl.status_name 
             FROM order_transaction ot
@@ -290,7 +285,6 @@ def update_order(order_id):
         current_status_row = cur.fetchone()
         current_status = current_status_row[0].upper() if current_status_row else 'PREPARING'
 
-        # 4. ONLY edit items if the order is still "Preparing"
         if current_status == 'PREPARING':
             cur.execute("DELETE FROM order_details WHERE order_id = %s", (order_id,))
             
@@ -313,7 +307,6 @@ def update_order(order_id):
                         VALUES (%s, %s, %s, %s, %s)
                     """, (order_id, inv_id, qty, unit_price, amount))
 
-        # 5. Update Status AND Payment Method
         if new_status_id:
             cur.execute("UPDATE order_transaction SET order_status_id = %s WHERE order_id = %s", (new_status_id, order_id))
             
@@ -346,7 +339,7 @@ def add_order():
         contact_number = data.get('contactNumber', '').strip()
         delivery_address = data.get('deliveryAddress', '').strip()
 
-        # 1. SMART CUSTOMER HANDLING 
+        # 1. Customer Handling 
         cur.execute("SELECT customer_id FROM customer WHERE customer_name = %s", (customer_name,))
         existing_cust = cur.fetchone()
 
@@ -364,7 +357,7 @@ def add_order():
             """, (customer_name, contact_number, delivery_address, 'no-email@placeholder.com'))
             customer_id = cur.fetchone()[0]
 
-        # 2. Get the Status & Payment IDs
+        # 2. Get Status & Payment IDs
         items = data.get('items', [])
         first_item_status = items[0].get('orderStatus', 'Preparing').strip() if items else 'Preparing'
         cur.execute("SELECT status_id FROM static_status WHERE status_scope = 'ORDER_STATUS' AND status_name ILIKE %s", (first_item_status,))
@@ -376,7 +369,6 @@ def add_order():
         pm_row = cur.fetchone()
         pm_id = pm_row[0] if pm_row else None
 
-        # 3. Create the Order Transaction 
         today = date.today()
         cur.execute("""
             INSERT INTO order_transaction (customer_id, order_date, order_status_id, payment_method_id)
@@ -384,15 +376,15 @@ def add_order():
         """, (customer_id, today, status_id, pm_id))
         order_id = cur.fetchone()[0]
 
-        # 4. Insert the Order Items
+        # 4. Insert Items and UPDATE INVENTORY
         for item in items:
             inv_id = item.get('inventory_id')
             if inv_id and str(inv_id).strip() != "":
                 
                 try:
-                    qty = float(item.get('quantity', 1)) or 1
+                    qty = int(item.get('quantity', 1)) or 1
                 except (ValueError, TypeError):
-                    qty = 1.0
+                    qty = 1
                     
                 try:
                     amount = float(item.get('amount', 0))
@@ -401,10 +393,38 @@ def add_order():
                     
                 unit_price = (amount / qty) if qty > 0 else 0.0
 
+                # Insert into order details
                 cur.execute("""
                     INSERT INTO order_details (order_id, inventory_id, order_quantity, unit_price, order_total)
                     VALUES (%s, %s, %s, %s, %s)
                 """, (order_id, inv_id, qty, unit_price, amount))
+
+                # =========================================================
+                # THE FIX: Deduct from Inventory Table Automatically!
+                # =========================================================
+                cur.execute("""
+                    UPDATE inventory
+                    SET item_quantity = item_quantity - %s
+                    WHERE inventory_id = %s
+                    RETURNING item_quantity
+                """, (qty, inv_id))
+                
+                result = cur.fetchone()
+                
+                if result:
+                    new_qty = result[0]
+                    
+                    # Automatically set status to "Out of Stock" if it drops to 0 or below
+                    if new_qty <= 0:
+                        cur.execute("""
+                            UPDATE inventory
+                            SET item_status_id = (
+                                SELECT status_id FROM static_status 
+                                WHERE status_scope = 'INVENTORY_STATUS' AND status_code = 'OUT_OF_STOCK' 
+                                LIMIT 1
+                            )
+                            WHERE inventory_id = %s
+                        """, (inv_id,))
 
         conn.commit()
         return jsonify({"message": "Order added successfully!", "order_id": order_id}), 201

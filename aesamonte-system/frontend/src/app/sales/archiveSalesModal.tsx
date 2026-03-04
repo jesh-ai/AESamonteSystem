@@ -11,19 +11,20 @@ import {
 } from 'react-icons/lu'
 
 export interface Transaction {
-  no: number
+  no: string  // <--- FIXED to string
   name: string
   address: string
   date: string
   qty: number
   amount: number
-  status: 'PAID' | 'PENDING'
+  status: 'PAID' | 'PENDING' | 'INACTIVE'
+  paymentMethod: string // <--- ADDED
   is_archived?: boolean
 }
 
 interface ArchiveTableProps {
   transactions: Transaction[]
-  onRestore: (txNo: number) => void
+  onRestore: (txNo: string) => void // <--- FIXED to string
   onBack: () => void
 }
 
