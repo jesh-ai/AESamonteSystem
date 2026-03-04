@@ -383,3 +383,41 @@ def update_inventory_item(id):
     finally:
         cur.close()
         conn.close()
+
+# ================= INVENTORY SUMMARY =================
+@inventory_bp.route("/api/inventory/summary", methods=["GET"])
+def get_inventory_summary():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("""
+            SELECT
+                COUNT(*) FILTER (
+                    WHERE created_at >= NOW() - INTERVAL '7 days'
+                    AND item_status_id != 4
+                ) AS weekly_count,
+
+                COUNT(*) FILTER (
+                    WHERE created_at >= NOW() - INTERVAL '30 days'
+                    AND item_status_id != 4
+                ) AS monthly_count,
+
+                COUNT(*) FILTER (
+                    WHERE created_at >= NOW() - INTERVAL '1 year'
+                    AND item_status_id != 4
+                ) AS yearly_count
+            FROM inventory
+        """)
+
+        row = cur.fetchone()
+
+        return jsonify({
+            "weekly": row[0],
+            "monthly": row[1],
+            "yearly": row[2]
+        })
+
+    finally:
+        cur.close()
+        conn.close()
