@@ -20,6 +20,9 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
   
   const [activeSearchIndex, setActiveSearchIndex] = useState<number | null>(null);
 
+  // THE FIX: Filter out archived items immediately
+  const activeInventory = (inventoryItems || []).filter((inv: any) => !inv.is_archived);
+
   useEffect(() => {
     if (orderData) {
       const initialItems = orderData.items && orderData.items.length > 0 
@@ -48,7 +51,7 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
     const safeItems = formData.items || [];
     const newItems = [...safeItems];
     
-    const selectedInv = inventoryItems.find((inv: any) => String(inv.id) === selectedInvId);
+    const selectedInv = activeInventory.find((inv: any) => String(inv.id) === selectedInvId);
     
     if (selectedInv) {
       const currentQty = Number(newItems[index].quantity) || 1;
@@ -70,7 +73,7 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
     const newItems = [...safeItems];
     newItems[index].item = text;
     
-    const match = inventoryItems.find((inv: any) => inv.item_name.toLowerCase().trim() === text.toLowerCase().trim());
+    const match = activeInventory.find((inv: any) => inv.item_name.toLowerCase().trim() === text.toLowerCase().trim());
     
     if (match && Number(match.qty) > 0) {
         newItems[index].inventory_id = match.id;
@@ -95,7 +98,7 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
     const newItems = [...safeItems];
     const qtyNum = Number(newQty) || 0;
     
-    const invItem = inventoryItems.find((inv: any) => String(inv.id) === String(newItems[index].inventory_id));
+    const invItem = activeInventory.find((inv: any) => String(inv.id) === String(newItems[index].inventory_id));
     const existingPrice = (Number(newItems[index].amount) / (Number(newItems[index].quantity) || 1)) || 0;
     const price = invItem ? Number(invItem.price) : existingPrice;
 
@@ -137,7 +140,6 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
     <div className={s.modalOverlay} style={{ zIndex: 1100 }}> 
       <div className={s.modalContent} style={{ width: '850px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', padding: 0 }}>
         
-        {/* --- HEADER --- */}
         <div className={s.modalHeader} style={{ padding: '20px 24px', borderBottom: '1px solid #eaeaea', backgroundColor: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
            <div className={s.modalTitleGroup}>
              <h2 className={s.title} style={{ fontSize: '1.25rem', margin: '0 0 4px 0' }}>Edit Order Details</h2>
@@ -219,10 +221,8 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
                     )}
                  </div>
 
-                 {/* --- THE LAYOUT FIX: Adjusted grid fractions --- */}
                  <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.2fr 0.6fr 1fr', gap: '10px' }}>
                    
-                   {/* ADDED minWidth: 0 to force CSS Grid to respect column sizes */}
                    <div className={s.formGroup} style={{ position: 'relative', minWidth: 0 }}>
                       <label className={s.miniLabel} style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>Item Name</span>
@@ -252,7 +252,8 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
                           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', maxHeight: '250px', overflowY: 'auto',
                           marginTop: '4px'
                         }}>
-                          {inventoryItems
+                          {/* THE FIX: Replaced all inventoryItems with activeInventory */}
+                          {activeInventory
                             .filter((inv: any) => Number(inv.qty) > 0)
                             .filter((inv: any) => 
                               inv.item_name.toLowerCase().includes((item.item || '').toLowerCase()) ||
@@ -278,7 +279,8 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
                             ))
                           }
                           
-                          {inventoryItems.filter((inv: any) => Number(inv.qty) <= 0 && inv.item_name.toLowerCase().includes((item.item || '').toLowerCase())).length > 0 && (
+                          {/* THE FIX: Replaced all inventoryItems with activeInventory */}
+                          {activeInventory.filter((inv: any) => Number(inv.qty) <= 0 && inv.item_name.toLowerCase().includes((item.item || '').toLowerCase())).length > 0 && (
                              <div style={{ padding: '10px 12px', fontSize: '0.8rem', color: '#ef4444', textAlign: 'center', backgroundColor: '#fef2f2' }}>
                                 Some matches are currently Out of Stock.
                              </div>
@@ -287,7 +289,6 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
                       )}
                    </div>
                    
-                   {/* ADDED minWidth: 0 to force CSS Grid to respect column sizes */}
                    <div className={s.formGroup} style={{ minWidth: 0 }}>
                       <label className={s.miniLabel}>Description</label>
                       <div style={{ 
@@ -311,7 +312,6 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
                       </div>
                    </div>
 
-                   {/* ADDED minWidth: 0 */}
                    <div className={s.formGroup} style={{ minWidth: 0 }}>
                       <label className={s.miniLabel}>Qty</label>
                       <input 
@@ -324,7 +324,6 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
                       />
                    </div>
 
-                   {/* ADDED minWidth: 0 */}
                    <div className={s.formGroup} style={{ minWidth: 0 }}>
                       <label className={s.miniLabel}>Amount (₱)</label>
                       <div style={{ padding: '8px 12px', height: '38px', backgroundColor: '#f3f4f6', borderRadius: '6px', border: '1px solid #e5e7eb', color: '#6b7280', fontSize: '0.9rem', display: 'flex', alignItems: 'center' }}>

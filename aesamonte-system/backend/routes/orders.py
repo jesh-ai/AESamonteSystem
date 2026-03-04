@@ -144,7 +144,7 @@ def orders_list():
             "availabilityStatus": availability_status,
             "problematicItems": problematic_items,
             "items": items_list,
-            "is_archived": is_archived,   # <-- ADD THIS
+            "is_archived": is_archived,
         })
 
         return jsonify(orders)
@@ -155,7 +155,7 @@ def orders_list():
         cur.close()
         conn.close()
 
-     # ===================== TOGGLE ARCHIVE =====================
+# ===================== TOGGLE ARCHIVE =====================
 @orders_bp.route("/archive/<string:order_id>", methods=["PUT", "OPTIONS"])
 def toggle_order_archive(order_id):
     if request.method == "OPTIONS":
@@ -165,7 +165,6 @@ def toggle_order_archive(order_id):
     cur = conn.cursor()
 
     try:
-        # Get current order status
         cur.execute("""
             SELECT ss.status_code
             FROM order_transaction ot
@@ -180,7 +179,6 @@ def toggle_order_archive(order_id):
         current_status = row[0]
 
         if current_status == 'INACTIVE':
-            # RESTORING — set back to PREPARING
             cur.execute("""
                 SELECT status_id, status_name FROM static_status 
                 WHERE status_scope = 'ORDER_STATUS' AND status_code = 'PREPARING'
@@ -189,7 +187,6 @@ def toggle_order_archive(order_id):
             is_archived = False
             action_msg = "Order restored from Archive"
         else:
-            # ARCHIVING — set to INACTIVE
             cur.execute("""
                 SELECT status_id, status_name FROM static_status 
                 WHERE status_scope = 'ORDER_STATUS' AND status_code = 'INACTIVE'
@@ -221,6 +218,7 @@ def toggle_order_archive(order_id):
     finally:
         cur.close()
         conn.close()
+
 # ================= GET STATUSES =================
 @orders_bp.route("/status", methods=["GET"])
 def get_order_statuses():
@@ -286,15 +284,62 @@ def update_order(order_id):
         current_status = current_status_row[0].upper() if current_status_row else 'PREPARING'
 
         if current_status == 'PREPARING':
+            
+            # =======================================================
+            # FIX STEP 1: RESTOCK OLD ITEMS
+            # =======================================================
+            cur.execute("SELECT inventory_id, order_quantity FROM order_details WHERE order_id = %s", (order_id,))
+            old_items = cur.fetchall()
+            for old_inv_id, old_qty in old_items:
+                # Add the old quantity back into the inventory
+                cur.execute("""
+                    UPDATE inventory 
+                    SET item_quantity = item_quantity + %s 
+                    WHERE inventory_id = %s
+                """, (old_qty, old_inv_id))
+                
+                # Automatically restore status to 'Available' if it had hit 0 previously
+                cur.execute("""
+                    UPDATE inventory
+                    SET item_status_id = (
+                        SELECT status_id FROM static_status 
+                        WHERE status_scope = 'INVENTORY_STATUS' AND status_code = 'AVAILABLE' 
+                        LIMIT 1
+                    )
+                    WHERE inventory_id = %s AND item_quantity > 0 AND item_status_id = (
+                        SELECT status_id FROM static_status 
+                        WHERE status_scope = 'INVENTORY_STATUS' AND status_code = 'OUT_OF_STOCK' 
+                        LIMIT 1
+                    )
+                """, (old_inv_id,))
+            # =======================================================
+
+            # FIX STEP 2: DELETE OLD ITEMS
             cur.execute("DELETE FROM order_details WHERE order_id = %s", (order_id,))
             
+            # FIX STEP 3: INSERT NEW ITEMS & DEDUCT NEW AMOUNTS
             for item in data.get('items', []):
                 inv_id = item.get('inventory_id')
                 if inv_id and str(inv_id).strip() != "":
+                    
+                    # --- SECURITY CHECK: REJECT ARCHIVED ITEMS ---
+                    cur.execute("""
+                        SELECT ss.status_code, i.item_name 
+                        FROM inventory i
+                        JOIN static_status ss ON i.item_status_id = ss.status_id
+                        WHERE i.inventory_id = %s
+                    """, (inv_id,))
+                    inv_check = cur.fetchone()
+                    if not inv_check:
+                        raise Exception(f"Item ID {inv_id} not found.")
+                    if inv_check[0] == 'INACTIVE':
+                        raise Exception(f"Cannot add '{inv_check[1]}' because it has been archived.")
+                    # ---------------------------------------------
+                    
                     try:
-                        qty = float(item.get('quantity', 1)) or 1
+                        qty = int(item.get('quantity', 1)) or 1
                     except (ValueError, TypeError):
-                        qty = 1.0
+                        qty = 1
                     try:
                         amount = float(item.get('amount', 0))
                     except (ValueError, TypeError):
@@ -306,6 +351,30 @@ def update_order(order_id):
                         INSERT INTO order_details (order_id, inventory_id, order_quantity, unit_price, order_total)
                         VALUES (%s, %s, %s, %s, %s)
                     """, (order_id, inv_id, qty, unit_price, amount))
+
+                    # Deduct the new quantities from the inventory table
+                    cur.execute("""
+                        UPDATE inventory
+                        SET item_quantity = item_quantity - %s
+                        WHERE inventory_id = %s
+                        RETURNING item_quantity
+                    """, (qty, inv_id))
+                    
+                    result = cur.fetchone()
+                    
+                    if result:
+                        new_qty = result[0]
+                        # Automatically set status to "Out of Stock" if it drops to 0
+                        if new_qty <= 0:
+                            cur.execute("""
+                                UPDATE inventory
+                                SET item_status_id = (
+                                    SELECT status_id FROM static_status 
+                                    WHERE status_scope = 'INVENTORY_STATUS' AND status_code = 'OUT_OF_STOCK' 
+                                    LIMIT 1
+                                )
+                                WHERE inventory_id = %s
+                            """, (inv_id,))
 
         if new_status_id:
             cur.execute("UPDATE order_transaction SET order_status_id = %s WHERE order_id = %s", (new_status_id, order_id))
@@ -369,6 +438,7 @@ def add_order():
         pm_row = cur.fetchone()
         pm_id = pm_row[0] if pm_row else None
 
+        # 3. Create Order Transaction
         today = date.today()
         cur.execute("""
             INSERT INTO order_transaction (customer_id, order_date, order_status_id, payment_method_id)
@@ -381,6 +451,21 @@ def add_order():
             inv_id = item.get('inventory_id')
             if inv_id and str(inv_id).strip() != "":
                 
+                # --- SECURITY CHECK: REJECT ARCHIVED ITEMS ---
+                cur.execute("""
+                    SELECT ss.status_code, i.item_name 
+                    FROM inventory i
+                    JOIN static_status ss ON i.item_status_id = ss.status_id
+                    WHERE i.inventory_id = %s
+                """, (inv_id,))
+                inv_check = cur.fetchone()
+                
+                if not inv_check:
+                    raise Exception(f"Item ID {inv_id} not found.")
+                if inv_check[0] == 'INACTIVE':
+                    raise Exception(f"Order failed: '{inv_check[1]}' is archived.")
+                # ---------------------------------------------
+
                 try:
                     qty = int(item.get('quantity', 1)) or 1
                 except (ValueError, TypeError):
@@ -399,9 +484,7 @@ def add_order():
                     VALUES (%s, %s, %s, %s, %s)
                 """, (order_id, inv_id, qty, unit_price, amount))
 
-                # =========================================================
-                # THE FIX: Deduct from Inventory Table Automatically!
-                # =========================================================
+                # Deduct from Inventory Table Automatically
                 cur.execute("""
                     UPDATE inventory
                     SET item_quantity = item_quantity - %s
@@ -414,7 +497,7 @@ def add_order():
                 if result:
                     new_qty = result[0]
                     
-                    # Automatically set status to "Out of Stock" if it drops to 0 or below
+                    # Automatically set status to "Out of Stock" if it drops to 0
                     if new_qty <= 0:
                         cur.execute("""
                             UPDATE inventory

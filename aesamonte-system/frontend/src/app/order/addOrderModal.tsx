@@ -29,6 +29,9 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
 }) => {
   const s = styles as Record<string, string>;
 
+  // THE FIX: Filter out archived items immediately
+  const activeInventory = (inventoryItems || []).filter((inv: any) => !inv.is_archived);
+
   const getDefaultStatus = () => {
     if (!statuses || statuses.length === 0) return 'Preparing';
     const match = statuses.find(st => st.status_name.trim().toLowerCase() === 'preparing');
@@ -74,7 +77,7 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
 
   const handleItemSelect = (index: number, selectedInvId: string) => {
     const newItems = [...items];
-    const selectedInv = inventoryItems.find((inv: any) => String(inv.id) === selectedInvId);
+    const selectedInv = activeInventory.find((inv: any) => String(inv.id) === selectedInvId);
     
     if (selectedInv) {
       const currentQty = Number(newItems[index].quantity) || 1;
@@ -95,7 +98,7 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
     const newItems = [...items];
     newItems[index].item = text;
     
-    const match = inventoryItems.find((inv: any) => inv.item_name.toLowerCase().trim() === text.toLowerCase().trim());
+    const match = activeInventory.find((inv: any) => inv.item_name.toLowerCase().trim() === text.toLowerCase().trim());
     
     if (match && Number(match.qty) > 0) {
         newItems[index].inventory_id = match.id;
@@ -119,7 +122,7 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
     const newItems = [...items];
     const qtyNum = Number(newQty) || 0;
     
-    const invItem = inventoryItems.find((inv: any) => String(inv.id) === String(newItems[index].inventory_id));
+    const invItem = activeInventory.find((inv: any) => String(inv.id) === String(newItems[index].inventory_id));
     const existingPrice = (Number(newItems[index].amount) / (Number(newItems[index].quantity) || 1)) || 0;
     const price = invItem ? Number(invItem.price) : existingPrice;
 
@@ -165,7 +168,6 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
 
   if (!isOpen) return null;
 
-  // --- NEW: AUTO-CALCULATE TOTALS ---
   const totalQty = items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
   const totalAmt = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
@@ -185,7 +187,6 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
           
           <div style={{ padding: '20px 24px', backgroundColor: '#fff', borderBottom: '1px solid #eaeaea', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', zIndex: 10 }}>
               
-              {/* --- NEW: BLUE SUMMARY BANNER --- */}
               <div style={{ backgroundColor: '#eff6ff', padding: '15px 20px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #dbeafe', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr' }}>
                 <div>
                   <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Order ID</span>
@@ -272,7 +273,8 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', maxHeight: '250px', overflowY: 'auto',
                          marginTop: '4px'
                        }}>
-                         {inventoryItems
+                         {/* THE FIX: Replaced all inventoryItems with activeInventory */}
+                         {activeInventory
                            .filter((inv: any) => Number(inv.qty) > 0)
                            .filter((inv: any) => 
                              inv.item_name.toLowerCase().includes((item.item || '').toLowerCase()) ||
@@ -298,7 +300,8 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
                            ))
                          }
                          
-                         {inventoryItems.filter((inv: any) => Number(inv.qty) <= 0 && inv.item_name.toLowerCase().includes((item.item || '').toLowerCase())).length > 0 && (
+                         {/* THE FIX: Replaced all inventoryItems with activeInventory */}
+                         {activeInventory.filter((inv: any) => Number(inv.qty) <= 0 && inv.item_name.toLowerCase().includes((item.item || '').toLowerCase())).length > 0 && (
                             <div style={{ padding: '10px 12px', fontSize: '0.8rem', color: '#ef4444', textAlign: 'center', backgroundColor: '#fef2f2' }}>
                                Some matches are currently Out of Stock.
                             </div>
