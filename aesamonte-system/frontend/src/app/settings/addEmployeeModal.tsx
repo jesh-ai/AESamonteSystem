@@ -39,8 +39,8 @@ export default function AddEmployeeModal({ onClose, onAdd, employee }: any) {
 
     try {
       const url = employee 
-        ? `http://localhost:5000/api/employees/${employee.id}` 
-        : "http://localhost:5000/api/employees";
+        ? `${process.env.NEXT_PUBLIC_API_URL}/api/employees/${employee.id}`
+        : `${process.env.NEXT_PUBLIC_API_URL}/api/employees`;
 
       const response = await fetch(url, {
         method: employee ? "PUT" : "POST",
