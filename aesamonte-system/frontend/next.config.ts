@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   async rewrites() {
-    const backendUrl = process.env.BACKEND_URL || "https://ae-samonte-system.onrender.com";
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || "https://ae-samonte-system.onrender.com";
     return [
       {
         source: "/api/:path*",
