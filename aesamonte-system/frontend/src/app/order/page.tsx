@@ -166,7 +166,10 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
   const handlePrint = () => {
     if (!selectedOrderForView) return;
     const pw = window.open('', '_blank');
-    if (!pw) return;
+    if (!pw) {
+      alert('Pop-up blocked. Please allow pop-ups for this site in your browser settings, then try again.');
+      return;
+    }
 
     const items = selectedOrderForView.items || [];
     const totalRows = Math.max(25, items.length);
@@ -176,7 +179,7 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
         ? `<tr>
             <td>${i + 1}</td>
             <td>${item.order_quantity}</td>
-            <td>${item.item_status || 'PCS'}</td>
+            <td>PCS</td>
             <td class="part">${item.item_name || `Item #${item.inventory_id}`}</td>
            </tr>`
         : `<tr><td>${i + 1}</td><td></td><td></td><td></td></tr>`;
@@ -292,7 +295,6 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
     pw.document.close();
     pw.focus();
     pw.print();
-    pw.close();
   };
   // ===== END HANDLE PRINT =====
 
