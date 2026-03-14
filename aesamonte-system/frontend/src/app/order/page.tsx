@@ -73,7 +73,7 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/orders/list');
+      const res = await fetch('/api/orders/list');
       const data: Order[] = await res.json();
       setOrders(data.map(order => ({
         ...order,
@@ -87,13 +87,13 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
 
   useEffect(() => {
     fetchOrders();
-    fetch('http://127.0.0.1:5000/api/orders/summary').then(r => r.json()).then(setSummary);
+    fetch('/api/orders/summary').then(r => r.json()).then(setSummary);
     const fetchDropdowns = async () => {
       try {
         const [sR, pR, iR] = await Promise.all([
-          fetch("http://127.0.0.1:5000/api/orders/status?scope=ORDER_STATUS"),
-          fetch("http://127.0.0.1:5000/api/orders/status?scope=PAYMENT_METHOD"),
-          fetch("http://127.0.0.1:5000/api/inventory")
+          fetch("/api/orders/status?scope=ORDER_STATUS"),
+          fetch("/api/orders/status?scope=PAYMENT_METHOD"),
+          fetch("/api/inventory")
         ]);
         if (sR.ok) setOrderStatuses(await sR.json());
         if (pR.ok) setPaymentMethods(await pR.json());
@@ -105,7 +105,7 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
 
   const handleSave = async (newOrderData: any) => {
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/orders/add`, {
+      const response = await fetch(`/api/orders/add`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newOrderData),
       });
       if (response.ok) {
@@ -127,7 +127,7 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
 
   const handleUpdateSave = async (updatedOrder: any) => {
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/orders/update/${updatedOrder.id}`, {
+      const response = await fetch(`/api/orders/update/${updatedOrder.id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedOrder),
       });
       if (response.ok) {
@@ -139,7 +139,7 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
 
   const handleToggleArchive = async (id: number) => {
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/orders/archive/${id}`, { method: 'PUT' });
+      const response = await fetch(`/api/orders/archive/${id}`, { method: 'PUT' });
       if (response.ok) {
         const apiData = await response.json();
         setOrders(prev => prev.map(o => o.id === id ? { ...o, is_archived: apiData.is_archived } : o));

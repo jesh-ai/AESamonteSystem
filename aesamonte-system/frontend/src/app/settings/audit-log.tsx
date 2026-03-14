@@ -42,7 +42,7 @@ export default function AuditLog({
 
   // Fetch logs
   useEffect(() => {
-    fetch('http://127.0.0.1:5000/api/audit-log')
+    fetch('/api/audit-log')
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setLogs(data);

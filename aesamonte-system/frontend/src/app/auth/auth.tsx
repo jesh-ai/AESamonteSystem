@@ -30,7 +30,7 @@ export default function Login({ onLogin }: LoginProps) {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-        const response = await fetch('http://127.0.0.1:5000/api/auth/login', {
+        const response = await fetch('/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -117,7 +117,7 @@ export default function Login({ onLogin }: LoginProps) {
     const handleOtpVerify = async (otpValue: string) => {
       //e.preventDefault();
       try {
-        const response = await fetch('http://127.0.0.1:5000/api/auth/verify-otp', {
+        const response = await fetch('/api/auth/verify-otp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -141,7 +141,7 @@ export default function Login({ onLogin }: LoginProps) {
 
     const handleSendOtp = async (method: "sms" | "email") => {
       try {
-        const response = await fetch('http://127.0.0.1:5000/api/auth/send-otp', {
+        const response = await fetch('/api/auth/send-otp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 

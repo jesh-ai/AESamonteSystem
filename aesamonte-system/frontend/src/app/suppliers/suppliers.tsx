@@ -98,7 +98,7 @@ export default function Suppliers({
 
   const fetchSuppliers = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/suppliers');
+      const res = await fetch('/api/suppliers');
       const data = await res.json();
       setSuppliers(data);
     } catch (err) {
@@ -114,7 +114,7 @@ export default function Suppliers({
 
   const handleCreateSupplier = async () => {
     try {
-      const response = await fetch('http://127.0.0.1:5000/api/suppliers', {
+      const response = await fetch('/api/suppliers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -152,7 +152,7 @@ export default function Suppliers({
   const handleEditSupplier = async () => {
     if (!editFormData) return;
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/suppliers/${editFormData.id}`, {
+      const response = await fetch(`/api/suppliers/${editFormData.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -185,7 +185,7 @@ export default function Suppliers({
 
   const handleToggleArchive = async (id: number) => {
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/suppliers/archive/${id}`, {
+      const response = await fetch(`/api/suppliers/archive/${id}`, {
         method: 'PUT',
       });
       if (response.ok) {

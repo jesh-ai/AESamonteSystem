@@ -35,7 +35,7 @@ export default function AddSupplierModal({ isOpen, onClose, onSuccess }: AddSupp
     if (!form.supplierName.trim()) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/suppliers', {
+      const res = await fetch('/api/suppliers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

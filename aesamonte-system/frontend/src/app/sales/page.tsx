@@ -108,8 +108,8 @@ export default function SalesPage({ role = 'Admin', department, employeeId = 0, 
       if (!isBackground) setIsLoading(true)
       const t = new Date().getTime()
       const [summaryRes, transRes] = await Promise.all([
-        fetch(`http://127.0.0.1:5000/api/sales/summary?t=${t}`, { cache: 'no-store' }),
-        fetch(`http://127.0.0.1:5000/api/sales/transactions?t=${t}`, { cache: 'no-store' })
+        fetch(`/api/sales/summary?t=${t}`, { cache: 'no-store' }),
+        fetch(`/api/sales/transactions?t=${t}`, { cache: 'no-store' })
       ])
       if (summaryRes.ok && transRes.ok) {
         setSummary(await summaryRes.json())
@@ -128,7 +128,7 @@ export default function SalesPage({ role = 'Admin', department, employeeId = 0, 
     if (!tx.paymentMethod?.toLowerCase().includes('bank')) return
     if (tx.status === 'INACTIVE' || tx.is_archived) return
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/sales/toggle-status/${tx.no}`, { method: 'PUT' })
+      const response = await fetch(`/api/sales/toggle-status/${tx.no}`, { method: 'PUT' })
       if (response.ok) {
         const data = await response.json()
         handleExportSuccess(data.message, 'success')
@@ -144,7 +144,7 @@ export default function SalesPage({ role = 'Admin', department, employeeId = 0, 
 
   const handleToggleArchive = async (txNo: string) => {
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/sales/archive/${txNo}`, { method: 'PUT' })
+      const response = await fetch(`/api/sales/archive/${txNo}`, { method: 'PUT' })
       if (response.ok) {
         const data = await response.json()
         setTransactions(prev =>
@@ -166,7 +166,7 @@ export default function SalesPage({ role = 'Admin', department, employeeId = 0, 
     setShowViewModal(true)
 
     try {
-      const res = await fetch(`http://127.0.0.1:5000/api/orders/list`)
+      const res = await fetch(`/api/orders/list`)
       if (!res.ok) return
       const orders = await res.json()
 

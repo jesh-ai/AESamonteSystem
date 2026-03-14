@@ -140,7 +140,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
   const fetchInventory = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`http://127.0.0.1:5000/api/inventory?t=${new Date().getTime()}`, {
+      const res = await fetch(`/api/inventory?t=${new Date().getTime()}`, {
         method: "GET",
         headers: { "Cache-Control": "no-cache", "Pragma": "no-cache" },
         cache: "no-store" 
@@ -166,7 +166,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
 
   const fetchInventorySummary = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:5000/api/inventory/summary", { cache: "no-store" });
+      const res = await fetch("/api/inventory/summary", { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to fetch summary");
       const summary = await res.json();
       setData(prev => ({
@@ -188,7 +188,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
   useEffect(() => {
     const fetchSuppliers = async () => {
       try {
-        const res = await fetch("http://127.0.0.1:5000/api/suppliers");
+        const res = await fetch("/api/suppliers");
         if (res.ok) { const data = await res.json(); setSuppliers(data); }
       } catch (err) { console.error("Failed to fetch suppliers", err); }
     };
@@ -198,7 +198,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
   useEffect(() => {
     const fetchUOMs = async () => {
       try {
-        const res = await fetch("http://127.0.0.1:5000/api/uom");
+        const res = await fetch("/api/uom");
         if (res.ok) { const data = await res.json(); setUoms(data); }
       } catch (err) { console.error("Failed to fetch UOMs", err); }
     };
@@ -218,7 +218,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
   /* ================= TOGGLE ARCHIVE ================= */
   const handleToggleArchive = async (id: string) => {
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/inventory/archive/${id}`, { method: 'PUT' });
+      const response = await fetch(`/api/inventory/archive/${id}`, { method: 'PUT' });
       if (response.ok) {
         const apiData = await response.json();
         setProducts(prev => prev.map(p => p.id === id ? { ...p, is_archived: apiData.is_archived, status: apiData.new_status } : p));
@@ -251,7 +251,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
 
   const handleEditClick = async (product: Product) => {
     try {
-      const res = await fetch(`http://127.0.0.1:5000/api/inventory/${product.id}`);
+      const res = await fetch(`/api/inventory/${product.id}`);
       if (res.ok) {
         const fullData = await res.json();
         setSelectedProduct(fullData); 
@@ -267,7 +267,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
 
   const handleUpdate = async (updatedItem: any) => {
     try {
-      const res = await fetch(`http://127.0.0.1:5000/api/inventory/update/${updatedItem.id}`, {
+      const res = await fetch(`/api/inventory/update/${updatedItem.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedItem),
@@ -302,7 +302,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
         leadTime: Number(item.leadTime) || 0,
         minOrder: Number(item.minOrder) || 0,
       }));
-      const res = await fetch("http://127.0.0.1:5000/api/inventory/add", {
+      const res = await fetch("/api/inventory/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formattedItems), 

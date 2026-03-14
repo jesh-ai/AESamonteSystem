@@ -55,16 +55,16 @@ export default function ReportsPage({ role = "Admin", onLogout }: { role?: strin
       try {
         const t = new Date().getTime(); 
 
-        const salesRes = await fetch(`http://127.0.0.1:5000/api/reports/sales?t=${t}`, { cache: 'no-store' });
+        const salesRes = await fetch(`/api/reports/sales?t=${t}`, { cache: 'no-store' });
         if (salesRes.ok) setSalesData(await salesRes.json());
         else throw new Error("Failed to load sales report.");
 
-        const extraRes = await fetch(`http://127.0.0.1:5000/api/reports/extra?t=${t}`, { cache: 'no-store' });
+        const extraRes = await fetch(`/api/reports/extra?t=${t}`, { cache: 'no-store' });
         if (extraRes.ok) setExtraData(await extraRes.json());
         else throw new Error("Failed to load extra report data.");
 
         try {
-          const invRes = await fetch(`http://127.0.0.1:5000/api/inventory/summary?t=${t}`, { cache: 'no-store' });
+          const invRes = await fetch(`/api/inventory/summary?t=${t}`, { cache: 'no-store' });
           if (invRes.ok) {
              const data = await invRes.json();
              setInventoryData({

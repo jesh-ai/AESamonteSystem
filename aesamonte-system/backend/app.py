@@ -1,3 +1,4 @@
+import os
 from flask import Flask
 from flask_cors import CORS
 from routes.auth import auth_bp
@@ -11,7 +12,11 @@ from routes.reports import reports_bp
 from routes.export_requests import export_requests_bp
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=[
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    os.environ.get("FRONTEND_URL", ""),
+], supports_credentials=True)
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(inventory_bp)
