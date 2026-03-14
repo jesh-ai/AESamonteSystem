@@ -588,3 +588,277 @@
   0% { transform: scale(0.9); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
 }
+
+/* =====================================================
+   SUPPLIER VIEW MODAL — suppliers.module.css additions
+   Copy-paste these classes into your suppliers.module.css
+   ===================================================== */
+
+/* ── Backdrop ── */
+.viewBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+/* ── Modal box ── */
+.viewModal {
+  background: #fff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Modal header ── */
+.viewModalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 1.25rem 1.5rem 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.viewCompanyName {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 2px;
+}
+
+.viewOrderNumber {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #1a4263;
+  letter-spacing: 0.03em;
+}
+
+.viewHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* ── Status badges ── */
+.viewStatusActive {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.viewStatusArchived {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+}
+
+/* ── Close button ── */
+.viewCloseBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  transition: background 0.15s, color 0.15s;
+}
+.viewCloseBtn:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+/* ── Supplier name banner ── */
+.viewSupplierBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, #f0f7ff 0%, #e8f0fe 100%);
+  border-bottom: 1px solid #dbeafe;
+}
+
+.viewSupplierLabel {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 2px;
+}
+
+.viewSupplierNameLarge {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #1e293b;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+.viewSupplierAddress {
+  font-size: 0.8rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+/* ── Scrollable print body ── */
+.viewPrintBody {
+  padding: 1.25rem 1.5rem;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* ── Section wrapper ── */
+.viewCustomerSection {
+  margin-bottom: 1.25rem;
+}
+
+.viewSectionTitle {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  margin-bottom: 0.75rem;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* ── Supplier details grid (2 columns) ── */
+.viewSupplierDetailsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+/* Each detail item with icon */
+.viewDetailItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.viewDetailIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.viewInfoLabel {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
+}
+
+.viewInfoValue {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* ── Totals / terms box (reused from orders pattern) ── */
+.viewTotalsWrapper {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.viewTotalsBox {
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.viewTotalLine {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 1rem;
+  font-size: 0.85rem;
+  color: #475569;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.viewTotalLine:last-child {
+  border-bottom: none;
+}
+
+.viewTotalFinal {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+  background: #f8fafc;
+  border-top: 2px solid #e2e8f0;
+}
+
+/* ── Modal footer ── */
+.viewModalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #e2e8f0;
+  background: #fafafa;
+  border-radius: 0 0 16px 16px;
+}
+
+.viewBtnPrint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  border: none;
+  background: #1a4263;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.viewBtnPrint:hover {
+  background: #15344f;
+}

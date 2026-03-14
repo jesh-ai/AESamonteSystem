@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import styles from '@/css/suppliers.module.css';
 import TopHeader from '@/components/layout/TopHeader';
-import ArchiveSupplierTable from './archiveSupModal';  
+import ArchiveSupplierTable from './archiveSupModal';
 import {
   LuSearch,
   LuEllipsisVertical,
@@ -13,7 +13,12 @@ import {
   LuArchive,
   LuChevronRight,
   LuChevronLeft,
-  LuX
+  LuX,
+  LuPrinter,
+  LuPhone,
+  LuMail,
+  LuMapPin,
+  LuUser
 } from 'react-icons/lu';
 
 /* ================= TYPES ================= */
@@ -25,12 +30,19 @@ type Supplier = {
   contactNumber: string;
   email: string;
   address: string;
-  is_archived?: boolean;  
+  paymentTerms?: string;
+  is_archived?: boolean;
 };
 
 type SortKey = keyof Supplier;
 
 const ROWS_PER_PAGE = 10;
+
+/* ================= HELPERS ================= */
+
+const getViewStatusClass = (isArchived: boolean | undefined, s: Record<string, string>) => {
+  return isArchived ? s.viewStatusArchived : s.viewStatusActive;
+};
 
 /* ================= COMPONENT ================= */
 
@@ -48,12 +60,16 @@ export default function Suppliers({
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
-  const [isArchiveView, setIsArchiveView] = useState(false);  
+  const [isArchiveView, setIsArchiveView] = useState(false);
 
   // Toast states
-  const [showToast, setShowToast] = useState(false);          
-  const [toastMessage, setToastMessage] = useState('');       
-  const [isError, setIsError] = useState(false);              
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [isError, setIsError] = useState(false);
+
+  // View modal state
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [selectedSupplierForView, setSelectedSupplierForView] = useState<Supplier | null>(null);
 
   // --- CREATE MODAL STATE ---
   const [showModal, setShowModal] = useState(false);
@@ -80,19 +96,19 @@ export default function Suppliers({
 
   /* ================= FETCH ================= */
 
-  const fetchSuppliers = async () => {  
+  const fetchSuppliers = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/suppliers')
-      const data = await res.json()
-      setSuppliers(data)
+      const res = await fetch('http://127.0.0.1:5000/api/suppliers');
+      const data = await res.json();
+      setSuppliers(data);
     } catch (err) {
-      console.error('Failed to fetch Suppliers', err)
+      console.error('Failed to fetch Suppliers', err);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
-  useEffect(() => { fetchSuppliers() }, []);
+  useEffect(() => { fetchSuppliers(); }, []);
 
   /* ================= HANDLERS ================= */
 
@@ -109,32 +125,32 @@ export default function Suppliers({
           email: supplierFormData.email,
           paymentTerms: supplierFormData.paymentTerms,
         })
-      })
-      const data = await response.json()
+      });
+      const data = await response.json();
       if (response.ok) {
-        await fetchSuppliers()
-        setShowModal(false)
+        await fetchSuppliers();
+        setShowModal(false);
         setSupplierFormData({
           supplierName: '', address: '', contactPerson: '',
           contact: '', email: '', paymentTerms: 'Cash on Delivery'
-        })
-        setToastMessage(data.message || 'Supplier created successfully!')
-        setIsError(false)
-        setShowToast(true)
+        });
+        setToastMessage(data.message || 'Supplier created successfully!');
+        setIsError(false);
+        setShowToast(true);
       } else {
-        setToastMessage(data.error || 'Failed to create supplier.')
-        setIsError(true)
-        setShowToast(true)
+        setToastMessage(data.error || 'Failed to create supplier.');
+        setIsError(true);
+        setShowToast(true);
       }
-    } catch (err) {
-      setToastMessage('Network error. Please try again.')
-      setIsError(true)
-      setShowToast(true)
+    } catch {
+      setToastMessage('Network error. Please try again.');
+      setIsError(true);
+      setShowToast(true);
     }
-  }
+  };
 
   const handleEditSupplier = async () => {
-    if (!editFormData) return
+    if (!editFormData) return;
     try {
       const response = await fetch(`http://127.0.0.1:5000/api/suppliers/${editFormData.id}`, {
         method: 'PUT',
@@ -146,53 +162,53 @@ export default function Suppliers({
           contactNumber: editFormData.contactNumber,
           email: editFormData.email,
         })
-      })
-      const data = await response.json()
+      });
+      const data = await response.json();
       if (response.ok) {
-        await fetchSuppliers()
-        setEditModal(false)
-        setEditFormData(null)
-        setToastMessage(data.message || 'Supplier updated successfully!')
-        setIsError(false)
-        setShowToast(true)
+        await fetchSuppliers();
+        setEditModal(false);
+        setEditFormData(null);
+        setToastMessage(data.message || 'Supplier updated successfully!');
+        setIsError(false);
+        setShowToast(true);
       } else {
-        setToastMessage(data.error || 'Failed to update supplier.')
-        setIsError(true)
-        setShowToast(true)
+        setToastMessage(data.error || 'Failed to update supplier.');
+        setIsError(true);
+        setShowToast(true);
       }
     } catch {
-      setToastMessage('Network error. Please try again.')
-      setIsError(true)
-      setShowToast(true)
+      setToastMessage('Network error. Please try again.');
+      setIsError(true);
+      setShowToast(true);
     }
-  }
+  };
 
-  const handleToggleArchive = async (id: number) => {   
+  const handleToggleArchive = async (id: number) => {
     try {
       const response = await fetch(`http://127.0.0.1:5000/api/suppliers/archive/${id}`, {
         method: 'PUT',
-      })
+      });
       if (response.ok) {
-        const apiData = await response.json()
+        const apiData = await response.json();
         setSuppliers(prev =>
           prev.map(sup => sup.id === id ? { ...sup, is_archived: apiData.is_archived } : sup)
-        )
-        setToastMessage(apiData.message)
-        setIsError(false)
-        setShowToast(true)
-        setOpenMenuId(null)
+        );
+        setToastMessage(apiData.message);
+        setIsError(false);
+        setShowToast(true);
+        setOpenMenuId(null);
       } else {
-        const errorData = await response.json()
-        setToastMessage(`Failed: ${errorData.error}`)
-        setIsError(true)
-        setShowToast(true)
+        const errorData = await response.json();
+        setToastMessage(`Failed: ${errorData.error}`);
+        setIsError(true);
+        setShowToast(true);
       }
-    } catch (err) {
-      setToastMessage("Network error.")
-      setIsError(true)
-      setShowToast(true)
+    } catch {
+      setToastMessage('Network error.');
+      setIsError(true);
+      setShowToast(true);
     }
-  }
+  };
 
   const handleNumericInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -210,12 +226,135 @@ export default function Suppliers({
     });
   };
 
+  // ===== OPEN / CLOSE VIEW MODAL =====
+  const handleOpenView = (supplier: Supplier) => {
+    setSelectedSupplierForView(supplier);
+    setShowViewModal(true);
+  };
+
+  const closeViewModal = () => {
+    setShowViewModal(false);
+    setSelectedSupplierForView(null);
+  };
+
+  // ===== HANDLE PRINT — SUPPLIER PROFILE FORMAT =====
+  const handlePrint = () => {
+    if (!selectedSupplierForView) return;
+    const pw = window.open('', '_blank');
+    if (!pw) return;
+
+    pw.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>Supplier Profile - No. ${String(selectedSupplierForView.id).padStart(4, '0')}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #000; padding: 24px 28px; }
+
+    .top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; border-bottom: 2px solid #000; padding-bottom: 12px; }
+    .company h1 { font-size: 26px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+    .company p  { font-size: 10px; line-height: 1.65; }
+
+    .receipt-block { text-align: right; }
+    .receipt-title { font-size: 13px; font-weight: 700; letter-spacing: 1px; margin-bottom: 4px; }
+    .receipt-no    { font-size: 24px; font-weight: 900; color: #1a4263; letter-spacing: 2px; }
+    .receipt-no span { font-size: 13px; font-weight: 700; color: #000; }
+
+    .section { margin-bottom: 16px; }
+    .section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #ccc; padding-bottom: 4px; margin-bottom: 10px; color: #1a4263; }
+
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .info-item label { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #666; display: block; margin-bottom: 2px; }
+    .info-item span  { font-size: 11px; color: #000; }
+
+    .info-full { margin-bottom: 10px; }
+    .info-full label { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #666; display: block; margin-bottom: 2px; }
+    .info-full span  { font-size: 11px; color: #000; }
+
+    .status-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 10px; font-weight: 700; background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+
+    .print-footer { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 10px; font-size: 9px; color: #666; display: flex; justify-content: space-between; }
+
+    @media print { body { padding: 10px 14px; } @page { margin: 0.4in; size: letter; } }
+  </style>
+</head>
+<body>
+  <div class="top">
+    <div class="company">
+      <h1>AE Samonte Merchandise</h1>
+      <p>ALAIN E. SAMONTE - Prop.</p>
+      <p>VAT Reg. TIN : 263-884-036-00000</p>
+      <p>1457 A. Leon Guinto St., Zone 73 Barangay 676,</p>
+      <p>1000 Ermita NCR, City of Manila, First District, Philippines</p>
+    </div>
+    <div class="receipt-block">
+      <div class="receipt-title">SUPPLIER PROFILE</div>
+      <div class="receipt-no"><span>S-</span>${String(selectedSupplierForView.id).padStart(4, '0')}</div>
+      <div style="margin-top:6px; font-size:10px;">Printed: ${new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+      <div style="margin-top:4px;"><span class="status-badge">${selectedSupplierForView.is_archived ? 'ARCHIVED' : 'ACTIVE'}</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Company Information</div>
+    <div class="info-full">
+      <label>Supplier Name</label>
+      <span style="font-size:15px; font-weight:700;">${selectedSupplierForView.supplierName}</span>
+    </div>
+    <div class="info-full">
+      <label>Address</label>
+      <span>${selectedSupplierForView.address}</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Contact Information</div>
+    <div class="info-grid">
+      <div class="info-item">
+        <label>Contact Person</label>
+        <span>${selectedSupplierForView.contactPerson}</span>
+      </div>
+      <div class="info-item">
+        <label>Contact Number</label>
+        <span>${selectedSupplierForView.contactNumber}</span>
+      </div>
+    </div>
+    <div class="info-full" style="margin-top:10px;">
+      <label>Email Address</label>
+      <span>${selectedSupplierForView.email}</span>
+    </div>
+  </div>
+
+  ${selectedSupplierForView.paymentTerms ? `
+  <div class="section">
+    <div class="section-title">Payment Terms</div>
+    <div class="info-item">
+      <label>Terms</label>
+      <span>${selectedSupplierForView.paymentTerms}</span>
+    </div>
+  </div>
+  ` : ''}
+
+  <div class="print-footer">
+    <div>AE Samonte Merchandise — Supplier Management System</div>
+    <div>Document generated on ${new Date().toLocaleString('en-PH')}</div>
+  </div>
+</body>
+</html>`);
+
+    pw.document.close();
+    pw.focus();
+    pw.print();
+    pw.close();
+  };
+  // ===== END HANDLE PRINT =====
+
   /* ================= DATA PROCESSING ================= */
 
   const filtered = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     return suppliers.filter(sup => {
-      const matchesArchiveView = isArchiveView ? Boolean(sup.is_archived) : !sup.is_archived;  
+      const matchesArchiveView = isArchiveView ? Boolean(sup.is_archived) : !sup.is_archived;
       return matchesArchiveView && (
         sup.id.toString().includes(term) ||
         sup.supplierName.toLowerCase().includes(term) ||
@@ -225,7 +364,7 @@ export default function Suppliers({
         sup.address.toLowerCase().includes(term)
       );
     });
-  }, [suppliers, searchTerm, isArchiveView]); 
+  }, [suppliers, searchTerm, isArchiveView]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -314,7 +453,7 @@ export default function Suppliers({
                 <button
                   className={s.archiveIconBtn}
                   style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#64748b' }}
-                  onClick={() => setIsArchiveView(true)}  
+                  onClick={() => setIsArchiveView(true)}
                   title="View Archives"
                 >
                   <LuArchive size={20} />
@@ -352,14 +491,19 @@ export default function Suppliers({
               <tbody>
                 {paginated.length ? (
                   paginated.map((sup, i) => (
-                    <tr key={sup.id} className={i % 2 ? s.altRow : ''}>
+                    <tr
+                      key={sup.id}
+                      className={i % 2 ? s.altRow : ''}
+                      onClick={() => handleOpenView(sup)}
+                      style={{ cursor: 'pointer' }}
+                    >
                       <td>{sup.id}</td>
-                      <td>{sup.supplierName}</td>
+                      <td><strong>{sup.supplierName}</strong></td>
                       <td>{sup.contactPerson}</td>
                       <td>{sup.contactNumber}</td>
                       <td>{sup.email}</td>
-                      <td>{sup.address}</td>
-                      <td className={s.actionCell}>
+                      <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sup.address}</td>
+                      <td className={s.actionCell} onClick={e => e.stopPropagation()}>
                         <LuEllipsisVertical
                           className={s.moreIcon}
                           onClick={() => setOpenMenuId(openMenuId === sup.id ? null : sup.id)}
@@ -369,9 +513,9 @@ export default function Suppliers({
                             <button
                               className={s.popBtnEdit}
                               onClick={() => {
-                                setEditFormData(sup)
-                                setEditModal(true)
-                                setOpenMenuId(null)
+                                setEditFormData(sup);
+                                setEditModal(true);
+                                setOpenMenuId(null);
                               }}
                             >
                               <LuPencil size={14} /> Edit
@@ -427,7 +571,7 @@ export default function Suppliers({
                   <input
                     name="supplierName"
                     value={supplierFormData.supplierName}
-                    onChange={(e) => setSupplierFormData({...supplierFormData, supplierName: e.target.value})}
+                    onChange={(e) => setSupplierFormData({ ...supplierFormData, supplierName: e.target.value })}
                   />
                 </div>
               </div>
@@ -437,7 +581,7 @@ export default function Suppliers({
                 <input
                   name="address"
                   value={supplierFormData.address}
-                  onChange={(e) => setSupplierFormData({...supplierFormData, address: e.target.value})}
+                  onChange={(e) => setSupplierFormData({ ...supplierFormData, address: e.target.value })}
                 />
               </div>
 
@@ -448,7 +592,7 @@ export default function Suppliers({
                   <input
                     name="contactPerson"
                     value={supplierFormData.contactPerson}
-                    onChange={(e) => setSupplierFormData({...supplierFormData, contactPerson: e.target.value})}
+                    onChange={(e) => setSupplierFormData({ ...supplierFormData, contactPerson: e.target.value })}
                   />
                 </div>
                 <div className={s.formGroup}>
@@ -466,7 +610,7 @@ export default function Suppliers({
                 <input
                   name="email"
                   value={supplierFormData.email}
-                  onChange={(e) => setSupplierFormData({...supplierFormData, email: e.target.value})}
+                  onChange={(e) => setSupplierFormData({ ...supplierFormData, email: e.target.value })}
                 />
               </div>
 
@@ -476,7 +620,7 @@ export default function Suppliers({
                 <select
                   name="paymentTerms"
                   value={supplierFormData.paymentTerms}
-                  onChange={(e) => setSupplierFormData({...supplierFormData, paymentTerms: e.target.value})}
+                  onChange={(e) => setSupplierFormData({ ...supplierFormData, paymentTerms: e.target.value })}
                 >
                   <option>Cash on Delivery</option>
                   <option>Card</option>
@@ -513,7 +657,7 @@ export default function Suppliers({
                   <label>Supplier Name</label>
                   <input
                     value={editFormData.supplierName}
-                    onChange={(e) => setEditFormData({...editFormData, supplierName: e.target.value})}
+                    onChange={(e) => setEditFormData({ ...editFormData, supplierName: e.target.value })}
                   />
                 </div>
               </div>
@@ -522,7 +666,7 @@ export default function Suppliers({
                 <label>Address</label>
                 <input
                   value={editFormData.address}
-                  onChange={(e) => setEditFormData({...editFormData, address: e.target.value})}
+                  onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
                 />
               </div>
 
@@ -532,14 +676,14 @@ export default function Suppliers({
                   <label>Contact Person</label>
                   <input
                     value={editFormData.contactPerson}
-                    onChange={(e) => setEditFormData({...editFormData, contactPerson: e.target.value})}
+                    onChange={(e) => setEditFormData({ ...editFormData, contactPerson: e.target.value })}
                   />
                 </div>
                 <div className={s.formGroup}>
                   <label>Contact No.</label>
                   <input
                     value={editFormData.contactNumber}
-                    onChange={(e) => setEditFormData({...editFormData, contactNumber: e.target.value.replace(/[^\d]/g, '')})}
+                    onChange={(e) => setEditFormData({ ...editFormData, contactNumber: e.target.value.replace(/[^\d]/g, '') })}
                   />
                 </div>
               </div>
@@ -548,7 +692,7 @@ export default function Suppliers({
                 <label>Email Address</label>
                 <input
                   value={editFormData.email}
-                  onChange={(e) => setEditFormData({...editFormData, email: e.target.value})}
+                  onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
                 />
               </div>
 
@@ -559,6 +703,87 @@ export default function Suppliers({
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== VIEW / SUPPLIER PROFILE MODAL ===== */}
+      {showViewModal && selectedSupplierForView && (
+        <div className={s.viewBackdrop} onClick={closeViewModal}>
+          <div className={s.viewModal} onClick={e => e.stopPropagation()}>
+
+            {/* Modal Header */}
+            <div className={s.viewModalHeader}>
+              <div>
+                <h2 className={s.viewCompanyName}>AE Samonte Trading</h2>
+                <p className={s.viewOrderNumber}>S-{String(selectedSupplierForView.id).padStart(4, '0')}</p>
+              </div>
+              <div className={s.viewHeaderRight}>
+                <button className={s.viewCloseBtn} onClick={closeViewModal}><LuX size={20} /></button>
+              </div>
+            </div>
+
+            {/* Supplier Name Banner */}
+            <div className={s.viewSupplierBanner}>
+              <div>
+                <p className={s.viewSupplierLabel}>Supplier Name</p>
+                <p className={s.viewSupplierNameLarge}>{selectedSupplierForView.supplierName}</p>
+                <p className={s.viewSupplierAddress}>{selectedSupplierForView.address}</p>
+              </div>
+            </div>
+
+            {/* Details Body */}
+            <div className={s.viewPrintBody}>
+
+              {/* Contact Info Section */}
+              <div className={s.viewCustomerSection}>
+                <p className={s.viewSectionTitle}>Contact Information</p>
+                <div className={s.viewSupplierDetailsGrid}>
+                  <div className={s.viewDetailItem}>
+                    <div className={s.viewDetailIcon}><LuUser size={14} /></div>
+                    <div>
+                      <p className={s.viewInfoLabel}>Contact Person</p>
+                      <p className={s.viewInfoValue}>{selectedSupplierForView.contactPerson || '—'}</p>
+                    </div>
+                  </div>
+                  <div className={s.viewDetailItem}>
+                    <div className={s.viewDetailIcon}><LuPhone size={14} /></div>
+                    <div>
+                      <p className={s.viewInfoLabel}>Contact Number</p>
+                      <p className={s.viewInfoValue}>{selectedSupplierForView.contactNumber || '—'}</p>
+                    </div>
+                  </div>
+                  <div className={s.viewDetailItem}>
+                    <div className={s.viewDetailIcon}><LuMail size={14} /></div>
+                    <div>
+                      <p className={s.viewInfoLabel}>Email Address</p>
+                      <p className={s.viewInfoValue}>{selectedSupplierForView.email || '—'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Terms */}
+              {selectedSupplierForView.paymentTerms && (
+                <div className={s.viewCustomerSection}>
+                  <p className={s.viewSectionTitle}>Terms</p>
+                  <div className={s.viewTotalsWrapper}>
+                    <div className={s.viewTotalsBox}>
+                      <div className={s.viewTotalLine}>
+                        <span>Payment Terms</span>
+                        <span>{selectedSupplierForView.paymentTerms}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Buttons */}
+            <div className={s.viewModalFooter}>
+              <button className={s.viewBtnPrint} onClick={handlePrint}><LuPrinter size={14} /> Print </button>
+            </div>
+
           </div>
         </div>
       )}

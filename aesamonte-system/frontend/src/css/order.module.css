@@ -827,3 +827,297 @@ th.actionHeader .sortHeaderInner {
   justify-content: center;
   align-items: center;
 }
+/* ===== VIEW / RECEIPT MODAL ===== */
+.viewBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5000;
+  padding: 16px;
+  animation: toastPop 0.15s ease;
+}
+
+.viewModal {
+  background: #ffffff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 620px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.viewModal::-webkit-scrollbar {
+  width: 6px;
+}
+
+.viewModal::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.viewModal::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 3px;
+}
+
+.viewModal::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+
+.viewModalHeader {
+  padding: 20px 24px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.viewCompanyName {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.viewOrderNumber {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.viewHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.viewCloseBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+
+.viewCloseBtn:hover {
+  color: #475569;
+}
+
+.viewDateRow {
+  padding: 4px 24px 0;
+  display: flex;
+  justify-content: flex-end;
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* Status badges for view modal */
+.viewStatusPreparing {
+  padding: 3px 14px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1.5px solid #3b82f6;
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.viewStatusToShip {
+  padding: 3px 14px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1.5px solid #f59e0b;
+  color: #b45309;
+  background: #fffbeb;
+}
+
+.viewStatusReceived {
+  padding: 3px 14px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1.5px solid #22c55e;
+  color: #15803d;
+  background: #f0fdf4;
+}
+
+.viewStatusCancelled {
+  padding: 3px 14px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1.5px solid #ef4444;
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+.viewStatusDefault {
+  padding: 3px 14px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1.5px solid #94a3b8;
+  color: #475569;
+  background: #f8fafc;
+}
+
+/* Printable body */
+.viewPrintBody {
+  padding: 0 24px;
+}
+
+/* Customer section */
+.viewCustomerSection {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin: 16px 0;
+}
+
+.viewSectionTitle {
+  font-size: 11px;
+  color: #3b82f6;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 10px;
+}
+
+.viewCustomerGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+.viewInfoLabel {
+  font-size: 11px;
+  color: #94a3b8;
+  margin: 0 0 2px;
+}
+
+.viewInfoValue {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+}
+
+/* Items table */
+.viewItemsTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 4px 0 12px;
+}
+
+.viewItemsTable thead th {
+  font-size: 11px;
+  color: #64748b;
+  padding: 8px;
+  border-bottom: 1px solid #e2e8f0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  text-align: right;
+}
+
+.viewItemsTable thead th:first-child {
+  text-align: left;
+}
+
+.viewItemsTable tbody td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 13px;
+  color: #334155;
+  text-align: right;
+}
+
+.viewItemsTable tbody td:first-child {
+  text-align: left;
+}
+
+.viewItemName {
+  margin: 0;
+}
+
+.viewItemStatus {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.viewEmptyRow td {
+  padding: 20px 8px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+/* Totals */
+.viewTotalsWrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.viewTotalsBox {
+  width: 220px;
+}
+
+.viewTotalLine {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.viewTotalFinal {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0 0;
+  margin-top: 6px;
+  border-top: 1.5px solid #1e293b;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+/* Footer */
+.viewModalFooter {
+  padding: 14px 24px 20px;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.viewBtnPrint {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #1a4263;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s;
+}
+
+.viewBtnPrint:hover {
+  background: #164163;
+  opacity: 0.9;
+}
