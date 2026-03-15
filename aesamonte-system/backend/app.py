@@ -10,6 +10,7 @@ from routes.audit_log import audit_log_bp
 from routes.users import users_bp
 from routes.reports import reports_bp
 from routes.export_requests import export_requests_bp
+from routes.roles import roles_bp
 
 app = Flask(__name__)
 CORS(app, origins=[
@@ -27,6 +28,7 @@ app.register_blueprint(audit_log_bp)
 app.register_blueprint(users_bp, url_prefix="/api")
 app.register_blueprint(reports_bp)
 app.register_blueprint(export_requests_bp)
+app.register_blueprint(roles_bp, url_prefix="/api")
 
 
 if __name__ == "__main__":

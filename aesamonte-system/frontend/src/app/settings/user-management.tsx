@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useEffect, useState } from "react";
@@ -30,7 +31,7 @@ export default function UserManagement({ onBack }: { onBack: () => void }) {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`);
+      const response = await fetch(`/api/employees`);
       const data = await response.json();
 
       const formattedUsers = data
@@ -63,7 +64,7 @@ export default function UserManagement({ onBack }: { onBack: () => void }) {
     if (!userToDelete) return;
     try {
       // Calls the Soft Delete backend
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/${userToDelete}`, {
+      const response = await fetch(`/api/employees/${userToDelete}`, {
         method: "DELETE" 
       });
 
