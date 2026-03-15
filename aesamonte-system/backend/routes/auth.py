@@ -21,7 +21,7 @@ def login():
 
     try:
         cur.execute("""
-            SELECT e.employee_id, e.role_id, r.role_name, e.department,
+            SELECT e.employee_id, e.role_id, r.role_name,
                    r.sales_permissions, r.inventory_permissions, r.order_permissions,
                    r.supplier_permissions, r.reports_permissions, r.settings_permissions
             FROM employee e
@@ -46,7 +46,6 @@ def login():
                 "employee_id": user['employee_id'],
                 "role_id":     user['role_id'],
                 "role_name":   user['role_name'],
-                "department":  user['department'],
                 "permissions": permissions,
                 "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=8)
             }
@@ -58,7 +57,6 @@ def login():
                 "token":       token,
                 "role":        user['role_name'],
                 "employee_id": user['employee_id'],
-                "department":  user['department'],
                 "permissions": permissions,
             }), 200
 

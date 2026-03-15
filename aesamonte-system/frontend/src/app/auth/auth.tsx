@@ -59,9 +59,9 @@ export default function Login({ onLogin }: LoginProps) {
         alert(data.message || "Invalid credentials");
       }
     } catch (err) {
-      alert("Connection failed. Ensure your Flask server is running on port 5000.");
+      alert("Connection failed. The backend server is unreachable. Please try again later.");
     }
-    
+
   };
 
   // inside Login component in src/app/auth/auth.tsx
@@ -135,7 +135,7 @@ export default function Login({ onLogin }: LoginProps) {
           alert(data.message || "Invalid OTP");
         }
       } catch (err) {
-        alert("Connection failed. Ensure your Flask server is running on port 5000.");
+        alert("Connection failed. The backend server is unreachable. Please try again later.");
       }
     };
 
@@ -160,7 +160,7 @@ export default function Login({ onLogin }: LoginProps) {
           alert(data.message || "Failed to send OTP");
         }
       } catch (err) {
-        alert("Connection failed. Ensure your Flask server is running on port 5000.");
+        alert("Connection failed. The backend server is unreachable. Please try again later.");
       }
     };
   return (
