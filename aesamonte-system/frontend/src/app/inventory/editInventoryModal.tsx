@@ -262,7 +262,7 @@ const EditInventoryModal = ({ isOpen, onClose, itemData, onSave, suppliers, uoms
                             disabled={usedElsewhere}
                             style={{ color: usedElsewhere ? '#9ca3af' : '#374151' }}
                           >
-                            {sup.supplierName}{usedElsewhere ? ' (already added)' : ''}
+                            {sup.supplierName}{usedElsewhere ? '' : ''}
                           </option>
                         );
                       })}
