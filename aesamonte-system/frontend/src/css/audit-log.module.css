@@ -27,18 +27,13 @@
   color: #555;
 }
 
-.tableContainer {
-  background: #fff;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-}
-
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 2rem;
+  flex-wrap: wrap; 
+  gap: 1rem;
 }
 
 .title {
@@ -53,8 +48,10 @@
   background: #f1f3f4;
   padding: 8px 15px;
   border-radius: 8px;
-  width: 250px;
+  width: 100%;
+  max-width: 250px; 
   gap: 8px;
+  flex: 1;
 }
 
 .searchInput {
@@ -66,6 +63,7 @@
 
 .table {
   width: 100%;
+  min-width: 1050px; /* ADD THIS: Forces table width to trigger the scrollbar (1050px is good for 11 columns) */
   border-collapse: collapse;
   table-layout: fixed;
 }
@@ -106,10 +104,10 @@
 .sortIconsStack svg:hover { color: #1a4263; transform: scale(1.2); }
 .activeSort { color: #1a4263 !important; }
 
-.footer { display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; }
+.footer { display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; flex-wrap: wrap; gap: 1rem;}
 .showDataText { font-size: 0.9rem; }
 .countBadge { border: 1px solid #ccc; padding: 2px 8px; border-radius: 10px; }
-.pagination { display: flex; align-items: center; gap: 8px; }
+.pagination { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center;}
 
 .pageCircle,
 .pageCircleActive {
@@ -158,4 +156,51 @@
 .newValue {
   color: #4A4A4A;  
   font-weight: 600;
+}
+
+/* ===== TABLE CONTAINER ===== */
+.tableContainer {
+  background-color: #ffffff;
+  margin: 2rem 0;
+  padding: 2.5rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  max-width: 100%; /* ADD THIS: Keeps container from stretching past the screen */
+  box-sizing: border-box; /* ADD THIS: Keeps padding inside the max-width */
+}
+
+/* ADD THIS NEW CLASS */
+.tableResponsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 600px) {
+  /* Existing footer rule */
+  .footer {
+    justify-content: center;
+    text-align: center;
+  }
+  
+  /* NEW RULES FOR HEADER CONTROLS */
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .controls {
+  display: flex !important;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap; /* ADD THIS: Allows the search bar and buttons to wrap if needed */
+  width: 100%; /* ADD THIS: Take up full width when stacked */
+  max-width: fit-content; /* ADD THIS: Prevents stretching when not stacked */
+}
+  
+  .searchWrapper {
+    max-width: 100%; /* Allows search bar to span full width on mobile */
+    order: 3; /* Pushes the search bar below the buttons for better tap targets */
+  }
 }
