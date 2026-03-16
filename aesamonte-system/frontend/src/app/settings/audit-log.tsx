@@ -146,16 +146,29 @@ export default function AuditLog({
     if (page >= 1 && page <= totalPages) setCurrentPage(page);
   };
 
-  const renderPageNumbers = () =>
-    Array.from({ length: totalPages }, (_, i) => (
-      <div
-        key={`page-${i + 1}`}
-        className={`${s.pageCircle} ${currentPage === i + 1 ? s.pageCircleActive : ''}`}
-        onClick={() => changePage(i + 1)}
-      >
-        {i + 1}
-      </div>
-    ));
+  const renderPageNumbers = () => {
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    const pages = [];
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(
+        <button
+          key={i}
+          className={currentPage === i ? s.pageCircleActive : s.pageCircle}
+          onClick={() => setCurrentPage(i)}
+        >
+          {i}
+        </button>
+      );
+    }
+    return pages;
+  };
 
   if (isLoading) return <div className={s.loadingContainer}>Loading Audit Logs...</div>;
 
@@ -204,84 +217,86 @@ export default function AuditLog({
             </div>
           </div>
 
-          <table className={s.table}>
-            <colgroup>
-              <col className={s.dateCol} />
-              <col className={s.recordCol} />
-              <col className={s.moduleCol} />
-              <col className={s.actionCol} />
-              <col className={s.performedByCol} />
-              <col className={s.changedFieldsCol} />
-            </colgroup>
+          <div className={s.tableResponsive}>
+            <table className={s.table}>
+              <colgroup>
+                <col className={s.dateCol} />
+                <col className={s.recordCol} />
+                <col className={s.moduleCol} />
+                <col className={s.actionCol} />
+                <col className={s.performedByCol} />
+                <col className={s.changedFieldsCol} />
+              </colgroup>
 
-            <thead>
-              <tr>
-                {columns.map(col => (
-                  <th key={col.key} onClick={() => handleSort(col.key)} className={s.sortableHeader}>
-                    <div className={s.sortHeaderInner}>
-                      <span>{col.label}</span>
-                      <div className={s.sortIconsStack}>
-                        <LuChevronUp
-                          className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''}
-                        />
-                        <LuChevronDown
-                          className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''}
-                        />
+              <thead>
+                <tr>
+                  {columns.map(col => (
+                    <th key={col.key} onClick={() => handleSort(col.key)} className={s.sortableHeader}>
+                      <div className={s.sortHeaderInner}>
+                        <span>{col.label}</span>
+                        <div className={s.sortIconsStack}>
+                          <LuChevronUp
+                            className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''}
+                          />
+                          <LuChevronDown
+                            className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  </th>
-                ))}
-                <th>CHANGED FIELDS</th>
-              </tr>
-            </thead>
+                    </th>
+                  ))}
+                  <th>CHANGED FIELDS</th>
+                </tr>
+              </thead>
 
-            <tbody>
-              {paginated.length ? (
-                paginated.map((log, i) => (
-                  <tr key={`log-${log.id}-${currentPage}-${i}`} className={i % 2 ? s.altRow : ''}>
-                    <td className={s.dateCol}>{log.actionDate ? new Date(log.actionDate).toLocaleString() : '-'}</td>
-                    <td className={s.recordCol}>{log.recordName ?? '-'}</td>
-                    <td className={s.moduleCol}>{log.module ?? '-'}</td>
-                    <td className={s.actionCol}>{log.actionType ?? '-'}</td>
-                    <td className={s.performedByCol}>{log.performedBy ?? '-'}</td>
-                    <td className={s.changedFieldsCol}>
-                      {log.changedFields
-                        ? Object.entries(log.changedFields).map(([field, value], idx) => {
-                            const oldVal = typeof value === 'object' && value.old !== undefined ? JSON.stringify(value.old) : '-';
-                            const newVal =
-                              typeof value === 'object' && value.new !== undefined
-                                ? JSON.stringify(value.new)
-                                : typeof value === 'object'
-                                ? JSON.stringify(value)
-                                : value ?? '-';
+              <tbody>
+                {paginated.length ? (
+                  paginated.map((log, i) => (
+                    <tr key={`log-${log.id}-${currentPage}-${i}`} className={i % 2 ? s.altRow : ''}>
+                      <td className={s.dateCol}>{log.actionDate ? new Date(log.actionDate).toLocaleString() : '-'}</td>
+                      <td className={s.recordCol}>{log.recordName ?? '-'}</td>
+                      <td className={s.moduleCol}>{log.module ?? '-'}</td>
+                      <td className={s.actionCol}>{log.actionType ?? '-'}</td>
+                      <td className={s.performedByCol}>{log.performedBy ?? '-'}</td>
+                      <td className={s.changedFieldsCol}>
+                        {log.changedFields
+                          ? Object.entries(log.changedFields).map(([field, value], idx) => {
+                              const oldVal = typeof value === 'object' && value.old !== undefined ? JSON.stringify(value.old) : '-';
+                              const newVal =
+                                typeof value === 'object' && value.new !== undefined
+                                  ? JSON.stringify(value.new)
+                                  : typeof value === 'object'
+                                  ? JSON.stringify(value)
+                                  : value ?? '-';
 
-                            return log.actionType?.toUpperCase() === 'UPDATE' ? (
-                              <div key={`field-${field}-${idx}`} style={{ marginBottom: '0.5rem' }}>
-                                <div>
-                                  <strong>{field.replace(/_/g, ' ')}:</strong>{' '}
-                                  <span className={s.newValue}><em>{newVal}</em></span>
+                              return log.actionType?.toUpperCase() === 'UPDATE' ? (
+                                <div key={`field-${field}-${idx}`} style={{ marginBottom: '0.5rem' }}>
+                                  <div>
+                                    <strong>{field.replace(/_/g, ' ')}:</strong>{' '}
+                                    <span className={s.newValue}><em>{newVal}</em></span>
+                                  </div>
+                                  <div className={s.oldValue}>OLD: {oldVal}</div>
                                 </div>
-                                <div className={s.oldValue}>OLD: {oldVal}</div>
-                              </div>
-                            ) : (
-                              <div key={`field-${field}-${idx}`} style={{ marginBottom: '0.5rem' }}>
-                                <strong>{field.replace(/_/g, ' ')}:</strong> <span className={s.newValue}>{newVal}</span>
-                              </div>
-                            );
-                          })
-                        : '-'}
+                              ) : (
+                                <div key={`field-${field}-${idx}`} style={{ marginBottom: '0.5rem' }}>
+                                  <strong>{field.replace(/_/g, ' ')}:</strong> <span className={s.newValue}>{newVal}</span>
+                                </div>
+                              );
+                            })
+                          : '-'}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '2rem' }}>
+                      No audit logs found.
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '2rem' }}>
-                    No audit logs found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
 
           <div className={s.footer}>
             <div className={s.showDataText}>
@@ -289,15 +304,13 @@ export default function AuditLog({
             </div>
             {totalPages > 1 && (
               <div className={s.pagination}>
-                <button className={s.nextBtn} onClick={() => changePage(currentPage - 1)} disabled={currentPage === 1}>
+                <button className={s.nextBtn} disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}>
                   <LuChevronLeft />
                 </button>
+                
                 {renderPageNumbers()}
-                <button
-                  className={s.nextBtn}
-                  onClick={() => changePage(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                >
+                
+                <button className={s.nextBtn} disabled={currentPage >= totalPages} onClick={() => setCurrentPage(prev => prev + 1)}>
                   <LuChevronRight />
                 </button>
               </div>
