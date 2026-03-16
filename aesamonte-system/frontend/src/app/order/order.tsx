@@ -562,6 +562,7 @@ export default function OrderPage({ role, onLogout }: { role: string; onLogout: 
                 <p className={s.viewSectionTitle}>Customer Details</p>
                 <div className={s.viewCustomerGrid}>
                   {[
+                    {label: 'Customer Name', value: selectedOrderForView.customer},
                     { label: 'Contact Number', value: selectedOrderForView.contact || '—' },
                     { label: 'Address', value: selectedOrderForView.address },
                     { label: 'Payment Method', value: selectedOrderForView.paymentMethod },
