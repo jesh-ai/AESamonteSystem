@@ -1,0 +1,31 @@
+{
+  "version": 2,
+  "regions": ["sin1"],
+  "functions": {
+    "backend/api/*.py": {
+      "regions": ["sin1"]
+    }
+  },
+  "builds": [
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/next"
+    },
+    {
+      "src": "backend/api/index.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/backend/api/index.py"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/backup/cron",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}
