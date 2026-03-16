@@ -4,37 +4,35 @@ import React, { useState } from 'react';
 import styles from "@/css/inventory.module.css";
 import { exportPDF, exportExcel, exportCSV } from '@/utils/exportUtils';
 
-interface Product {
-  id: string; item_name: string; item_description: string; sku: string;
-  brand: string; qty: number; uom: string; unitPrice: number; price: number; status: string;
+interface Order {
+  id: number; customer: string; address: string; date: string;
+  totalQty: number; totalAmount: number; paymentMethod: string; status: string;
 }
-interface InventorySummary {
-  totalProducts: number; totalProductsChange: number;
-  weeklyInventory: number; monthlyInventory: number; yearlyInventory: number;
-  outOfStockCount: number;
+interface OrderSummary {
+  shippedToday: { current: number; total: number };
+  cancelled: { current: number };
+  totalOrders: { count: number };
 }
 interface ExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (message: string, type?: 'success' | 'error') => void;
-  data: Product[];
-  summary: InventorySummary;
+  data: Order[];
+  summary: OrderSummary;
 }
 
 const COLUMNS = [
-  { header: 'ID',            key: 'id' },
-  { header: 'Item Name',     key: 'item_name' },
-  { header: 'Description',   key: 'item_description' },
-  { header: 'SKU',           key: 'sku' },
-  { header: 'Brand',         key: 'brand' },
-  { header: 'Qty',           key: 'qty' },
-  { header: 'UOM',           key: 'uom' },
-  { header: 'Unit Price',    key: 'unitPrice' },
-  { header: 'Selling Price', key: 'price' },
-  { header: 'Status',        key: 'status' },
+  { header: 'ID',             key: 'id' },
+  { header: 'Customer',       key: 'customer' },
+  { header: 'Address',        key: 'address' },
+  { header: 'Date',           key: 'date' },
+  { header: 'Qty',            key: 'totalQty' },
+  { header: 'Total Amount',   key: 'totalAmount' },
+  { header: 'Payment Method', key: 'paymentMethod' },
+  { header: 'Status',         key: 'status' },
 ];
 
-const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, onSuccess, data, summary }) => {
+const OrderExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, onSuccess, data, summary }) => {
   const [format, setFormat] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -47,21 +45,18 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, onSuccess, d
     setLoading(true);
     try {
       const summaryItems = [
-        { label: 'Total Products',    value: summary.totalProducts.toLocaleString() },
-        { label: 'vs Last Month',     value: `+${summary.totalProductsChange}%` },
-        { label: 'Weekly Inventory',  value: summary.weeklyInventory.toLocaleString() },
-        { label: 'Monthly Inventory', value: summary.monthlyInventory.toLocaleString() },
-        { label: 'Yearly Inventory',  value: summary.yearlyInventory.toLocaleString() },
-        { label: 'Out of Stock',      value: summary.outOfStockCount.toLocaleString() },
+        { label: 'Shipped Today',    value: `${summary.shippedToday.current} / ${summary.shippedToday.total}` },
+        { label: 'Orders Cancelled', value: summary.cancelled.current.toLocaleString() },
+        { label: 'Total Orders',     value: summary.totalOrders.count.toLocaleString() },
       ];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rows = data.map(p => ({ ...p }) as Record<string, any>);
+      const rows = data.map(o => ({ ...o }) as Record<string, any>);
 
-      if (format === 'PDF')        await exportPDF('Inventory Report', summaryItems, COLUMNS, rows, 'AE_Samonte_Inventory');
-      else if (format === 'Excel') await exportExcel('Inventory Report', summaryItems, COLUMNS, rows, 'AE_Samonte_Inventory');
-      else if (format === 'CSV')   exportCSV('Inventory Report', summaryItems, COLUMNS, rows, 'AE_Samonte_Inventory');
+      if (format === 'PDF')        await exportPDF('Orders Report', summaryItems, COLUMNS, rows, 'AE_Samonte_Orders');
+      else if (format === 'Excel') await exportExcel('Orders Report', summaryItems, COLUMNS, rows, 'AE_Samonte_Orders');
+      else if (format === 'CSV')   exportCSV('Orders Report', summaryItems, COLUMNS, rows, 'AE_Samonte_Orders');
 
-      onSuccess(`Inventory Report downloaded as ${format}!`, 'success');
+      onSuccess(`Orders Report downloaded as ${format}!`, 'success');
       setFormat(''); onClose();
     } catch (err) {
       console.error(err);
@@ -99,4 +94,4 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, onSuccess, d
   );
 };
 
-export default ExportModal;
+export default OrderExportModal;

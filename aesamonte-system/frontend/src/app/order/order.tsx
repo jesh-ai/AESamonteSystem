@@ -5,6 +5,8 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import styles from '@/css/order.module.css';
 import TopHeader from '@/components/layout/TopHeader';
+import ExportButton from '@/components/features/ExportButton';
+import ExportModal from './exportModal';
 import OrderEditModal from './editOrderModal';
 import AddOrderModal from './addOrderModal';
 import ArchiveTable from './archiveOrderModal';
@@ -69,6 +71,7 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
   const [orderStatuses, setOrderStatuses] = useState<any[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [inventoryItems, setInventoryItems] = useState<any[]>([]);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastTitle, setToastTitle] = useState('');
   const [toastMessage, setToastMessage] = useState('');
@@ -454,6 +457,14 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
       )}
 
       <div className={s.mainContent}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', marginBottom: '20px' }}>
+          {['Admin', 'Manager'].includes(role) && (
+            <div onClick={() => setShowExportModal(true)}>
+              <ExportButton />
+            </div>
+          )}
+        </div>
+
         <div className={s.topGrid}>
           <section className={s.statCard}><p className={s.cardTitle}>Shipped Today</p><h2 className={s.bigNumber}>{summary ? `${summary.shippedToday.current}/${summary.shippedToday.total}` : '—'}</h2></section>
           <section className={s.statCard}><p className={s.cardTitle}>Orders Cancelled</p><h2 className={s.bigNumber}>{summary ? summary.cancelled.current : '—'}</h2></section>
@@ -549,6 +560,7 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
         )}
       </div>
 
+      <ExportModal isOpen={showExportModal} onClose={() => setShowExportModal(false)} onSuccess={(msg, type) => { setToastTitle(type === 'error' ? 'Oops!' : 'Success!'); setToastMessage(msg); setIsError(type === 'error'); setShowToast(true); }} data={orders.filter(o => !o.is_archived)} summary={summary ?? { shippedToday: { current: 0, total: 0 }, cancelled: { current: 0 }, totalOrders: { count: 0 } }} />
       <AddOrderModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} onSave={handleSave} statuses={orderStatuses} paymentMethods={paymentMethods} inventoryItems={inventoryItems} />
       <OrderEditModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} orderData={selectedOrderForEdit} onSave={handleUpdateSave} statuses={orderStatuses} paymentMethods={paymentMethods} inventoryItems={inventoryItems} />
 

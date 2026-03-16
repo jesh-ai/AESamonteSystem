@@ -647,7 +647,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
       </div>
 
       {/* --- Export Modal --- */}
-      <ExportModal isOpen={showExportModal} onClose={() => setShowExportModal(false)} onSuccess={handleExportSuccess} />
+      <ExportModal isOpen={showExportModal} onClose={() => setShowExportModal(false)} onSuccess={handleExportSuccess} data={products.filter(p => !p.is_archived)} summary={data} />
 
       {/* --- Export Request Modal --- */}
       <ExportRequestModal
