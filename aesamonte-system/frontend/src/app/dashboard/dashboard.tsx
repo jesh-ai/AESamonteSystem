@@ -247,7 +247,7 @@ export default function Dashboard({ role = "Admin", onLogout, onNavigate }: Dash
 
   const handleCardClick = async (orderId: number) => {
     setReceiptLoading(true);
-    setReceipt({ orderId, customerName: "", orderDate: "", totalAmount: 0, status: "", paymentMethod: "", items: [] });
+    setReceipt({ orderId, customerName: "", customerAddress: "", orderDate: "", totalAmount: 0, status: "", paymentMethod: "", items: [] });
     try {
       const res = await fetch(`${API}/api/dashboard/order-receipt/${orderId}`, { credentials: "include" });
       const text = await res.text();
@@ -276,101 +276,101 @@ export default function Dashboard({ role = "Admin", onLogout, onNavigate }: Dash
     }).join("");
 
     pw.document.write(`<!DOCTYPE html>
-<html>
-<head>
-  <title>Delivery Receipt - No. ${receipt.orderId}</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; font-size: 11px; color: #000; padding: 24px 28px; }
-    .top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
-    .company h1 { font-size: 26px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
-    .company p  { font-size: 10px; line-height: 1.65; }
-    .receipt-block { text-align: right; }
-    .receipt-title { font-size: 13px; font-weight: 700; letter-spacing: 1px; margin-bottom: 4px; }
-    .receipt-no    { font-size: 24px; font-weight: 900; color: #c0392b; letter-spacing: 2px; }
-    .receipt-no span { font-size: 13px; font-weight: 700; color: #000; }
-    .meta-row { display: flex; justify-content: flex-end; align-items: flex-end; gap: 4px; margin-top: 4px; font-size: 10px; }
-    .meta-label { font-weight: 600; white-space: nowrap; }
-    .meta-value { border-bottom: 1px solid #000; min-width: 120px; padding: 0 4px; font-size: 10px; }
-    .deliver-section { font-size: 10px; margin-bottom: 6px; }
-    .deliver-row   { display: flex; align-items: flex-end; gap: 6px; margin-bottom: 4px; }
-    .deliver-label { font-weight: 700; font-size: 11px; white-space: nowrap; }
-    .deliver-line  { border-bottom: 1px solid #000; flex: 1; min-height: 14px; padding: 0 4px; font-size: 11px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 10px; }
-    thead th { border: 1px solid #000; padding: 5px 6px; font-weight: 700; text-align: center; font-size: 11px; }
-    thead th.art { font-size: 12px; letter-spacing: 1px; }
-    tbody td { border: 1px solid #000; padding: 2px 6px; text-align: center; height: 19px; font-size: 10px; }
-    tbody td.part { text-align: left; }
-    .print-footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 12px; }
-    .footer-left  { max-width: 46%; font-size: 9px; line-height: 1.65; color: #333; }
-    .footer-right { font-size: 10px; text-align: right; }
-    .received-text { margin-bottom: 30px; }
-    .by-line { display: flex; align-items: flex-end; justify-content: flex-end; gap: 6px; margin-bottom: 4px; }
-    .by-underline { border-bottom: 1px solid #000; width: 160px; height: 16px; }
-    .sig-line { border-top: 1px solid #000; width: 180px; margin-left: auto; text-align: center; padding-top: 2px; font-size: 9px; }
-    .not-valid { font-style: italic; font-weight: 700; font-size: 9px; text-decoration: underline; text-align: center; margin-top: 8px; }
-    @media print { body { padding: 10px 14px; } @page { margin: 0.4in; size: letter; } }
-  </style>
-</head>
-<body>
-  <div class="top">
-    <div class="company">
-      <h1>AE Samonte Merchandise</h1>
-      <p>ALAIN E. SAMONTE - Prop.</p>
-      <p>VAT Reg. TIN : 263-884-036-00000</p>
-      <p>1457 A. Leon Guinto St., Zone 73 Barangay 676,</p>
-      <p>1000 Ermita NCR, City of Manila, First District, Philippines</p>
-    </div>
-    <div class="receipt-block">
-      <div class="receipt-title">DELIVERY RECEIPT</div>
-      <div class="receipt-no"><span>N<sup>o</sup></span> ${receipt.orderId}</div>
-      <div class="meta-row"><span class="meta-label">Date:</span><span class="meta-value">${receipt.orderDate}</span></div>
-      <div class="meta-row"><span class="meta-label">P.O. No.:</span><span class="meta-value">&nbsp;</span></div>
-      <div class="meta-row"><span class="meta-label">RFQ No.:</span><span class="meta-value">&nbsp;</span></div>
-      <div class="meta-row"><span class="meta-label">TIN No.:</span><span class="meta-value">&nbsp;</span></div>
-    </div>
-  </div>
-  <div class="deliver-section">
-    <div class="deliver-row">
-      <span class="deliver-label">DELIVERED TO:</span>
-      <span class="deliver-line">${receipt.customerName}</span>
-    </div>
-    <div class="deliver-row">
-      <span class="deliver-label">Address:</span>
-      <span class="deliver-line">${receipt.customerAddress || ""}</span>
-    </div>
-  </div>
-  <table>
-    <thead>
-      <tr>
-        <th style="width:6%">ITEM</th>
-        <th style="width:8%">QTY</th>
-        <th style="width:10%">UNIT</th>
-        <th class="art">ARTICLES / PARTICULARS</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>
-  <div class="print-footer">
-    <div class="footer-left">
-      <div>20 Bkts. (50x3) 4251 - 5250</div>
-      <div>BIR Authority to Print No.: OCN033AU20250000004322</div>
-      <div>Date of ATP: OCTOBER 10, 2025</div>
-      <div>REGENCIA PRINTING SERVICES | Ramil P. Egencia - Prop.</div>
-      <div>Lot 3 to 7, Raq's Hope Ville, Navarro 4107 City of General</div>
-      <div>Trias, Cavite, Philippines • VAT Reg. TIN: 245-821-996-00000</div>
-      <div>Printer's Accreditation No.: 54BMP20250000000023</div>
-      <div>Date of ATP: OCT. 09, 2025 • Expiry Date: OCT. 08, 2030</div>
-    </div>
-    <div class="footer-right">
-      <div class="received-text">Received the above goods in good order and condition.</div>
-      <div class="by-line"><span>By:</span><div class="by-underline"></div></div>
-      <div class="sig-line">Authorized Signature</div>
-      <div class="not-valid">"THIS DOCUMENT IS NOT VALID FOR CLAIM OF INPUT TAX"</div>
-    </div>
-  </div>
-</body>
-</html>`);
+      <html>
+      <head>
+        <title>Delivery Receipt - No. ${receipt.orderId}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; font-size: 11px; color: #000; padding: 24px 28px; }
+          .top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+          .company h1 { font-size: 26px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+          .company p  { font-size: 10px; line-height: 1.65; }
+          .receipt-block { text-align: right; }
+          .receipt-title { font-size: 13px; font-weight: 700; letter-spacing: 1px; margin-bottom: 4px; }
+          .receipt-no    { font-size: 24px; font-weight: 900; color: #c0392b; letter-spacing: 2px; }
+          .receipt-no span { font-size: 13px; font-weight: 700; color: #000; }
+          .meta-row { display: flex; justify-content: flex-end; align-items: flex-end; gap: 4px; margin-top: 4px; font-size: 10px; }
+          .meta-label { font-weight: 600; white-space: nowrap; }
+          .meta-value { border-bottom: 1px solid #000; min-width: 120px; padding: 0 4px; font-size: 10px; }
+          .deliver-section { font-size: 10px; margin-bottom: 6px; }
+          .deliver-row   { display: flex; align-items: flex-end; gap: 6px; margin-bottom: 4px; }
+          .deliver-label { font-weight: 700; font-size: 11px; white-space: nowrap; }
+          .deliver-line  { border-bottom: 1px solid #000; flex: 1; min-height: 14px; padding: 0 4px; font-size: 11px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 10px; }
+          thead th { border: 1px solid #000; padding: 5px 6px; font-weight: 700; text-align: center; font-size: 11px; }
+          thead th.art { font-size: 12px; letter-spacing: 1px; }
+          tbody td { border: 1px solid #000; padding: 2px 6px; text-align: center; height: 19px; font-size: 10px; }
+          tbody td.part { text-align: left; }
+          .print-footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 12px; }
+          .footer-left  { max-width: 46%; font-size: 9px; line-height: 1.65; color: #333; }
+          .footer-right { font-size: 10px; text-align: right; }
+          .received-text { margin-bottom: 30px; }
+          .by-line { display: flex; align-items: flex-end; justify-content: flex-end; gap: 6px; margin-bottom: 4px; }
+          .by-underline { border-bottom: 1px solid #000; width: 160px; height: 16px; }
+          .sig-line { border-top: 1px solid #000; width: 180px; margin-left: auto; text-align: center; padding-top: 2px; font-size: 9px; }
+          .not-valid { font-style: italic; font-weight: 700; font-size: 9px; text-decoration: underline; text-align: center; margin-top: 8px; }
+          @media print { body { padding: 10px 14px; } @page { margin: 0.4in; size: letter; } }
+        </style>
+      </head>
+      <body>
+        <div class="top">
+          <div class="company">
+            <h1>AE Samonte Merchandise</h1>
+            <p>ALAIN E. SAMONTE - Prop.</p>
+            <p>VAT Reg. TIN : 263-884-036-00000</p>
+            <p>1457 A. Leon Guinto St., Zone 73 Barangay 676,</p>
+            <p>1000 Ermita NCR, City of Manila, First District, Philippines</p>
+          </div>
+          <div class="receipt-block">
+            <div class="receipt-title">DELIVERY RECEIPT</div>
+            <div class="receipt-no"><span>N<sup>o</sup></span> ${receipt.orderId}</div>
+            <div class="meta-row"><span class="meta-label">Date:</span><span class="meta-value">${receipt.orderDate}</span></div>
+            <div class="meta-row"><span class="meta-label">P.O. No.:</span><span class="meta-value">&nbsp;</span></div>
+            <div class="meta-row"><span class="meta-label">RFQ No.:</span><span class="meta-value">&nbsp;</span></div>
+            <div class="meta-row"><span class="meta-label">TIN No.:</span><span class="meta-value">&nbsp;</span></div>
+          </div>
+        </div>
+        <div class="deliver-section">
+          <div class="deliver-row">
+            <span class="deliver-label">DELIVERED TO:</span>
+            <span class="deliver-line">${receipt.customerName}</span>
+          </div>
+          <div class="deliver-row">
+            <span class="deliver-label">Address:</span>
+            <span class="deliver-line">${receipt.customerAddress || ""}</span>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:6%">ITEM</th>
+              <th style="width:8%">QTY</th>
+              <th style="width:10%">UNIT</th>
+              <th class="art">ARTICLES / PARTICULARS</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div class="print-footer">
+          <div class="footer-left">
+            <div>20 Bkts. (50x3) 4251 - 5250</div>
+            <div>BIR Authority to Print No.: OCN033AU20250000004322</div>
+            <div>Date of ATP: OCTOBER 10, 2025</div>
+            <div>REGENCIA PRINTING SERVICES | Ramil P. Egencia - Prop.</div>
+            <div>Lot 3 to 7, Raq's Hope Ville, Navarro 4107 City of General</div>
+            <div>Trias, Cavite, Philippines • VAT Reg. TIN: 245-821-996-00000</div>
+            <div>Printer's Accreditation No.: 54BMP20250000000023</div>
+            <div>Date of ATP: OCT. 09, 2025 • Expiry Date: OCT. 08, 2030</div>
+          </div>
+          <div class="footer-right">
+            <div class="received-text">Received the above goods in good order and condition.</div>
+            <div class="by-line"><span>By:</span><div class="by-underline"></div></div>
+            <div class="sig-line">Authorized Signature</div>
+            <div class="not-valid">"THIS DOCUMENT IS NOT VALID FOR CLAIM OF INPUT TAX"</div>
+          </div>
+        </div>
+      </body>
+      </html>`);
     pw.document.close();
     pw.focus();
     pw.print();
@@ -613,7 +613,10 @@ export default function Dashboard({ role = "Admin", onLogout, onNavigate }: Dash
                     </defs>
                     <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
                     <YAxis tickFormatter={fmtK} tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} width={40} />
-                    <Tooltip formatter={(value: number | string) => fmt(typeof value === "number" ? value : Number(value))} labelStyle={{ color: "#164163" }} />
+                    <Tooltip
+                      formatter={(value) => fmt(typeof value === "number" ? value : Number(value))}
+                      labelStyle={{ color: "#164163" }}
+                    />
                     <Area type="monotone" dataKey="sales" stroke="#164163" strokeWidth={2} fill="url(#salesGrad)" dot={false} activeDot={{ r: 5 }} />
                   </AreaChart>
                 </ResponsiveContainer>
