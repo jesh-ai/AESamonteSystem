@@ -6,8 +6,8 @@
     "next-dev": "cd frontend && npm run dev",
     "flask-server": "python backend/app.py",
     "dev": "concurrently -n \"NEXT,FLASK\" -c \"cyan,yellow\" \"npm run next-dev\" \"npm run flask-server\"",
-    "build": "next build",
-    "start": "next start",
+    "build": "cd frontend && npm install && npm run build",
+    "start": "cd frontend && npm run start",
     "lint": "eslint"
   },
   "dependencies": {
