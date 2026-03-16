@@ -1,6 +1,9 @@
 {
   "version": 2,
   "regions": ["sin1"],
+  "framework": "nextjs",
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/.next",
   "rewrites": [
     {
       "source": "/api/:path*",
