@@ -47,10 +47,14 @@ const getViewStatusClass = (status: string, s: Record<string, string>) => {
   }
 };
 
-export default function OrderPage({ role, onLogout }: { role: string; onLogout: () => void }) {
+export default function OrderPage({ role, onLogout, initialSearch }: { role: string; onLogout: () => void; initialSearch?: string }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(initialSearch ?? '');
+
+  useEffect(() => {
+    if (initialSearch) setSearchTerm(initialSearch);
+  }, [initialSearch]);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState<{ key: Exclude<SortKey, null> | null; direction: 'asc' | 'desc' | null }>({ key: null, direction: null });
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);

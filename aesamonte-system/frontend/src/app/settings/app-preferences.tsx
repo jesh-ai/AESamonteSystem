@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import sharedStyles from "@/css/settings.module.css";
 import prefStyles from "@/css/app-preferences.module.css";
 import SettingsHeader from "@/components/layout/BackSettingsHeader";
@@ -63,6 +63,13 @@ export default function AppPreferences({ onBack }: { onBack: () => void }) {
 
   const [notifs, setNotifs] = useState({ ...DEFAULT_STATE.notifs });
 
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('notifPreferences');
+      if (saved) setNotifs(JSON.parse(saved));
+    } catch { /* ignore */ }
+  }, []);
+
   const toggleNotif = (key: keyof typeof notifs) =>
     setNotifs(prev => ({ ...prev, [key]: !prev[key] }));
 
@@ -87,7 +94,7 @@ export default function AppPreferences({ onBack }: { onBack: () => void }) {
       setShowModal(true);
       return;
     }
-    console.log('Saved:', { timezone, date, language, logoFile, notifs });
+    localStorage.setItem('notifPreferences', JSON.stringify(notifs));
     savedState.current = { timezone, date, language, notifs: { ...notifs }, logoFile };
     setNoChanges(false);
     setShowModal(true);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Login from "@/app/auth/auth";
 import Dashboard from "@/app/dashboard/dashboard";
 import Sidebar from "@/components/layout/SideNavBar";
@@ -18,6 +18,17 @@ export default function Home() {
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState("Dashboard");
+  const [pendingSearch, setPendingSearch] = useState<{ tab: string; term: string } | null>(null);
+
+  useEffect(() => {
+    function handleNavigate(e: Event) {
+      const { tab, search } = (e as CustomEvent<{ tab: string; search: string }>).detail;
+      setActiveTab(tab);
+      setPendingSearch({ tab, term: search ?? '' });
+    }
+    window.addEventListener('app:navigate', handleNavigate);
+    return () => window.removeEventListener('app:navigate', handleNavigate);
+  }, []);
 
   const handleLogin = (data: UserInfo) => {
     setUserInfo(data);
@@ -56,11 +67,11 @@ export default function Home() {
             {activeTab === "Dashboard" ? (
               <Dashboard role={userInfo.roleName} onLogout={handleLogout} onNavigate={setActiveTab} />
             ) : activeTab === "Inventory" ? (
-              <Inventory role={userInfo.roleName} department={userInfo.department} employeeId={userInfo.employeeId} onLogout={handleLogout} />
+              <Inventory role={userInfo.roleName} department={userInfo.department} employeeId={userInfo.employeeId} onLogout={handleLogout} initialSearch={pendingSearch?.tab === 'Inventory' ? pendingSearch.term : ''} />
             ) : activeTab === "Sales" ? (
               <Sales role={userInfo.roleName} department={userInfo.department} employeeId={userInfo.employeeId} onLogout={handleLogout} />
             ) : activeTab === "Orders" ? (
-              <Orders role={userInfo.roleName} onLogout={handleLogout} />
+              <Orders role={userInfo.roleName} onLogout={handleLogout} initialSearch={pendingSearch?.tab === 'Orders' ? pendingSearch.term : ''} />
             ) : activeTab === "Reports" ? (
               <Reports role={userInfo.roleName} onLogout={handleLogout} />
             ) : activeTab === "Settings" ? (

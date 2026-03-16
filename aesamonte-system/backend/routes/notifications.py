@@ -28,6 +28,7 @@ def get_notifications():
                     ot.order_id,
                     ss.status_code,
                     ss.status_name,
+                    c.customer_name,
                     COALESCE(
                         (SELECT MAX(oal.order_audit_log_date)
                          FROM order_audit_log oal
@@ -36,16 +37,18 @@ def get_notifications():
                     ) AS event_time
                 FROM order_transaction ot
                 JOIN static_status ss ON ot.order_status_id = ss.status_id
+                JOIN customer c ON ot.customer_id = c.customer_id
                 WHERE ss.status_scope = 'ORDER_STATUS'
                   AND ss.status_code IN ('PENDING', 'PREPARING', 'CANCELLED', 'RECEIVED')
                 ORDER BY event_time DESC
                 LIMIT 10
             """)
             for row in cur.fetchall():
-                order_id, status_code, status_name, event_time = row
+                order_id, status_code, status_name, customer_name, event_time = row
                 notifications.append({
                     "category": "ORDER",
                     "reference": str(order_id),
+                    "customer_name": customer_name,
                     "status_code": status_code,
                     "status_name": status_name,
                     "event_time": event_time,
@@ -61,6 +64,7 @@ def get_notifications():
                     ot.order_id,
                     'PAID',
                     'Paid',
+                    c.customer_name,
                     COALESCE(
                         (SELECT MAX(oal.order_audit_log_date)
                          FROM order_audit_log oal
@@ -70,15 +74,17 @@ def get_notifications():
                 FROM sales_transaction st
                 JOIN order_transaction ot ON ot.order_id = st.order_id
                 JOIN static_status ss ON st.sales_status_id = ss.status_id
+                JOIN customer c ON ot.customer_id = c.customer_id
                 WHERE ss.status_code = 'PAID'
                 ORDER BY event_time DESC
                 LIMIT 10
             """)
             for row in cur.fetchall():
-                order_id, status_code, status_name, event_time = row
+                order_id, status_code, status_name, customer_name, event_time = row
                 notifications.append({
                     "category": "ORDER",
                     "reference": str(order_id),
+                    "customer_name": customer_name,
                     "status_code": status_code,
                     "status_name": status_name,
                     "event_time": event_time,
@@ -91,7 +97,9 @@ def get_notifications():
         try:
             cur.execute("""
                 SELECT
-                    COALESCE(i.item_sku, i.inventory_id::text),
+                    i.inventory_id,
+                    i.item_name,
+                    i.item_sku,
                     'OUT_OF_STOCK',
                     'Out of Stock',
                     COALESCE(
@@ -108,10 +116,12 @@ def get_notifications():
                 LIMIT 10
             """)
             for row in cur.fetchall():
-                ref, status_code, status_name, event_time = row
+                inventory_id, item_name, item_sku, status_code, status_name, event_time = row
                 notifications.append({
                     "category": "INVENTORY",
-                    "reference": ref,
+                    "reference": str(inventory_id),
+                    "item_name": item_name,
+                    "item_sku": item_sku,
                     "status_code": status_code,
                     "status_name": status_name,
                     "event_time": event_time,
@@ -124,7 +134,9 @@ def get_notifications():
         try:
             cur.execute("""
                 SELECT
-                    COALESCE(i.item_sku, i.inventory_id::text),
+                    i.inventory_id,
+                    i.item_name,
+                    i.item_sku,
                     'LOW_STOCK',
                     'Low Stock',
                     COALESCE(
@@ -143,10 +155,12 @@ def get_notifications():
                 LIMIT 10
             """)
             for row in cur.fetchall():
-                ref, status_code, status_name, event_time = row
+                inventory_id, item_name, item_sku, status_code, status_name, event_time = row
                 notifications.append({
                     "category": "INVENTORY",
-                    "reference": ref,
+                    "reference": str(inventory_id),
+                    "item_name": item_name,
+                    "item_sku": item_sku,
                     "status_code": status_code,
                     "status_name": status_name,
                     "event_time": event_time,
@@ -173,17 +187,14 @@ def get_notifications():
             date_str = ""
             time_str = ""
 
-        detail = (
-            f"Order ID: {n['reference']}"
-            if n["category"] == "ORDER"
-            else f"Item No. {n['reference']}"
-        )
-
         result.append({
             "id": idx + 1,
+            "key": f"{n['status_code'].lower()}:{n['reference']}",
             "type": n["status_code"].lower(),
             "label": n["status_name"],
-            "detail": detail,
+            "reference": n["reference"],
+            "name": n.get("item_name") or n.get("customer_name"),
+            "sku": n.get("item_sku"),
             "date": date_str,
             "time": time_str,
         })

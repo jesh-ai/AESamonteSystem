@@ -30,6 +30,7 @@ interface InventoryProps {
   department?: string | null;
   employeeId?: number;
   onLogout: () => void;
+  initialSearch?: string;
 }
 interface Supplier {
   id: number;
@@ -70,7 +71,7 @@ interface InventorySummary {
 
 const ROWS_PER_PAGE = 10;
 
-const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0, onLogout }) => {
+const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0, onLogout, initialSearch }) => {
   const s = styles as Record<string, string>;
 
   // --- RBAC permission flags ---
@@ -92,7 +93,11 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
     outOfStockItems: [], 
   });
   
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(initialSearch ?? '');
+
+  useEffect(() => {
+    if (initialSearch) setSearchTerm(initialSearch);
+  }, [initialSearch]);
   const [sortConfig, setSortConfig] = useState<{
     key: keyof Product | '';
     direction: 'asc' | 'desc' | null;
@@ -366,7 +371,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
 
   const filteredProducts = products.filter(p => {
     const matchesArchiveView = isArchiveView ? Boolean(p.is_archived) : !p.is_archived;
-    const searchStr = `${p.id} ${p.item_name} ${p.brand}`.toLowerCase();
+    const searchStr = `${p.id} ${p.item_name} ${p.brand} ${p.sku}`.toLowerCase();
     const matchesSearch = searchStr.includes(searchTerm.toLowerCase());
     return matchesArchiveView && matchesSearch;
   });
