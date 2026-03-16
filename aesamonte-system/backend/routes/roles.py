@@ -244,3 +244,25 @@ def delete_role(role_id):
     finally:
         cur.close()
         conn.close()
+
+@roles_bp.route('/roles/<int:role_id>/unassign', methods=['POST'])
+def unassign_user(role_id):
+    data = request.json
+    employee_id = data.get('employee_id')
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        # NOTE: If your database requires every user to have a role (NOT NULL), 
+        # change `NULL` to your default lowest-tier role ID (e.g., `2` for Staff).
+        cur.execute(
+            "UPDATE employee SET role_id = 4 WHERE employee_id = %s AND role_id = %s", 
+            (employee_id, role_id)
+        )
+        conn.commit()
+        return jsonify({"message": "User unassigned"}), 200
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()

@@ -75,8 +75,8 @@ export default function EditRoleModal({
     const load = async () => {
       try {
         const [roleRes, empRes] = await Promise.all([
-          fetch(`/api/roles/${roleId}`),
-          fetch('/api/employees'),
+          fetch(`https://ae-samonte-system.onrender.com/api/roles/${roleId}`),
+          fetch('https://ae-samonte-system.onrender.com/api/employees'),
         ]);
         const roleData: RoleDetail = await roleRes.json();
         const empData: Employee[]  = await empRes.json();
@@ -113,7 +113,7 @@ export default function EditRoleModal({
 
   const handleAssign = async (emp: Employee) => {
     try {
-      const res = await fetch(`/api/roles/${roleId}/assign`, {
+      const res = await fetch(`https://ae-samonte-system.onrender.com/api/roles/${roleId}/assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ employee_id: emp.id }),
@@ -127,12 +127,38 @@ export default function EditRoleModal({
     }
   };
 
+  const handleUnassign = async (empId: number) => {
+    try {
+      const res = await fetch(`https://ae-samonte-system.onrender.com/api/roles/${roleId}/unassign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employee_id: empId }),
+      });
+      
+      // If Flask returns a 404 or 500 HTML page, this stops it from trying to parse it as JSON
+      if (!res.ok) {
+        const text = await res.text();
+        // If it's an HTML error page, show a generic error. If it's our JSON error, parse it.
+        const errMsg = text.startsWith('<') ? 'Route not found or server error' : JSON.parse(text).error;
+        setError(`Backend Error: ${errMsg}`);
+        return;
+      }
+
+      // If it IS ok, safely parse the JSON
+      const data = await res.json();
+      setAssignedUsers(prev => prev.filter(u => u.employee_id !== empId));
+      
+    } catch (err: any) {
+      setError(`Network Error: ${err.message || 'Check if Flask is running'}`);
+    }
+  };
+
   const handleSave = async () => {
     if (!roleName.trim()) { setError('Role name is required.'); return; }
     setSaving(true);
     setError('');
     try {
-      const res = await fetch(`/api/roles/${roleId}`, {
+      const res = await fetch(`https://ae-samonte-system.onrender.com/api/roles/${roleId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role_name: roleName, description, is_active: isActive, granular_permissions: perms }),
@@ -300,7 +326,12 @@ export default function EditRoleModal({
                           <span className={styles.userName}>{u.employee_name}</span>
                           <span className={styles.userEmail}>{u.employee_email}</span>
                         </div>
-                        <div className={styles.removeTip} title="To remove, reassign in User Management">
+                        <div 
+                          className={styles.removeTip} 
+                          title="Remove user from this role"
+                          onClick={() => handleUnassign(u.employee_id)}
+                          style={{ cursor: 'pointer', color: '#dc2626' }}
+                        >
                           <LuUserMinus size={16} />
                         </div>
                       </div>
