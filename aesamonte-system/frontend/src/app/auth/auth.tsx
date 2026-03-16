@@ -18,14 +18,23 @@ interface LoginProps {
 export default function Login({ onLogin }: LoginProps) {
   const [view, setView] = useState<"login" | "forgot" | "sms" |"sms_otp" | "email_info" | "email_otp">("login");
   const [employeeId, setEmployeeId] = useState("");
+  const [employeeIdError, setEmployeeIdError] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false); 
+  const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [contactNumber, setContactNumber] = useState("");
-  const [emailAddress, setEmailAddress] = useState(""); 
+  const [emailAddress, setEmailAddress] = useState("");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
-  const [timer, setTimer] = useState(0); 
+  const [timer, setTimer] = useState(0);
   const [showPop, setShowPop] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "error" | "success" | "info" } | null>(null);
+  const toastTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = (message: string, type: "error" | "success" | "info" = "error") => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToast({ message, type });
+    toastTimeoutRef.current = setTimeout(() => setToast(null), 4000);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,10 +65,10 @@ export default function Login({ onLogin }: LoginProps) {
           token:       data.token,
         });
       } else {
-        alert(data.message || "Invalid credentials");
+        showToast(data.message || "Invalid credentials. Please check your Employee ID and password.", "error");
       }
     } catch (err) {
-      alert("Connection failed. The backend server is unreachable. Please try again later.");
+      showToast("Connection failed. The backend server is unreachable. Please try again later.", "error");
     }
 
   };
@@ -91,8 +100,18 @@ export default function Login({ onLogin }: LoginProps) {
   };
 
   const handleResend = () => {
-    setTimer(120); // Starts the 2:00 countdown
-    alert("OTP Resent to your phone!");
+    setTimer(120);
+    showToast("OTP resent to your registered phone number.", "success");
+  };
+
+  const handleEmployeeIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    if (val === "" || /^\d+$/.test(val)) {
+      setEmployeeId(val);
+      setEmployeeIdError("");
+    } else {
+      setEmployeeIdError("Employee ID must contain numbers only.");
+    }
   };
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -132,10 +151,10 @@ export default function Login({ onLogin }: LoginProps) {
         if (response.ok) {
           setShowPop(true);
         } else {
-          alert(data.message || "Invalid OTP");
+          showToast(data.message || "Invalid OTP. Please try again.", "error");
         }
       } catch (err) {
-        alert("Connection failed. The backend server is unreachable. Please try again later.");
+        showToast("Connection failed. The backend server is unreachable. Please try again later.", "error");
       }
     };
 
@@ -157,10 +176,10 @@ export default function Login({ onLogin }: LoginProps) {
           setTimer(120);
           setView(method === "sms" ? "sms_otp" : "email_otp");
         } else {
-          alert(data.message || "Failed to send OTP");
+          showToast(data.message || "Failed to send OTP. Please check your information.", "error");
         }
       } catch (err) {
-        alert("Connection failed. The backend server is unreachable. Please try again later.");
+        showToast("Connection failed. The backend server is unreachable. Please try again later.", "error");
       }
     };
   return (
@@ -182,19 +201,20 @@ export default function Login({ onLogin }: LoginProps) {
         {view === "login" ? (
           <form onSubmit={handleLogin} className={styles.loginForm}>
             <div className={styles.loginField}>
-              <label className={styles.loginLabel}>Employee ID</label>
+              <label className={styles.loginLabel}>Employee ID <span style={{ color: "red" }}>*</span></label>
               <input
                 type="text"
                 value={employeeId}
-                onChange={(e) => setEmployeeId(e.target.value)}
+                onChange={handleEmployeeIdChange}
                 className={styles.loginInput}
                 required
                 suppressHydrationWarning={true}
               />
+              {employeeIdError && <span className={styles.fieldError}>{employeeIdError}</span>}
             </div>
 
             <div className={styles.loginField}>
-              <label className={styles.loginLabel}>Password</label>
+              <label className={styles.loginLabel}>Password <span style={{ color: "red" }}>*</span></label>
               <div className={styles.passwordWrapper}>
                 <input
                   type={showPassword ? "text" : "password"}
@@ -267,18 +287,19 @@ export default function Login({ onLogin }: LoginProps) {
             <p className={styles.forgotSubtitle}>To continue, enter the information for the selected recovery method.</p>
 
             <div className={styles.loginField}>
-              <label className={styles.loginLabel}>Employee ID<span style={{color: 'red'}}>*</span></label>
+              <label className={styles.loginLabel}>Employee ID <span style={{color: 'red'}}>*</span></label>
               <input
                 type="text"
                 placeholder="Employee ID"
                 value={employeeId}
-                onChange={(e) => setEmployeeId(e.target.value)}
+                onChange={handleEmployeeIdChange}
                 className={styles.loginInput}
               />
+              {employeeIdError && <span className={styles.fieldError}>{employeeIdError}</span>}
             </div>
 
             <div className={styles.loginField} style={{marginTop: '15px'}}>
-              <label className={styles.loginLabel}>Contact Number<span style={{color: 'red'}}>*</span></label>
+              <label className={styles.loginLabel}>Contact Number <span style={{color: 'red'}}>*</span></label>
               <input
                 type="text"
                 placeholder="Contact Number"
@@ -342,18 +363,19 @@ export default function Login({ onLogin }: LoginProps) {
             <p className={styles.forgotSubtitle}>To continue, enter the information for the selected recovery method.</p>
             
             <div className={styles.loginField}>
-              <label className={styles.loginLabel}>Employee ID<span style={{color: 'red'}}>*</span></label>
-              <input 
-                type="text" 
-                placeholder="Employee ID" 
-                value={employeeId} 
-                onChange={(e) => setEmployeeId(e.target.value)} 
-                className={styles.loginInput} 
+              <label className={styles.loginLabel}>Employee ID <span style={{color: 'red'}}>*</span></label>
+              <input
+                type="text"
+                placeholder="Employee ID"
+                value={employeeId}
+                onChange={handleEmployeeIdChange}
+                className={styles.loginInput}
               />
+              {employeeIdError && <span className={styles.fieldError}>{employeeIdError}</span>}
             </div>
-            
+
             <div className={styles.loginField} style={{marginTop: '15px'}}>
-              <label className={styles.loginLabel}>Email Address<span style={{color: 'red'}}>*</span></label>
+              <label className={styles.loginLabel}>Email Address <span style={{color: 'red'}}>*</span></label>
               <input 
                 type="email" 
                 placeholder="Email Address" 
@@ -405,12 +427,12 @@ export default function Login({ onLogin }: LoginProps) {
                 <span className={styles.timerText}>{formatTime(timer)}</span>
               ) : (
                 /* When timer is 0, show ONLY the blue clickable text */
-                <button 
-                  type="button" 
-                  className={styles.resendBtn} 
+                <button
+                  type="button"
+                  className={styles.resendBtn}
                   onClick={() => {
                     setTimer(120);
-                    alert("Verification email resent!");
+                    showToast("Verification email resent. Please check your inbox.", "success");
                   }}
                 >
                   Did not receive an email?
@@ -420,6 +442,27 @@ export default function Login({ onLogin }: LoginProps) {
             </div>
           )}
                 </div> 
+
+      {/* ALERT MODAL */}
+      {toast && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.alertModal}>
+            <div className={`${styles.alertModalBand} ${styles[`alertBand_${toast.type}`]}`} />
+            <div className={`${styles.alertModalCircle} ${styles[`alertCircle_${toast.type}`]}`}>
+              {toast.type === "error" ? "✕" : toast.type === "success" ? "✓" : "ℹ"}
+            </div>
+            <div className={styles.alertModalBody}>
+              <h2 className={styles.alertModalTitle}>
+                {toast.type === "error" ? "Login Failed" : toast.type === "success" ? "Success" : "Notice"}
+              </h2>
+              <p className={styles.alertModalMessage}>{toast.message}</p>
+              <button className={`${styles.alertModalOkBtn} ${styles[`alertOkBtn_${toast.type}`]}`} onClick={() => setToast(null)}>
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* VERI CONFIRM POPUP */}
       {showPop && (
@@ -436,8 +479,8 @@ export default function Login({ onLogin }: LoginProps) {
               <button className={styles.closeBtn} onClick={() => setShowPop(false)}>Close</button>
               <button className={styles.confirmBtn} onClick={() => {
                   setShowPop(false);
-                  setView("login"); 
-                  alert("Temporary password sent! Please check your messages/email.");
+                  setView("login");
+                  showToast("Temporary password sent! Please check your messages/email.", "success");
                 }}
               >
                 Confirm
