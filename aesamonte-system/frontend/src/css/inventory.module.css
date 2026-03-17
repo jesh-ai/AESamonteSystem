@@ -859,6 +859,25 @@
   align-items: center;
 }
 
+.archiveIconBtn {
+  background: #fff;
+  border: 1px solid #ddd;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  transition: all 0.2s;
+}
+
+.archiveIconBtn:hover {
+  background-color: #3e73b1;
+  color: #fff;
+}
+
+.popArchiveBtn:hover {
+  background-color: #64748b; 
+}
+
 /* ============= For View Item ============== */
 
 /* ── Backdrop ── */

@@ -117,12 +117,17 @@
   padding: 8px;
   border-radius: 8px;
   cursor: pointer;
+  display: flex;
+  transition: all 0.2s;
 }
 
 .archiveIconBtn:hover {
   background-color: #3e73b1;
   color: #fff;
-  transform: translateY(-1px);
+}
+
+.popArchiveBtn:hover {
+  background-color: #64748b; 
 }
 
 /* ===== TABLE STYLING ===== */

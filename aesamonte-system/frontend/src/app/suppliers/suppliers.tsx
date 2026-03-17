@@ -510,10 +510,9 @@ export default function Suppliers({
             <div className={s.header}>
               <h2 className={s.title}>Suppliers</h2>
               <div className={s.controls}>
-                <button
-                  className={s.archiveIconBtn}
-                  style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#64748b' }}
-                  onClick={() => setIsArchiveView(true)}
+                <button 
+                  className={s.archiveIconBtn} 
+                  onClick={() => setIsArchiveView(true)} 
                   title="View Archives"
                 >
                   <LuArchive size={20} />

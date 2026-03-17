@@ -485,7 +485,11 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
             <div className={s.header}>
               <h2 className={s.title}>List of Orders</h2>
               <div className={s.controls}>
-                <button className={s.archiveIconBtn} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#64748b' }} onClick={() => setIsArchiveView(true)} title="View Archives">
+                <button 
+                  className={s.archiveIconBtn} 
+                  onClick={() => setIsArchiveView(true)} 
+                  title="View Archives"
+                >
                   <LuArchive size={20} />
                 </button>
                 <div className={s.searchWrapper}>

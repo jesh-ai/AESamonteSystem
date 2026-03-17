@@ -102,18 +102,20 @@
 .archiveIconBtn {
   background: #fff;
   border: 1px solid #ddd;
-  border-radius: 8px;
   padding: 8px;
+  border-radius: 8px;
   cursor: pointer;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  transition: all 0.2s;
 }
 
 .archiveIconBtn:hover {
   background-color: #3e73b1;
   color: #fff;
-  transform: translateY(-1px);
+}
+
+.popArchiveBtn:hover {
+  background-color: #64748b;
 }
 
 /* ===== TABLE STYLING ===== */
