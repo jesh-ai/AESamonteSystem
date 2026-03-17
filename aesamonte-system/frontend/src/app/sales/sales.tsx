@@ -321,7 +321,13 @@ export default function SalesPage({ role = 'Admin', department, employeeId = 0, 
 
       <main className={s.mainContent}>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', width: '100%', margin: 0 }}>
+        <div>
+          <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#164163', margin: 0 }}>SALES</h1>
+          <p style={{ fontSize: '0.82rem', color: '#9ca3af', margin: '2px 0 0' }}>
+            Track, manage, and export all sales transactions and invoices.
+          </p>
+        </div>
           {canExport && (
             <div onClick={() => setShowExportModal(true)}>
               <ExportButton />

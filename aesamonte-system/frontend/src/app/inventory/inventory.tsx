@@ -74,14 +74,12 @@ const ROWS_PER_PAGE = 10;
 const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0, onLogout, initialSearch }) => {
   const s = styles as Record<string, string>;
 
-  // --- RBAC permission flags ---
   const isInventoryHead = role === 'Head' && department === 'Inventory';
   const isSalesHead     = role === 'Head' && department === 'Sales';
   const canModify       = ['Admin', 'Manager', 'Staff'].includes(role) || isInventoryHead;
   const canExport       = ['Admin', 'Manager'].includes(role) || isInventoryHead;
   const mustRequestExport = isSalesHead;
 
-  /* ================= STATE ================= */
   const [products, setProducts] = useState<Product[]>([]);
   const [data, setData] = useState<InventorySummary>({
     totalProducts: 0,
@@ -98,6 +96,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
   useEffect(() => {
     if (initialSearch) setSearchTerm(initialSearch);
   }, [initialSearch]);
+
   const [sortConfig, setSortConfig] = useState<{
     key: keyof Product | '';
     direction: 'asc' | 'desc' | null;
@@ -106,14 +105,8 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [isArchiveView, setIsArchiveView] = useState(false);
-
-  // Supplier States
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-
-  // UOM States
   const [uoms, setUoms] = useState<UOM[]>([]);
-
-  // Modal States
   const [showModal, setShowModal] = useState(false);
   const [defaultSupplierName, setDefaultSupplierName] = useState<string>('');
   const [showSupplierModal, setShowSupplierModal] = useState(false);
@@ -121,21 +114,13 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null); 
   const [showExportModal, setShowExportModal] = useState(false);
   const [showExportRequestModal, setShowExportRequestModal] = useState(false);
-
-  // View Modal States
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewProduct, setViewProduct] = useState<Product | null>(null);
-
-  // States for Alert Modal
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [isError, setIsError] = useState(false); 
-  
-  // Action Menu State
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
-
-  /* ================= HANDLERS ================= */
 
   const handleExportSuccess = (msg: string, type: 'success' | 'error' = 'success') => {
     setToastMessage(msg);
@@ -221,7 +206,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  /* ================= TOGGLE ARCHIVE ================= */
   const handleToggleArchive = async (id: string) => {
     try {
       const response = await fetch(`/api/inventory/archive/${id}`, { method: 'PUT' });
@@ -241,8 +225,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
     }
   };
 
-  /* ================= HANDLERS CONTINUED ================= */
-
   const requestSort = (key: keyof Product) => {
     let direction: 'asc' | 'desc' = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
@@ -255,7 +237,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
     setActiveMenuId(null);
   };
 
-  // ── FIXED: fetch full item details (includes supplier data) with toast error fallback ──
   const handleEditClick = async (product: Product) => {
     setActiveMenuId(null);
     try {
@@ -264,7 +245,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
         const fullData = await res.json();
         setSelectedProduct(fullData);
       } else {
-        // API route missing or errored — fall back to list data so modal still opens
         setSelectedProduct({
           id: product.id,
           sku: product.sku || '',
@@ -287,7 +267,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
       setShowEditModal(true);
     } catch (err) {
       console.error("Error fetching item details:", err);
-      // Network error — still open modal with whatever data we have
       setSelectedProduct({
         id: product.id,
         sku: product.sku || '',
@@ -367,8 +346,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
     }
   };
 
-  /* ================= DATA PROCESSING ================= */
-
   const filteredProducts = products.filter(p => {
     const matchesArchiveView = isArchiveView ? Boolean(p.is_archived) : !p.is_archived;
     const searchStr = `${p.id} ${p.item_name} ${p.brand} ${p.sku}`.toLowerCase();
@@ -396,8 +373,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
     });
   }, [filteredProducts, sortConfig]);
 
-  /* ================= PAGINATION ================= */
-
   const totalPages = Math.ceil(sortedProducts.length / ROWS_PER_PAGE);
   const paginatedProducts = sortedProducts.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
 
@@ -411,12 +386,9 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
     const maxVisiblePages = 5;
     let startPage = Math.max(1, currentPage - 2);
     let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-
-    // Adjust the window if we're near the end to ensure we still show 5 pages
     if (endPage - startPage + 1 < maxVisiblePages) {
       startPage = Math.max(1, endPage - maxVisiblePages + 1);
     }
-
     const pages = [];
     for (let i = startPage; i <= endPage; i++) {
       pages.push(
@@ -431,7 +403,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
     }
     return pages;
   };
-  /* ── Status badge class helper ── */
+
   const getStatusClass = (status: string) => {
     if (status?.includes('Available')) return s.viewStatusAvailable;
     if (status?.includes('Low Stock')) return s.viewStatusLowStock;
@@ -444,7 +416,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
     <div className={s.container}>
       <TopHeader role={role} onLogout={onLogout} />
 
-      {/* DYNAMIC ALERT POP-UP (Success/Error) */}
       {showToast && (
         <div className={s.toastOverlay}>
           <div className={s.alertBox}>
@@ -465,25 +436,35 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
       )}
 
       <div className={s.mainContent}>
-        <div className={s.headerActions}>
-          {canExport && (
-            <div onClick={() => setShowExportModal(true)}>
-              <ExportButton />
-            </div>
-          )}
-          {mustRequestExport && (
-            <button
-              onClick={() => setShowExportRequestModal(true)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                backgroundColor: '#475569', color: 'white', padding: '8px 18px',
-                borderRadius: '6px', border: 'none', cursor: 'pointer',
-                fontWeight: 500, fontSize: '0.9rem',
-              }}
-            >
-              Request Export
-            </button>
-          )}
+
+        {/* ── HEADER ROW: Title + Export ── */}
+        <div className={s.headerActions} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+          <div>
+            <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#164163', margin: 0 }}>INVENTORY</h1>
+            <p style={{ fontSize: '0.82rem', color: '#9ca3af', margin: '2px 0 0' }}>
+              Manage products, stock levels, and supplier information.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {canExport && (
+              <div onClick={() => setShowExportModal(true)}>
+                <ExportButton />
+              </div>
+            )}
+            {mustRequestExport && (
+              <button
+                onClick={() => setShowExportRequestModal(true)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  backgroundColor: '#475569', color: 'white', padding: '8px 18px',
+                  borderRadius: '6px', border: 'none', cursor: 'pointer',
+                  fontWeight: 500, fontSize: '0.9rem',
+                }}
+              >
+                Request Export
+              </button>
+            )}
+          </div>
         </div>
 
         <div className={s.topGrid}>
@@ -520,7 +501,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
           </section>
         </div>
 
-        {/* ================= CONDITIONAL RENDERING ================= */}
         {isArchiveView ? (
           <ArchiveTable 
             products={products} 
@@ -610,7 +590,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
                           <div className={s.popoverMenu} ref={menuRef}>
                             {canModify ? (
                               <>
-                               
                                 <button className={s.popEditBtn} onClick={(e) => { e.stopPropagation(); handleEditClick(p); }}><LuPencil size={12}/> Edit</button>
                                 <button className={s.popArchiveBtn} onClick={(e) => { e.stopPropagation(); handleToggleArchive(p.id); }}><LuArchive size={12}/> Archive</button>
                               </>
@@ -644,12 +623,11 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
             </div>
           </div>
         )}
-      </div>
 
-      {/* --- Export Modal --- */}
+      </div> {/* closes mainContent */}
+
       <ExportModal isOpen={showExportModal} onClose={() => setShowExportModal(false)} onSuccess={handleExportSuccess} data={products.filter(p => !p.is_archived)} summary={data} />
 
-      {/* --- Export Request Modal --- */}
       <ExportRequestModal
         isOpen={showExportRequestModal}
         onClose={() => setShowExportRequestModal(false)}
@@ -658,7 +636,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
         onSuccess={(msg) => handleExportSuccess(msg, 'success')}
       />
 
-      {/* can check for duplicates on add */}
       <AddInventoryModal 
         isOpen={showModal}
         onClose={() => { setShowModal(false); setDefaultSupplierName(''); }}
@@ -670,7 +647,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
         defaultSupplierName={defaultSupplierName}
       />
 
-      {/* can check for duplicates on edit */}
       <EditInventoryModal 
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}
@@ -693,12 +669,9 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
         existingSuppliers={suppliers}
       />
 
-      {/* ===== INVENTORY VIEW MODAL ===== */}
       {showViewModal && viewProduct && (
         <div className={s.viewBackdrop} onClick={() => setShowViewModal(false)}>
           <div className={s.viewModal} onClick={e => e.stopPropagation()}>
-
-            {/* Header */}
             <div className={s.viewModalHeader}>
               <div className={s.viewModalHeaderLeft}>
                 <h2 className={s.viewItemName}>{viewProduct.item_name}</h2>
@@ -716,10 +689,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
               </div>
             </div>
 
-            {/* Body */}
             <div className={s.viewBody}>
-
-              {/* Product Details */}
               <div className={s.viewSection}>
                 <p className={s.viewSectionTitle}>PRODUCT DETAILS</p>
                 <div className={s.viewSectionGrid}>
@@ -744,7 +714,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
                 )}
               </div>
 
-              {/* Stock & Pricing table */}
               <table className={s.viewItemsTable}>
                 <thead>
                   <tr>
@@ -766,7 +735,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
                   </tr>
                 </tbody>
               </table>
-
             </div>
           </div>
         </div>

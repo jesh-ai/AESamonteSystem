@@ -117,7 +117,6 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newOrderData),
       });
       if (response.ok) {
-        // FIX 1: use newOrderData.customerName (the field name sent by AddOrderModal)
         setSubmittedData({
           customer: newOrderData.customerName,
           total: newOrderData.items?.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0) || 0,
@@ -171,7 +170,6 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
   const handleOpenView = (order: Order) => { setSelectedOrderForView(order); setShowViewModal(true); };
   const closeViewModal = () => { setShowViewModal(false); setSelectedOrderForView(null); };
 
-  // ===== HANDLE PRINT — DELIVERY RECEIPT FORMAT =====
   const handlePrint = () => {
     if (!selectedOrderForView) return;
     const pw = window.open('', '_blank');
@@ -201,31 +199,25 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: Arial, sans-serif; font-size: 11px; color: #000; padding: 24px 28px; }
-
     .top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
     .company h1 { font-size: 26px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
     .company p  { font-size: 10px; line-height: 1.65; }
-
     .receipt-block { text-align: right; }
     .receipt-title { font-size: 13px; font-weight: 700; letter-spacing: 1px; margin-bottom: 4px; }
     .receipt-no    { font-size: 24px; font-weight: 900; color: #c0392b; letter-spacing: 2px; }
     .receipt-no span { font-size: 13px; font-weight: 700; color: #000; }
-
     .meta-row { display: flex; justify-content: flex-end; align-items: flex-end; gap: 4px; margin-top: 4px; font-size: 10px; }
     .meta-label { font-weight: 600; white-space: nowrap; }
     .meta-value { border-bottom: 1px solid #000; min-width: 120px; padding: 0 4px; font-size: 10px; }
-
     .deliver-section { font-size: 10px; margin-bottom: 6px; }
     .deliver-row   { display: flex; align-items: flex-end; gap: 6px; margin-bottom: 4px; }
     .deliver-label { font-weight: 700; font-size: 11px; white-space: nowrap; }
     .deliver-line  { border-bottom: 1px solid #000; flex: 1; min-height: 14px; padding: 0 4px; font-size: 11px; }
-
     table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 10px; }
     thead th { border: 1px solid #000; padding: 5px 6px; font-weight: 700; text-align: center; font-size: 11px; }
     thead th.art { font-size: 12px; letter-spacing: 1px; }
     tbody td { border: 1px solid #000; padding: 2px 6px; text-align: center; height: 19px; font-size: 10px; }
     tbody td.part { text-align: left; }
-
     .print-footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 12px; }
     .footer-left  { max-width: 46%; font-size: 9px; line-height: 1.65; color: #333; }
     .footer-right { font-size: 10px; text-align: right; }
@@ -234,7 +226,6 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
     .by-underline { border-bottom: 1px solid #000; width: 160px; height: 16px; }
     .sig-line { border-top: 1px solid #000; width: 180px; margin-left: auto; text-align: center; padding-top: 2px; font-size: 9px; }
     .not-valid { font-style: italic; font-weight: 700; font-size: 9px; text-decoration: underline; text-align: center; margin-top: 8px; }
-
     @media print { body { padding: 10px 14px; } @page { margin: 0.4in; size: letter; } }
   </style>
 </head>
@@ -256,7 +247,6 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
       <div class="meta-row"><span class="meta-label">TIN No.:</span><span class="meta-value">&nbsp;</span></div>
     </div>
   </div>
-
   <div class="deliver-section">
     <div class="deliver-row">
       <span class="deliver-label">DELIVERED TO:</span>
@@ -267,7 +257,6 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
       <span class="deliver-line">${selectedOrderForView.address}</span>
     </div>
   </div>
-
   <table>
     <thead>
       <tr>
@@ -279,7 +268,6 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
     </thead>
     <tbody>${rows}</tbody>
   </table>
-
   <div class="print-footer">
     <div class="footer-left">
       <div>20 Bkts. (50x3) 4251 - 5250</div>
@@ -305,7 +293,6 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
     pw.focus();
     pw.print();
   };
-  // ===== END HANDLE PRINT =====
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => { setSearchTerm(e.target.value); setCurrentPage(1); };
 
@@ -332,11 +319,7 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
-    
-    // Helper to safely extract pure digits from an ID (e.g., "OR-0001" -> 1)
     const getSafeId = (id: any) => Number(String(id).replace(/\D/g, '')) || 0;
-    
-    // Custom Status Cycle Logic
     if (sortConfig.key === 'status') {
       const activeStatus = STATUS_ORDER[statusCycleIndex];
       return arr.sort((a, b) => {
@@ -345,39 +328,28 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
         return (STATUS_PRIORITY[a.status.toUpperCase()] || 0) - (STATUS_PRIORITY[b.status.toUpperCase()] || 0) || getSafeId(a.id) - getSafeId(b.id);
       });
     }
-    
-    // Default fallback (uses getSafeId to prevent broken defaults)
     if (!sortConfig.key || !sortConfig.direction) {
       return arr.sort((a, b) => (STATUS_PRIORITY[a.status.toUpperCase()] || 0) - (STATUS_PRIORITY[b.status.toUpperCase()] || 0) || getSafeId(a.id) - getSafeId(b.id));
     }
-    
     const { key, direction } = sortConfig;
     return arr.sort((a, b) => {
       const A = a[key as keyof Order];
       const B = b[key as keyof Order];
-      
-      // Handle Dates
       if (key === 'date') {
         return direction === 'asc' 
           ? new Date(A as string).getTime() - new Date(B as string).getTime() 
           : new Date(B as string).getTime() - new Date(A as string).getTime();
       }
-
-      // Safely strip letters/dashes ONLY from the ID column
       if (key === 'id') {
         const numA = getSafeId(A);
         const numB = getSafeId(B);
         return direction === 'asc' ? numA - numB : numB - numA;
       }
-
-      // Handle Quantities and Amounts normally (Preserves decimal points!)
       if (key === 'totalQty' || key === 'totalAmount') {
         const numA = Number(A) || 0;
         const numB = Number(B) || 0;
         return direction === 'asc' ? numA - numB : numB - numA;
       }
-      
-      // Handle Strings (Names, Addresses, Payment Methods)
       const sA = String(A ?? '').toLowerCase();
       const sB = String(B ?? '').toLowerCase();
       if (sA < sB) return direction === 'asc' ? -1 : 1;
@@ -409,11 +381,9 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
     const maxVisiblePages = 5;
     let startPage = Math.max(1, currentPage - 2);
     let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-
     if (endPage - startPage + 1 < maxVisiblePages) {
       startPage = Math.max(1, endPage - maxVisiblePages + 1);
     }
-
     const pages = [];
     for (let i = startPage; i <= endPage; i++) {
       pages.push(
@@ -467,12 +437,22 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
       )}
 
       <div className={s.mainContent}>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', marginBottom: '20px' }}>
-          {['Admin', 'Manager'].includes(role) && (
-            <div onClick={() => setShowExportModal(true)}>
-              <ExportButton />
-            </div>
-          )}
+
+        {/* ── HEADER ROW: Title + Export ── */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', width: '100%', margin: 0 }}>
+          <div>
+            <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#164163', margin: 0 }}>ORDERS</h1>
+            <p style={{ fontSize: '0.82rem', color: '#9ca3af', margin: '2px 0 0' }}>
+              Track, manage, and process customer orders.
+            </p>
+          </div>
+          <div>
+            {['Admin', 'Manager'].includes(role) && (
+              <div onClick={() => setShowExportModal(true)}>
+                <ExportButton />
+              </div>
+            )}
+          </div>
         </div>
 
         <div className={s.topGrid}>
@@ -486,7 +466,7 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
         ) : (
           <div className={s.tableContainer}>
             <div className={s.header}>
-              <h2 className={s.title}>Orders</h2>
+              <h2 className={s.title}>List of Orders</h2>
               <div className={s.controls}>
                 <button className={s.archiveIconBtn} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#64748b' }} onClick={() => setIsArchiveView(true)} title="View Archives">
                   <LuArchive size={20} />
@@ -527,7 +507,6 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
                 <tbody>
                   {paginated.map((o, i) => (
                     <tr key={o.id} className={i % 2 ? s.altRow : ''} onClick={() => handleOpenView(o)} style={{ cursor: 'pointer' }}>
-                      {/* Removed inline text-alignments so the CSS can center them automatically! */}
                       <td>{o.id}</td>
                       <td><strong>{o.customer}</strong></td>
                       <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.address}</td>
@@ -551,7 +530,6 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
                 </tbody>
               </table>
             </div>
-          
 
             <div className={s.footer}>
               <div className={s.showDataText}>Showing <span className={s.countBadge}>{paginated.length}</span> of {sorted.length}</div>
@@ -559,9 +537,7 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
                 <button className={s.nextBtn} disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}>
                   <LuChevronLeft />
                 </button>
-                
                 {renderPageNumbers()}
-                
                 <button className={s.nextBtn} disabled={currentPage >= totalPages} onClick={() => setCurrentPage(prev => prev + 1)}>
                   <LuChevronRight />
                 </button>
@@ -571,15 +547,29 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
         )}
       </div>
 
-      <ExportModal isOpen={showExportModal} onClose={() => setShowExportModal(false)} onSuccess={(msg, type) => { setToastTitle(type === 'error' ? 'Oops!' : 'Success!'); setToastMessage(msg); setIsError(type === 'error'); setShowToast(true); }} data={orders.filter(o => !o.is_archived)} summary={summary ?? { shippedToday: { current: 0, total: 0 }, cancelled: { current: 0 }, totalOrders: { count: 0 } }} />
-      <AddOrderModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} onSave={handleSave} statuses={orderStatuses} paymentMethods={paymentMethods} inventoryItems={inventoryItems} />
-      <OrderEditModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} orderData={selectedOrderForEdit} onSave={handleUpdateSave} statuses={orderStatuses} paymentMethods={paymentMethods} inventoryItems={inventoryItems} />
+      <ExportModal isOpen={showExportModal} onClose={() => setShowExportModal(false)} 
+                    onSuccess={(msg, type) => { setToastTitle(type === 'error' ? 'Oops!' : 'Success!'); setToastMessage(msg); setIsError(type === 'error'); setShowToast(true); }} 
+                    data={orders.filter(o => !o.is_archived)} 
+                    summary={summary ?? { shippedToday: { current: 0, total: 0 }, cancelled: { current: 0 }, totalOrders: { count: 0 } 
+                    }} />
 
-      {/* ===== VIEW / RECEIPT MODAL ===== */}
+      <AddOrderModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} 
+                      onSave={handleSave} statuses={orderStatuses} 
+                      paymentMethods={paymentMethods} 
+                      inventoryItems={inventoryItems} 
+                      />
+
+      <OrderEditModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} 
+                      orderData={selectedOrderForEdit} 
+                      onSave={handleUpdateSave} 
+                      statuses={orderStatuses} 
+                      paymentMethods={paymentMethods} 
+                      inventoryItems={inventoryItems} 
+                      />
+
       {showViewModal && selectedOrderForView && (
         <div className={s.viewBackdrop} onClick={closeViewModal}>
           <div className={s.viewModal} onClick={e => e.stopPropagation()}>
-
             <div className={s.viewModalHeader}>
               <div>
                 <h2 className={s.viewCompanyName}>AE Samonte Merchandise</h2>
@@ -655,9 +645,9 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
             </div>
 
             <div className={s.viewModalFooter}>
-              <button className={s.viewBtnPrint} onClick={handlePrint}><LuPrinter size={14} /> Print Receipt</button>
+              <button className={s.viewBtnPrint} 
+                      onClick={handlePrint}><LuPrinter size={14} /> Print Receipt</button>
             </div>
-
           </div>
         </div>
       )}
