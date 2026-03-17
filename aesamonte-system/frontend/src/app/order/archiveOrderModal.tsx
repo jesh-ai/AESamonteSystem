@@ -98,62 +98,64 @@ export default function ArchiveTable({ orders, onRestore, onBack }: ArchiveTable
         </div>
       </div>
 
-      {/* TABLE */}
-      <table className={s.table}>
-        <thead>
-          <tr>
-            {columns.map(col => (
-              <th key={col.key} onClick={() => requestSort(col.key)} style={{ cursor: 'pointer' }}>
-                <div className={s.sortableHeader}>
-                  <span>{col.label}</span>
-                  <div className={s.sortIconsStack}>
-                    <LuChevronUp className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''} />
-                    <LuChevronDown className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''} />
+      {/* WRAP THE TABLE IN s.tableResponsive HERE */}
+      <div className={s.tableResponsive}>
+        <table className={s.table}>
+          <thead>
+            <tr>
+              {columns.map(col => (
+                <th key={col.key} onClick={() => requestSort(col.key)} style={{ cursor: 'pointer' }}>
+                  <div className={s.sortableHeader}>
+                    <span>{col.label}</span>
+                    <div className={s.sortIconsStack}>
+                      <LuChevronUp className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''} />
+                      <LuChevronDown className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''} />
+                    </div>
                   </div>
-                </div>
-              </th>
-            ))}
-            <th className={s.actionHeader}>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sortedOrders.length ? (
-            sortedOrders.map((o, i) => (
-              <tr key={o.id} className={i % 2 ? s.altRow : ''}>
-                <td style={{ color: '#94a3b8' }}>{o.id}</td>
-                <td style={{ fontWeight: 600, color: '#64748b' }}>{o.customer}</td>
-                <td style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#94a3b8' }}>{o.address}</td>
-                <td style={{ textAlign: 'center', color: '#94a3b8' }}>{o.totalQty}</td>
-                <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#64748b' }}>₱{o.totalAmount?.toLocaleString()}</td>
-                <td style={{ textAlign: 'center', color: '#94a3b8' }}>{o.paymentMethod}</td>
-                <td style={{ textAlign: 'center', color: '#94a3b8' }}>{o.date}</td>
-                <td>
-                  <span style={{ backgroundColor: '#e2e8f0', color: '#64748b', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>
-                    ARCHIVED
-                  </span>
-                </td>
-                <td className={s.actionCell}>
-                  <div className={s.actionWrapper}>
-                    <button
-                      className={s.archiveBtn}
-                      onClick={() => onRestore(o.id)}  
-                    >
-                      <LuArchiveRestore size={16} />
-                      <span>Restore</span>
-                    </button>
-                  </div>
+                </th>
+              ))}
+              <th className={s.actionHeader}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedOrders.length ? (
+              sortedOrders.map((o, i) => (
+                <tr key={o.id} className={i % 2 ? s.altRow : ''}>
+                  <td style={{ color: '#94a3b8' }}>{o.id}</td>
+                  <td style={{ fontWeight: 600, color: '#64748b' }}>{o.customer}</td>
+                  <td style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#94a3b8' }}>{o.address}</td>
+                  <td style={{ textAlign: 'center', color: '#94a3b8' }}>{o.totalQty}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#64748b' }}>₱{o.totalAmount?.toLocaleString()}</td>
+                  <td style={{ textAlign: 'center', color: '#94a3b8' }}>{o.paymentMethod}</td>
+                  <td style={{ textAlign: 'center', color: '#94a3b8' }}>{o.date}</td>
+                  <td>
+                    <span style={{ backgroundColor: '#e2e8f0', color: '#64748b', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>
+                      ARCHIVED
+                    </span>
+                  </td>
+                  <td className={s.actionCell}>
+                    <div className={s.actionWrapper}>
+                      <button
+                        className={s.archiveBtn}
+                        onClick={() => onRestore(o.id)}  
+                      >
+                        <LuArchiveRestore size={16} />
+                        <span>Restore</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={9} style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
+                  No archived orders found.
                 </td>
               </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={9} style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
-                No archived orders found.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+            )}
+          </tbody>
+        </table>
+      </div>
 
       {/* FOOTER */}
       <div className={s.footer} style={{ color: '#94a3b8' }}>

@@ -88,72 +88,77 @@ export default function ArchiveTable({ products, onRestore, onBack }: ArchiveTab
         </div>
       </div>
 
-      <table className={s.table}>
-        <thead>
-          <tr>
-            {[
-              { label: 'ID', key: 'id' },
-              { label: 'ITEM', key: 'item_name' },
-              { label: 'DESCRIPTION', key: 'item_description' },
-              { label: 'SKU', key: 'sku' },
-              { label: 'BRAND', key: 'brand' },
-              { label: 'QTY', key: 'qty' },
-              { label: 'UOM', key: 'uom' },
-              { label: 'PRICE', key: 'price' }
-            ].map(col => (
-              <th key={col.key} onClick={() => requestSort(col.key as keyof Product)}>
-                <div className={s.sortableHeader}>
-                  <span>{col.label}</span>
-                  <div className={s.sortIconsStack}>
-                    <LuChevronUp className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''} />
-                    <LuChevronDown className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''} />
+      {/* WRAP THE TABLE IN s.tableResponsive HERE */}
+      <div className={s.tableResponsive}>
+        <table className={s.table}>
+          <thead>
+            <tr>
+              {[
+                { label: 'ID', key: 'id' },
+                { label: 'ITEM', key: 'item_name' },
+                { label: 'DESCRIPTION', key: 'item_description' },
+                { label: 'SKU', key: 'sku' },
+                { label: 'BRAND', key: 'brand' },
+                { label: 'QTY', key: 'qty' },
+                { label: 'UOM', key: 'uom' },
+                { label: 'PRICE', key: 'price' }
+              ].map(col => (
+                <th key={col.key} onClick={() => requestSort(col.key as keyof Product)}>
+                  <div className={s.sortableHeader}>
+                    <span>{col.label}</span>
+                    <div className={s.sortIconsStack}>
+                      <LuChevronUp className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''} />
+                      <LuChevronDown className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''} />
+                    </div>
                   </div>
-                </div>
-              </th>
-            ))}
-            <th className={s.actionHeader}>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sortedProducts.length ? (
-            sortedProducts.map(p => (
-              <tr key={p.id}>
-                <td style={{ color: '#94a3b8' }}>{p.id}</td>
-                <td style={{ fontWeight: 600, color: '#64748b' }}>{p.item_name}</td>
-                <td style={{ color: '#94a3b8' }}>{p.item_description}</td>
-                <td style={{ color: '#94a3b8' }}>{p.sku}</td>
-                <td style={{ color: '#94a3b8' }}>{p.brand}</td>
-                <td style={{ color: '#94a3b8' }}>{p.qty}</td>
-                <td style={{ color: '#94a3b8' }}>{p.uom || '—'}</td>
-                <td style={{ color: '#94a3b8' }}>₱ {p.price?.toLocaleString()}</td>
-                <td>
-                   <span style={{ backgroundColor: '#e2e8f0', color: '#64748b', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>ARCHIVED</span>
-                </td>
-                
-                {/* THE FIX: Matching Sales UI perfectly! */}
-                <td className={s.actionCell}>
-                  <div className={s.actionWrapper}>
-                    <button 
-                      className={s.archiveBtn}
-                      onClick={() => onRestore(p.id)}
-                    >
-                      <LuArchiveRestore size={16} />
-                      <span>Restore</span>
-                    </button>
-                  </div>
+                </th>
+              ))}
+              {/* Added STATUS Header to match the columns in the body */}
+              <th>STATUS</th>
+              <th className={s.actionHeader}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedProducts.length ? (
+              sortedProducts.map(p => (
+                <tr key={p.id}>
+                  <td style={{ color: '#94a3b8' }}>{p.id}</td>
+                  <td style={{ fontWeight: 600, color: '#64748b' }}>{p.item_name}</td>
+                  <td style={{ color: '#94a3b8' }}>{p.item_description}</td>
+                  <td style={{ color: '#94a3b8' }}>{p.sku}</td>
+                  <td style={{ color: '#94a3b8' }}>{p.brand}</td>
+                  <td style={{ color: '#94a3b8' }}>{p.qty}</td>
+                  <td style={{ color: '#94a3b8' }}>{p.uom || '—'}</td>
+                  <td style={{ color: '#94a3b8' }}>₱ {p.price?.toLocaleString()}</td>
+                  <td>
+                     <span style={{ backgroundColor: '#e2e8f0', color: '#64748b', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>ARCHIVED</span>
+                  </td>
+                  
+                  {/* THE FIX: Matching Sales UI perfectly! */}
+                  <td className={s.actionCell}>
+                    <div className={s.actionWrapper}>
+                      <button 
+                        className={s.archiveBtn}
+                        onClick={() => onRestore(p.id)}
+                      >
+                        <LuArchiveRestore size={16} />
+                        <span>Restore</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={10} style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
+                  No archived inventory found.
                 </td>
               </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={10} style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
-                No archived inventory found.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-
+            )}
+          </tbody>
+        </table>
+      </div>
+      
       <div className={s.footer} style={{ color: '#94a3b8' }}>
         Showing {sortedProducts.length} archived items
       </div>

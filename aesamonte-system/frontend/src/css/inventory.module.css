@@ -857,10 +857,6 @@
   background-color: #d1fae5;
 }
 
-.archiveIconBtn:hover {
-  background-color: #3e73b1;
-  color: #fff;
-}
 .actionWrapper {
   display: flex;
   justify-content: center;

@@ -568,8 +568,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
               <div className={s.controls}>
                 <button 
                   className={s.archiveIconBtn} 
-                  style={{ border: '1px solid #ddd', background: '#fff', cursor: 'pointer', color: '#64748b', padding: '8px', borderRadius: '8px', display: 'flex', transition: 'all 0.2s' 
-                  }} 
                   onClick={() => setIsArchiveView(true)} 
                   title="View Archives"
                 >

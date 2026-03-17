@@ -84,78 +84,81 @@ export default function ArchiveTable({ transactions, onRestore, onBack }: Archiv
         </div>
       </div>
 
-      <table className={s.table}>
-        <thead>
-          <tr>
-            {[
-              { label: 'No.', key: 'no' },
-              { label: 'NAME', key: 'name' },
-              { label: 'ADDRESS', key: 'address' },
-              { label: 'DATE', key: 'date' },
-              { label: 'QTY', key: 'qty' },
-              { label: 'AMOUNT', key: 'amount' },
-              { label: 'STATUS', key: 'status' }
-            ].map(col => (
-              <th key={col.key}>
-                <div className={s.sortableHeader}>
-                  <span>{col.label}</span>
-                  <div className={s.sortIconsStack}>
-                    <span 
-                      className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''}
-                      onClick={() => requestSort(col.key as keyof Transaction, 'asc')}
-                    >
-                      <LuChevronUp size={12} />
-                    </span>
-                    <span 
-                      className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''}
-                      onClick={() => requestSort(col.key as keyof Transaction, 'desc')}
-                    >
-                      <LuChevronDown size={12} />
-                    </span>
+      {/* WRAP THE TABLE IN s.tableResponsive HERE */}
+      <div className={s.tableResponsive}>
+        <table className={s.table}>
+          <thead>
+            <tr>
+              {[
+                { label: 'No.', key: 'no' },
+                { label: 'NAME', key: 'name' },
+                { label: 'ADDRESS', key: 'address' },
+                { label: 'DATE', key: 'date' },
+                { label: 'QTY', key: 'qty' },
+                { label: 'AMOUNT', key: 'amount' },
+                { label: 'STATUS', key: 'status' }
+              ].map(col => (
+                <th key={col.key}>
+                  <div className={s.sortableHeader}>
+                    <span>{col.label}</span>
+                    <div className={s.sortIconsStack}>
+                      <span 
+                        className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''}
+                        onClick={() => requestSort(col.key as keyof Transaction, 'asc')}
+                      >
+                        <LuChevronUp size={12} />
+                      </span>
+                      <span 
+                        className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''}
+                        onClick={() => requestSort(col.key as keyof Transaction, 'desc')}
+                      >
+                        <LuChevronDown size={12} />
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </th>
-            ))}
-            <th className={s.actionHeader}>Action</th>
-          </tr>
-        </thead>
+                </th>
+              ))}
+              <th className={s.actionHeader}>Action</th>
+            </tr>
+          </thead>
 
-        <tbody>
-          {sortedTx.length ? (
-            sortedTx.map((tx, i) => (
-              <tr key={tx.no} className={i % 2 !== 0 ? s.rowOdd : ''}>
-                <td style={{ color: '#94a3b8' }}>{tx.no}</td>
-                <td style={{ fontWeight: 600, color: '#64748b' }}>{tx.name}</td>
-                <td style={{ color: '#94a3b8' }}>{tx.address}</td>
-                <td style={{ color: '#94a3b8' }}>{tx.date}</td>
-                <td style={{ color: '#94a3b8' }}>{tx.qty}</td>
-                <td style={{ color: '#94a3b8' }}>₱ {tx.amount.toLocaleString()}</td>
-                <td>
-                   <span style={{ backgroundColor: '#e2e8f0', color: '#64748b', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>ARCHIVED</span>
-                </td>
-                <td className={s.actionCell}>
-                  <div className={s.actionWrapper}>
-                    <button 
-                      className={s.archiveBtn}
-                      style={{ color: '#10b981', backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }}
-                      onClick={() => onRestore(tx.no)}
-                    >
-                      <LuArchiveRestore size={16} />
-                      <span>Restore</span>
-                    </button>
-                  </div>
+          <tbody>
+            {sortedTx.length ? (
+              sortedTx.map((tx, i) => (
+                <tr key={tx.no} className={i % 2 !== 0 ? s.rowOdd : ''}>
+                  <td style={{ color: '#94a3b8' }}>{tx.no}</td>
+                  <td style={{ fontWeight: 600, color: '#64748b' }}>{tx.name}</td>
+                  <td style={{ color: '#94a3b8' }}>{tx.address}</td>
+                  <td style={{ color: '#94a3b8' }}>{tx.date}</td>
+                  <td style={{ color: '#94a3b8' }}>{tx.qty}</td>
+                  <td style={{ color: '#94a3b8' }}>₱ {tx.amount.toLocaleString()}</td>
+                  <td>
+                     <span style={{ backgroundColor: '#e2e8f0', color: '#64748b', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>ARCHIVED</span>
+                  </td>
+                  <td className={s.actionCell}>
+                    <div className={s.actionWrapper}>
+                      <button 
+                        className={s.archiveBtn}
+                        style={{ color: '#10b981', backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }}
+                        onClick={() => onRestore(tx.no)}
+                      >
+                        <LuArchiveRestore size={16} />
+                        <span>Restore</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={8} style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
+                  No archived transactions found.
                 </td>
               </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={8} style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
-                No archived transactions found.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+            )}
+          </tbody>
+        </table>
+      </div>
 
       <div className={s.footer} style={{ color: '#94a3b8' }}>
         Showing {sortedTx.length} archived items

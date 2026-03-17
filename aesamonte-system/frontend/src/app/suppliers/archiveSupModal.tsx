@@ -89,67 +89,70 @@ export default function ArchiveSupplierTable({ suppliers, onRestore, onBack }: A
         </div>
       </div>
 
-      <table className={s.table}>
-        <thead>
-          <tr>
-            {columns.map(col => (
-              <th key={col.key} onClick={() => requestSort(col.key)} style={{ cursor: 'pointer' }}>
-                <div className={s.sortableHeaderInner}>
-                  <span>{col.label}</span>
-                  <div className={s.sortIconsStack}>
-                    <LuChevronUp className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''} />
-                    <LuChevronDown className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''} />
-                  </div>
-                </div>
-              </th>
-            ))}
-            <th style={{ display: 'none' }}>STATUS</th>  
-    <th style={{ textAlign: 'center', width: '120px' }}>ACTION</th>  
-          </tr>
-        </thead>
-        <tbody>
-          {sortedSuppliers.length ? (
-            sortedSuppliers.map((sup, i) => (
-              <tr key={sup.id} className={i % 2 ? s.altRow : ''}>
-                <td style={{ color: '#94a3b8' }}>{sup.id}</td>
-                <td style={{ fontWeight: 600, color: '#64748b' }}>{sup.supplierName}</td>
-                <td style={{ color: '#94a3b8' }}>{sup.contactPerson || '—'}</td>
-                <td style={{ color: '#94a3b8' }}>{sup.contactNumber || '—'}</td>
-                <td style={{ color: '#94a3b8' }}>{sup.email || '—'}</td>
-                <td style={{ color: '#94a3b8' }}>{sup.address || '—'}</td>
-                <td style={{ display: 'none' }}>
-                    <span style={{ backgroundColor: '#e2e8f0', 
-                                   color: '#64748b', 
-                                   padding: '4px 8px', 
-                                   borderRadius: '4px', 
-                                   fontSize: '0.75rem', 
-                                   fontWeight: 600, 
-                                   display: 'inline-block',
-                                   width: '90px',        
-                                   textAlign: 'center' 
-                                   }}>
-                                     ARCHIVED
-                    </span>
-                </td>
-                <td className={s.actionCell}>
-                    <div className={s.actionWrapper}>
-                    <button className={s.archiveBtn} onClick={() => onRestore(sup.id)}>
-                        <LuArchiveRestore size={14} />
-                        <span>Restore</span>
-                    </button>
-                    </div>
-                </td>
-                </tr>
-            ))
-          ) : (
+      {/* WRAP THE TABLE IN s.tableResponsive HERE */}
+      <div className={s.tableResponsive}>
+        <table className={s.table}>
+          <thead>
             <tr>
-              <td colSpan={8} style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
-                No archived suppliers found.
-              </td>
+              {columns.map(col => (
+                <th key={col.key} onClick={() => requestSort(col.key)} style={{ cursor: 'pointer' }}>
+                  <div className={s.sortableHeaderInner}>
+                    <span>{col.label}</span>
+                    <div className={s.sortIconsStack}>
+                      <LuChevronUp className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''} />
+                      <LuChevronDown className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''} />
+                    </div>
+                  </div>
+                </th>
+              ))}
+              <th style={{ display: 'none' }}>STATUS</th>  
+              <th style={{ textAlign: 'center', width: '120px' }}>ACTION</th>  
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {sortedSuppliers.length ? (
+              sortedSuppliers.map((sup, i) => (
+                <tr key={sup.id} className={i % 2 ? s.altRow : ''}>
+                  <td style={{ color: '#94a3b8' }}>{sup.id}</td>
+                  <td style={{ fontWeight: 600, color: '#64748b' }}>{sup.supplierName}</td>
+                  <td style={{ color: '#94a3b8' }}>{sup.contactPerson || '—'}</td>
+                  <td style={{ color: '#94a3b8' }}>{sup.contactNumber || '—'}</td>
+                  <td style={{ color: '#94a3b8' }}>{sup.email || '—'}</td>
+                  <td style={{ color: '#94a3b8' }}>{sup.address || '—'}</td>
+                  <td style={{ display: 'none' }}>
+                      <span style={{ backgroundColor: '#e2e8f0', 
+                                     color: '#64748b', 
+                                     padding: '4px 8px', 
+                                     borderRadius: '4px', 
+                                     fontSize: '0.75rem', 
+                                     fontWeight: 600, 
+                                     display: 'inline-block',
+                                     width: '90px',        
+                                     textAlign: 'center' 
+                                     }}>
+                                       ARCHIVED
+                      </span>
+                  </td>
+                  <td className={s.actionCell}>
+                      <div className={s.actionWrapper}>
+                      <button className={s.archiveBtn} onClick={() => onRestore(sup.id)}>
+                          <LuArchiveRestore size={14} />
+                          <span>Restore</span>
+                      </button>
+                      </div>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={8} style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
+                  No archived suppliers found.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
       <div className={s.footer} style={{ color: '#94a3b8' }}>
         Showing {sortedSuppliers.length} archived supplier{sortedSuppliers.length !== 1 ? 's' : ''}
