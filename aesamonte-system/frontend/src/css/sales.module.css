@@ -175,6 +175,8 @@
 /* ===== TABLE BODY ===== */
 .table {
   width: 100%;
+  /* Ensure the table can stretch beyond the screen width if needed */
+  min-width: max-content;
   border-collapse: collapse;
 }
 
@@ -186,6 +188,10 @@
   color: #64748b;
   border-bottom: 2px solid #f1f3f4;
   text-transform: uppercase;
+  /* Center the header text */
+  text-align: center;
+  /* Prevent header text from dropping to a new line */
+  white-space: nowrap;
 }
 
 .table td {
@@ -193,6 +199,10 @@
   font-size: 0.9rem;
   border-bottom: 1px solid #f1f3f4;
   vertical-align: middle;
+  /* Center the header text */
+  text-align: center;
+  /* Prevent header text from dropping to a new line */
+  white-space: nowrap;
 }
 
 /* Striping for rowOdd */
@@ -202,11 +212,13 @@
 
 /* Sorting */
 .sortableHeader {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   cursor: pointer;
   user-select: none;
+  display: flex !important;
+  align-items: center;
+  /* Push the header text and arrows to the center */
+  justify-content: center; 
+  gap: 6px;
 }
 
 .sortIconsStack {
@@ -764,13 +776,6 @@
   overflow-x: auto;
   -webkit-overflow-scrolling: touch; /* For smooth scrolling on iOS devices */
   margin-bottom: 1rem; /* Optional: Adds breathing room before the footer */
-}
-
-/* ===== TABLE BODY ===== */
-.table {
-  width: 100%;
-  min-width: 900px; /* ADD THIS: Forces the table to stay wide enough, triggering the scrollbar on smaller screens */
-  border-collapse: collapse;
 }
 
 @media (max-width: 600px) {

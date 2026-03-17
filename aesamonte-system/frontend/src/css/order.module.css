@@ -58,14 +58,6 @@
   box-sizing: border-box;
 }
 
-.table th {
-  text-align: left;
-  padding: 15px;
-  font-size: 0.9rem;
-  border-bottom: 1px solid #f1f3f4;
-  vertical-align: middle;
-}
-
 /* ===== TABLE HEADER ===== */
 .header {
   display: flex;
@@ -136,22 +128,27 @@
 /* ===== TABLE STYLING ===== */
 .table {
   width: 100%;
-  min-width: 900px;
+  /* Force the table to expand rather than squish text */
+  min-width: max-content; 
   border-collapse: collapse;
 }
 
 .table th,
 .table td {
-  text-align: left; 
   padding: 15px;
   font-size: 0.9rem;
   border-bottom: 1px solid #f1f3f4;
+  /* Center all data */
+  text-align: center; 
+  /* Prevent data from wrapping to a new line */
+  white-space: nowrap; 
 }
 
 .altRow {
   background: #EFF2F4;
 }
 
+/*
 .table th:nth-child(2), 
 .table td:nth-child(2) { 
   width: 40%; 
@@ -160,12 +157,15 @@
 .table td:nth-child(4) { 
   width: 15%; 
 }
+  */
 
 .sortableHeader {
   cursor: pointer;
   user-select: none;
   display: flex !important;
   align-items: center;
+  /* Push header text to the center */
+  justify-content: center; 
   gap: 6px;
 }
 
@@ -198,7 +198,7 @@
 
 /* ===== ACTIONS ===== */
 th.actionHeader {
-  text-align: center;
+  text-align: center !important;
 }
 
 th.actionHeader .sortHeaderInner {
@@ -210,6 +210,9 @@ th.actionHeader .sortHeaderInner {
 
 .actionCell {
   position: relative;
+  overflow: visible !important;
+  text-align: center !important;
+  vertical-align: middle !important;
   display: flex;          
   justify-content: center; 
   align-items: center;    
@@ -441,7 +444,7 @@ th.actionHeader .sortHeaderInner {
 .pillRed,
 .pillYellow,
 .pillBlue {
-  display: flex;
+  display: inline-flex; 
   align-items: center;
   justify-content: center;
   box-sizing: border-box;

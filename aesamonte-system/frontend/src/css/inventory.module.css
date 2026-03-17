@@ -171,20 +171,29 @@
 .table {
   width: 100%;
   border-collapse: collapse;
+  /* Ensure the table can stretch beyond the screen width if needed */
+  min-width: max-content;
 }
 
 .table th {
   padding: 15px;
-  text-align: left;
+  /* Center the header text */
+  text-align: center;
   border-bottom: 2px solid #f1f3f4;
   font-size: 0.85rem;
   font-weight: 700;
+  /* Prevent header text from dropping to a new line */
+  white-space: nowrap;
 }
 
 .table td {
   padding: 15px;
+  /* Center the table data */
+  text-align: center;
   border-bottom: 1px solid #f1f3f4;
   font-size: 0.9rem;
+  /* Prevent data text from dropping to a new line */
+  white-space: nowrap;
 }
 
 .sortableHeader {
@@ -192,6 +201,8 @@
   user-select: none;
   display: flex !important;
   align-items: center;
+  /* Push the header text and arrows to the center */
+  justify-content: center;
   gap: 6px;
 }
 
@@ -255,14 +266,25 @@
 }
 
 /* ===== ACTION ===== */
+.actionHeader {
+  /* Forces the word "Action" to be perfectly centered */
+  text-align: center !important; 
+}
+
 .actionCell {
   position: relative;
   overflow: visible !important; 
-  text-align: center;
+  /* Forces the icon to strictly anchor to the middle of the cell */
+  text-align: center !important;
+  vertical-align: middle !important;
 }
 
 .moreIcon {
   cursor: pointer;
+  /* inline-flex prevents the icon from having weird hidden margins */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: #64748b;
   font-size: 1.2rem;
   transition: color 0.2s;

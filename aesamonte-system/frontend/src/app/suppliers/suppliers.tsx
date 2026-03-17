@@ -536,14 +536,17 @@ export default function Suppliers({
                 <thead>
                   <tr>
                     {columns.map(col => (
-                      <th key={col.key!} onClick={() => handleSort(col.key)} className={s.sortableHeader}>
-                        <div className={s.sortHeaderInner}>
+                      // Removed className from the <th> so it remains a standard table cell
+                      <th key={col.key!} onClick={() => handleSort(col.key)} style={{ cursor: 'pointer' }}>
+                                            
+                        <div className={s.sortableHeader}>
                           <span>{col.label}</span>
                           <div className={s.sortIconsStack}>
                             <LuChevronUp size={12} className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''} />
                             <LuChevronDown size={12} className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''} />
                           </div>
                         </div>
+                        
                       </th>
                     ))}
                     <th className={s.actionHeader}>ACTION</th>

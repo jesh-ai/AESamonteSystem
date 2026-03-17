@@ -63,20 +63,17 @@
 
 .table {
   width: 100%;
-  min-width: 1050px; /* ADD THIS: Forces table width to trigger the scrollbar (1050px is good for 11 columns) */
+  min-width: max-content; /* Allows natural stretch for the scrollbar */
   border-collapse: collapse;
-  table-layout: fixed;
 }
 
 .table th,
 .table td {
-  text-align: left;
+  text-align: center; /* Centers all data */
   padding: 15px;
   font-size: 0.9rem;
   border-bottom: 1px solid #f1f3f4;
-  overflow: visible;      
-  text-overflow: clip;    
-  white-space: normal;    
+  white-space: nowrap; /* Prevents new lines for standard data */
 }
 
 /* Column widths */
@@ -87,10 +84,11 @@
 .performedByCol { width: 120px; }
 
 .changedFieldsCol {
-  width: 500px;      
+  min-width: 400px;
   max-width: 500px;
-  white-space: normal; 
+  white-space: normal !important; /* Allows JSON data to wrap to new lines */
   word-wrap: break-word; 
+  text-align: left !important; /* Keeps JSON readable by aligning it to the left */
 }
 
 /* Alternate row color */
@@ -98,7 +96,12 @@
 
 /* Sorting icons */
 .sortableHeader { cursor: pointer; user-select: none; }
-.sortHeaderInner { display: inline-flex; align-items: center; gap: 6px; }
+.sortHeaderInner { 
+  display: inline-flex; 
+  align-items: center; 
+  justify-content: center; /* Centers the header text alongside the arrows */
+  gap: 6px;
+}
 
 .sortIconsStack { 
   display: inline-flex; 

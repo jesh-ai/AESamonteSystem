@@ -119,16 +119,17 @@
 /* ===== TABLE STYLING ===== */
 .table {
   width: 100%;
+  min-width: max-content; /* Forces table to expand instead of squishing text */
   border-collapse: collapse;
-  table-layout: auto;
 }
 
 .table th,
 .table td {
-  text-align: left; 
   padding: 15px;
   font-size: 0.9rem;
   border-bottom: 1px solid #f1f3f4;
+  text-align: center; /* Center all data */
+  white-space: nowrap; /* Prevent data from wrapping to a new line */
 }
 
 .altRow {
@@ -164,6 +165,10 @@
 .sortableHeader {
   cursor: pointer;
   user-select: none;
+  display: flex !important;
+  align-items: center;
+  justify-content: center; /* Push header text to the center */
+  gap: 6px;
 }
 
 .sortHeaderInner,
@@ -201,22 +206,26 @@
 
 /* ACTIONS */
 .actionHeader {
-  text-align: center;
+  text-align: center !important;
 }
 
 .actionCell {
   position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 5px;
+  overflow: visible !important; 
+  /* Forces the icon to strictly anchor to the middle of the cell */
+  text-align: center !important;
+  vertical-align: middle !important;
 }
 
 .moreIcon {
   cursor: pointer;
+  /* inline-flex prevents the icon from having weird hidden margins */
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  color: #64748b;
+  font-size: 1.2rem;
+  transition: color 0.2s;
 }
 
 /* ===== POPUP MENU ===== */

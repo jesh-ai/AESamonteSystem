@@ -333,19 +333,22 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
   const sorted = useMemo(() => {
     const arr = [...filtered];
     
+    // Helper to safely extract pure digits from an ID (e.g., "OR-0001" -> 1)
+    const getSafeId = (id: any) => Number(String(id).replace(/\D/g, '')) || 0;
+    
     // Custom Status Cycle Logic
     if (sortConfig.key === 'status') {
       const activeStatus = STATUS_ORDER[statusCycleIndex];
       return arr.sort((a, b) => {
         if (a.status === activeStatus && b.status !== activeStatus) return -1;
         if (b.status === activeStatus && a.status !== activeStatus) return 1;
-        return (STATUS_PRIORITY[a.status.toUpperCase()] || 0) - (STATUS_PRIORITY[b.status.toUpperCase()] || 0) || a.id - b.id;
+        return (STATUS_PRIORITY[a.status.toUpperCase()] || 0) - (STATUS_PRIORITY[b.status.toUpperCase()] || 0) || getSafeId(a.id) - getSafeId(b.id);
       });
     }
     
-    // Default fallback
+    // Default fallback (uses getSafeId to prevent broken defaults)
     if (!sortConfig.key || !sortConfig.direction) {
-      return arr.sort((a, b) => (STATUS_PRIORITY[a.status.toUpperCase()] || 0) - (STATUS_PRIORITY[b.status.toUpperCase()] || 0) || a.id - b.id);
+      return arr.sort((a, b) => (STATUS_PRIORITY[a.status.toUpperCase()] || 0) - (STATUS_PRIORITY[b.status.toUpperCase()] || 0) || getSafeId(a.id) - getSafeId(b.id));
     }
     
     const { key, direction } = sortConfig;
@@ -360,8 +363,15 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
           : new Date(B as string).getTime() - new Date(A as string).getTime();
       }
 
-      // FIX: Explicitly convert these exact columns to pure numbers before sorting
-      if (key === 'id' || key === 'totalQty' || key === 'totalAmount') {
+      // Safely strip letters/dashes ONLY from the ID column
+      if (key === 'id') {
+        const numA = getSafeId(A);
+        const numB = getSafeId(B);
+        return direction === 'asc' ? numA - numB : numB - numA;
+      }
+
+      // Handle Quantities and Amounts normally (Preserves decimal points!)
+      if (key === 'totalQty' || key === 'totalAmount') {
         const numA = Number(A) || 0;
         const numB = Number(B) || 0;
         return direction === 'asc' ? numA - numB : numB - numA;
@@ -517,14 +527,15 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
                 <tbody>
                   {paginated.map((o, i) => (
                     <tr key={o.id} className={i % 2 ? s.altRow : ''} onClick={() => handleOpenView(o)} style={{ cursor: 'pointer' }}>
-                      <td style={{ textAlign: 'center' }}>{o.id}</td>
-                      <td style={{ textAlign: 'left', paddingLeft: '1rem' }}><strong>{o.customer}</strong></td>
-                      <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.address}</td>
-                      <td style={{ textAlign: 'center' }}>{o.totalQty}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 'bold' }}>₱{o.totalAmount?.toLocaleString()}</td>
-                      <td style={{ textAlign: 'center' }}>{o.paymentMethod}</td>
-                      <td style={{ textAlign: 'center' }}>{o.date}</td>
-                      <td style={{ textAlign: 'center' }}><span className={getStatusStyle(o.status)}>{o.status}</span></td>
+                      {/* Removed inline text-alignments so the CSS can center them automatically! */}
+                      <td>{o.id}</td>
+                      <td><strong>{o.customer}</strong></td>
+                      <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.address}</td>
+                      <td>{o.totalQty}</td>
+                      <td style={{ fontWeight: 'bold' }}>₱{o.totalAmount?.toLocaleString()}</td>
+                      <td>{o.paymentMethod}</td>
+                      <td>{o.date}</td>
+                      <td><span className={getStatusStyle(o.status)}>{o.status}</span></td>
                       <td className={s.actionCell} onClick={e => e.stopPropagation()}>
                         <LuEllipsisVertical className={s.moreIcon} onClick={() => setOpenMenuId(openMenuId === o.id ? null : o.id)} />
                         {openMenuId === o.id && (
