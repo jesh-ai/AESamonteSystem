@@ -124,9 +124,29 @@ export default function StatsGrid({ metrics, loading, onNavigate, insights, lowS
           onClick={() => setShowLowStockPopup(false)}
         >
           <div className={styles.lowStockPopup} data-lowstock="true" onClick={e => e.stopPropagation()}>
-            <div className={styles.lowStockPopupHeader}>
-              <p className={styles.lowStockPopupTitle}>LOW STOCK ITEMS</p>
-              <span className={styles.lowStockPopupCount}>{metrics?.lowStock ?? lowStockData.length} items</span>
+            <div className={styles.lowStockPopupHeader} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <p className={styles.lowStockPopupTitle}>LOW STOCK ITEMS</p>
+                <span className={styles.lowStockPopupCount}>{metrics?.lowStock ?? lowStockData.length} items</span>
+              </div>
+              <button 
+                onClick={() => setShowLowStockPopup(false)} 
+                style={{ 
+                  background: "#f3f4f6", 
+                  border: "none", 
+                  borderRadius: "50%", 
+                  width: "28px", 
+                  height: "28px", 
+                  cursor: "pointer", 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center",
+                  fontSize: "12px",
+                  color: "#6b7280"
+                }}
+              >
+                ✕
+              </button>
             </div>
             <div className={styles.lowStockPopupList}>
               {lowStockData.map((s, i) => (
@@ -146,10 +166,15 @@ export default function StatsGrid({ metrics, loading, onNavigate, insights, lowS
         </div>
       )}
 
-      {/* ── Item View Modal (Keeping your layout, fixing the data) ── */}
       {viewLowStockItem && (
         <div
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3000, padding: "1rem" }}
+          style={{ position: "fixed", inset: 0, 
+                   background: "rgba(0,0,0,0.45)", 
+                   display: "flex", alignItems: "center", 
+                   justifyContent: "center", 
+                   zIndex: 3000, 
+                   padding: "1rem" }}
+                   
           onClick={() => setViewLowStockItem(null)}
         >
           <div
@@ -166,29 +191,67 @@ export default function StatsGrid({ metrics, loading, onNavigate, insights, lowS
                 <p style={{ fontSize: "1.15rem", fontWeight: 700, color: "#164163", margin: 0 }}>{viewLowStockItem.item_name}</p>
                 <p style={{ fontSize: "0.75rem", color: "#9ca3af", margin: "3px 0 0" }}>ID: {viewLowStockItem.inventory_id} • SKU: {viewLowStockItem.sku || "—"}</p>
               </div>
-              <button onClick={() => setViewLowStockItem(null)} style={{ background: "#f3f4f6", border: "none", borderRadius: "50%", width: "32px", height: "32px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+              <button onClick={() => setViewLowStockItem(null)} 
+                      style={{ background: "#f3f4f6", 
+                               border: "none", 
+                               borderRadius: "50%", 
+                               width: "32px", 
+                               height: "32px", 
+                               cursor: "pointer", 
+                               display: "flex", 
+                               alignItems: "center", 
+                               justifyContent: "center" 
+                               }}>✕</button>
             </div>
 
-            <hr style={{ border: "none", borderTop: "1px dashed #e5e7eb", margin: 0 }} />
+            <hr style={{ border: "none", 
+                         borderTop: "1px dashed #e5e7eb",  
+                         margin: 0 }} />
 
             <div>
-              <p style={{ fontSize: "0.7rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", margin: "0 0 0.6rem" }}>Product Details</p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              <p style={{ fontSize: "0.7rem", 
+                          fontWeight: 700, 
+                          color: "#9ca3af", 
+                          textTransform: "uppercase", 
+                          margin: "0 0 0.6rem" }}>Product Details</p>
+
+              <div style={{ display: "grid", 
+                            gridTemplateColumns: "1fr 1fr", 
+                            gap: "0.75rem" }}>
                 <div>
-                  <p style={{ fontSize: "0.72rem", color: "#9ca3af", margin: 0 }}>Brand</p>
-                  <p style={{ fontSize: "0.88rem", fontWeight: 600, margin: 0 }}>{viewLowStockItem.brand || "—"}</p>
+
+                  <p style={{ fontSize: "0.72rem", 
+                              color: "#9ca3af", 
+                              margin: 0 }}>Brand</p>
+
+                  <p style={{ fontSize: "0.88rem", 
+                              fontWeight: 600, margin: 0 }}>{viewLowStockItem.brand || "—"}</p>
                 </div>
                 <div>
-                  <p style={{ fontSize: "0.72rem", color: "#9ca3af", margin: 0 }}>Unit (UOM)</p>
-                  <p style={{ fontSize: "0.88rem", fontWeight: 600, margin: 0 }}>{viewLowStockItem.uom || "—"}</p>
+                  <p style={{ fontSize: "0.72rem", 
+                              color: "#9ca3af", 
+                              margin: 0 }}>Unit (UOM)</p>
+
+                  <p style={{ fontSize: "0.88rem", 
+                              fontWeight: 600, 
+                              margin: 0 }}>{viewLowStockItem.uom || "—"}</p>
                 </div>
                 <div>
-                  <p style={{ fontSize: "0.72rem", color: "#9ca3af", margin: 0 }}>Supplier</p>
-                  <p style={{ fontSize: "0.88rem", fontWeight: 600, margin: 0 }}>{(viewLowStockItem as any).supplier_name || (viewLowStockItem as any).supplier || "—"}</p>
+                  <p style={{ fontSize: "0.72rem", 
+                              color: "#9ca3af", 
+                              margin: 0 }}>Supplier</p>
+                              
+                  <p style={{ fontSize: "0.88rem", 
+                              fontWeight: 600, 
+                              margin: 0 }}>{(viewLowStockItem as any).supplier_name || (viewLowStockItem as any).supplier || "—"}</p>
                 </div>
                 <div>
-                  <p style={{ fontSize: "0.72rem", color: "#9ca3af", margin: 0 }}>Reorder Point</p>
-                  <p style={{ fontSize: "0.88rem", fontWeight: 600, margin: 0 }}>{(viewLowStockItem as any).reorder_qty || (viewLowStockItem as any).reorderLevel || 0} {viewLowStockItem.uom}</p>
+                  <p style={{ fontSize: "0.72rem", 
+                              color: "#9ca3af", 
+                              margin: 0 }}>Reorder Point</p>
+                  <p style={{ fontSize: "0.88rem", 
+                              fontWeight: 600, 
+                              margin: 0 }}>{(viewLowStockItem as any).reorder_qty || (viewLowStockItem as any).reorderLevel || 0} {viewLowStockItem.uom}</p>
                 </div>
               </div>
             </div>
@@ -196,16 +259,36 @@ export default function StatsGrid({ metrics, loading, onNavigate, insights, lowS
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
               <thead>
                 <tr style={{ background: "#f9fafb" }}>
-                  <th style={{ padding: "8px 12px", textAlign: "left", fontSize: "0.68rem", color: "#9ca3af", textTransform: "uppercase" }}>QTY</th>
-                  <th style={{ padding: "8px 12px", textAlign: "left", fontSize: "0.68rem", color: "#9ca3af", textTransform: "uppercase" }}>UNIT COST</th>
-                  <th style={{ padding: "8px 12px", textAlign: "left", fontSize: "0.68rem", color: "#9ca3af", textTransform: "uppercase" }}>SELLING PRICE</th>
+                  <th style={{ padding: "8px 12px", 
+                               textAlign: "left", 
+                               fontSize: "0.68rem", 
+                               color: "#9ca3af", 
+                               textTransform: "uppercase" }}>QTY</th>
+
+                  <th style={{ padding: "8px 12px", 
+                               textAlign: "left", 
+                               fontSize: "0.68rem", 
+                               color: "#9ca3af", 
+                               textTransform: "uppercase" }}>UNIT COST</th>
+                  <th style={{ padding: "8px 12px", 
+                               textAlign: "left", 
+                               fontSize: "0.68rem", 
+                               color: "#9ca3af", 
+                               textTransform: "uppercase" }}>SELLING PRICE</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td style={{ padding: "10px 12px", fontWeight: 700, color: "#dc2626", fontSize: "1rem" }}>{viewLowStockItem.current_qty} <span style={{fontSize: '0.7rem', fontWeight: 400}}>{viewLowStockItem.uom}</span></td>
-                  <td style={{ padding: "10px 12px", fontWeight: 600 }}>₱ {((viewLowStockItem as any).unit_price || (viewLowStockItem as any).unitCost || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
-                  <td style={{ padding: "10px 12px", fontWeight: 600, color: "#164163" }}>₱ {((viewLowStockItem as any).selling_price || (viewLowStockItem as any).sellingPrice || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+                  <td style={{ padding: "10px 12px", 
+                               fontWeight: 700, 
+                               color: "#dc2626", 
+                               fontSize: "1rem" }}>{viewLowStockItem.current_qty} <span style={{fontSize: '0.7rem', fontWeight: 400}}>{viewLowStockItem.uom}</span></td>
+                  
+                  <td style={{ padding: "10px 12px", 
+                               fontWeight: 600 }}>₱ {((viewLowStockItem as any).unit_price || (viewLowStockItem as any).unitCost || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
+                  
+                  <td style={{ padding: "10px 12px", 
+                               fontWeight: 600, color: "#164163" }}>₱ {((viewLowStockItem as any).selling_price || (viewLowStockItem as any).sellingPrice || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</td>
                 </tr>
               </tbody>
             </table>
