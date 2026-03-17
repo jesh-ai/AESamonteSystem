@@ -8,7 +8,7 @@ import { AiOutlineUser } from "react-icons/ai";
 import { LuShieldCheck, LuLayoutTemplate, LuDatabaseBackup, LuKeyRound } from "react-icons/lu";
 import { LuClipboardList } from "react-icons/lu";
 import AccessControl from "./access-control";
-import AppPreferences from "./app-preferences";
+import GeneralSettings from "./general-settings";
 import BackupRestore from "./backup-restore";
 import AuditLog from "./audit-log";
 import ChangePasswordModal from "./ChangePasswordModal";
@@ -104,7 +104,7 @@ export default function SettingsPage({ role = "Admin", employeeId, onLogout }: S
         )}
 
         {activeView === "appPreferences" && (
-          <AppPreferences onBack={() => setActiveView("main")} />
+          <GeneralSettings onBack={() => setActiveView("main")} />
         )}
 
         {activeView === "backupRestore" && (

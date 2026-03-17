@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useEffect, useState } from "react";
@@ -9,6 +10,7 @@ interface GranularPerm {
   can_create: boolean;
   can_edit: boolean;
   can_archive: boolean;
+  can_export: boolean;
 }
 
 interface AssignedUser {
@@ -34,6 +36,7 @@ interface Employee {
 }
 
 const MODULES = [
+  { key: 'dashboard', label: 'Dashboard' },
   { key: 'sales',     label: 'Sales' },
   { key: 'inventory', label: 'Inventory' },
   { key: 'orders',    label: 'Orders' },
@@ -47,9 +50,10 @@ const ACTIONS: { key: keyof GranularPerm; label: string }[] = [
   { key: 'can_create',  label: 'Create' },
   { key: 'can_edit',    label: 'Edit' },
   { key: 'can_archive', label: 'Archive' },
+  { key: 'can_export',  label: 'Export' },
 ];
 
-const DEFAULT_PERM: GranularPerm = { can_view: false, can_create: false, can_edit: false, can_archive: false };
+const DEFAULT_PERM: GranularPerm = { can_view: false, can_create: false, can_edit: false, can_archive: false, can_export: false };
 
 export default function EditRoleModal({
   roleId,
@@ -107,7 +111,7 @@ export default function EditRoleModal({
 
   const toggleRow = (module: string) => {
     const allOn = ACTIONS.every(a => perms[module]?.[a.key]);
-    const next: GranularPerm = { can_view: !allOn, can_create: !allOn, can_edit: !allOn, can_archive: !allOn };
+    const next: GranularPerm = { can_view: !allOn, can_create: !allOn, can_edit: !allOn, can_archive: !allOn, can_export: !allOn };
     setPerms(prev => ({ ...prev, [module]: next }));
   };
 

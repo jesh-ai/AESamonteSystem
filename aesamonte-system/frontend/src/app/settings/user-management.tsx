@@ -27,24 +27,20 @@ export default function UserManagement({ onBack }: { onBack: () => void }) {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<number | null>(null);
+  const [roleMap, setRoleMap] = useState<Record<number, string>>({});
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (map: Record<number, string> = roleMap) => {
     setLoading(true);
     try {
       const response = await fetch(`/api/employees`);
       const data = await response.json();
-
       const formattedUsers = data
-        // FILTER: Only show users who are NOT Inactive (10)
         .filter((emp: any) => emp.status_id !== 10)
         .map((emp: any) => ({
           ...emp,
-          role: emp.role_id === 1 ? "Admin" : 
-                emp.role_id === 2 ? "Manager" : 
-                emp.role_id === 3 ? "Head" : "Staff",
+          role: map[emp.role_id] ?? `Role ${emp.role_id}`,
           status: emp.status_id === 9 ? "Active" : "Inactive"
         }));
-        
       setUsers(formattedUsers);
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -53,7 +49,19 @@ export default function UserManagement({ onBack }: { onBack: () => void }) {
     }
   };
 
-  useEffect(() => { fetchUsers(); }, []);
+  useEffect(() => {
+    fetch('/api/roles')
+      .then(r => r.json())
+      .then((data: any[]) => {
+        if (!Array.isArray(data)) return;
+        const map: Record<number, string> = {};
+        data.forEach(r => { map[r.role_id] = r.role_name; });
+        setRoleMap(map);
+        fetchUsers(map);
+      })
+      .catch(() => fetchUsers({}));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const initiateDelete = (id: number) => {
     setUserToDelete(id);
@@ -81,7 +89,7 @@ export default function UserManagement({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className={`${styles.settingsCard} ${styles.userManagementCard}`}>
+    <div className={styles.settingsCard}>
       <div className={styles.settingsHeaderWrapper}>
         <button className={styles.backButton} onClick={onBack}>
           <LuChevronLeft /> Back

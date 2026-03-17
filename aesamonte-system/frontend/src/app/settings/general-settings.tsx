@@ -50,7 +50,7 @@ const DEFAULT_STATE = {
   },
 };
 
-export default function AppPreferences({ onBack }: { onBack: () => void }) {
+export default function GeneralSettings({ onBack }: { onBack: () => void }) {
   const s = prefStyles as Record<string, string>;
 
   const [timezone, setTimezone] = useState(DEFAULT_STATE.timezone);
@@ -117,7 +117,7 @@ export default function AppPreferences({ onBack }: { onBack: () => void }) {
   return (
     <div className={sharedStyles.settingsCard}>
       <SettingsHeader
-        title="App Preferences"
+        title="General Settings"
         icon={<LuLayoutTemplate />}
         onBack={onBack}
       />

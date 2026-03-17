@@ -5,22 +5,41 @@ import React, { useState, useEffect } from "react";
 import styles from "@/css/addEmployeeModal.module.css";
 import { LuUserPlus, LuX, LuSave } from "react-icons/lu";
 
+interface RoleOption {
+  role_id: number;
+  role_name: string;
+}
+
 export default function AddEmployeeModal({ onClose, onAdd, employee }: any) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [contact, setContact] = useState("");
-  const [role, setRole] = useState("4"); 
-  const [status, setStatus] = useState("9"); // HTML select values are always strings
+  const [role, setRole] = useState("");
+  const [status, setStatus] = useState("9");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [roleOptions, setRoleOptions] = useState<RoleOption[]>([]);
+
+  useEffect(() => {
+    fetch('/api/roles')
+      .then(r => r.json())
+      .then((data: RoleOption[]) => {
+        const filtered = Array.isArray(data) ? data : [];
+        setRoleOptions(filtered);
+        // Set default role to first available if not editing
+        if (!employee && filtered.length > 0) {
+          setRole(filtered[filtered.length - 1].role_id.toString());
+        }
+      })
+      .catch(() => setRoleOptions([]));
+  }, []);
 
   useEffect(() => {
     if (employee) {
       setName(employee.name || "");
       setEmail(employee.email || "");
       setContact(employee.contact || "");
-      setRole(employee.role_id?.toString() || "4");
-      // Force incoming number to string for the select dropdown
+      setRole(employee.role_id?.toString() || "");
       setStatus(employee.status_id?.toString() || "9");
     }
   }, [employee]);
@@ -106,10 +125,9 @@ export default function AddEmployeeModal({ onClose, onAdd, employee }: any) {
               <div className={styles.formGroup}>
                 <label>Designated Role</label>
                 <select value={role} onChange={(e) => setRole(e.target.value)}>
-                  <option value="1">Admin</option>
-                  <option value="2">Head</option>
-                  <option value="3">Manager</option>
-                  <option value="4">Staff</option>
+                  {roleOptions.map(r => (
+                    <option key={r.role_id} value={r.role_id.toString()}>{r.role_name}</option>
+                  ))}
                 </select>
               </div>
               <div className={styles.formGroup}>

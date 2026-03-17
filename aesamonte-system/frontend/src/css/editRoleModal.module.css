@@ -203,7 +203,7 @@
 
 .matrixHeader {
   display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 0.7fr;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1fr 0.7fr;
   background: #f8f9fa;
   color: #555;
   padding: 0.6rem 1rem;
@@ -218,7 +218,7 @@
 
 .matrixRow {
   display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 0.7fr;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1fr 0.7fr;
   align-items: center;
   padding: 0.6rem 1rem;
   border-bottom: 1px solid #f3f3f3;
