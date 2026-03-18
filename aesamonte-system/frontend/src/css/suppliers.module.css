@@ -441,22 +441,30 @@
   background: #ff5722;
   color: white;
   border: none;
-  padding: 8px 20px;
-  border-radius: 20px;
+  padding: 5px 10px;
+  border-radius: 8px;
   cursor: pointer;
   font-weight: 600;
   transition: transform 0.1s;
+  font-size: 0.75rem;
 }
+
 
 .saveBtn {
   background: #1a4263;
   color: white;
   border: none;
-  padding: 8px 24px;
+  padding: 5px 20px;
   border-radius: 8px;
   cursor: pointer;
   font-weight: 600;
   transition: transform 0.1s;
+  font-size: 0.75rem;
+}
+.cancelBtn:hover,
+.saveBtn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
 }
 
 .cancelBtn:active, .saveBtn:active {

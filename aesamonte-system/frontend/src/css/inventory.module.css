@@ -558,12 +558,19 @@
   background: #ff5722; 
   color: white; 
   border: none; 
-  padding: 5px 14px; 
+  padding: 5px 10px; 
   border-radius: 8px; 
   cursor: pointer; 
   font-weight: 600;
   font-size: 0.75rem;
 }
+
+.cancelBtn:hover,
+.saveBtn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+}
+
 
 .saveBtn, .createBtn { 
   background: #1a4263; 
