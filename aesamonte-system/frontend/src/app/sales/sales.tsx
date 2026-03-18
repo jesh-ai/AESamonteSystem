@@ -408,7 +408,7 @@ const mustRequestExport = isInventoryHead || role === 'Staff';
                 <button className={s.archiveIconBtn} onClick={() => setIsArchiveView(true)} title="View Archives"><LuArchive size={20} /></button>
                 <div className={s.searchWrapper}>
                   <LuSearch size={18} className={s.searchIcon} />
-                  <input className={s.searchInput} placeholder="Search transactions..." value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1) }} />
+                  <input className={s.searchInput} placeholder="Search by No. or by Name" value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1) }} />
                 </div>
               </div>
             </div>
@@ -422,17 +422,22 @@ const mustRequestExport = isInventoryHead || role === 'Staff';
                       { label: 'ADDRESS', key: 'address' }, { label: 'DATE', key: 'date' },
                       { label: 'QTY', key: 'qty' }, { label: 'AMOUNT', key: 'amount' },
                       { label: 'PAYMENT', key: 'paymentMethod' }, { label: 'STATUS', key: 'status' }
-                    ].map(col => (
-                      <th key={col.key} onClick={() => requestSort(col.key as keyof Transaction)}>
-                        <div className={s.sortableHeader}>
-                          <span>{col.label}</span>
-                          <div className={s.sortIconsStack}>
-                            <LuChevronUp className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''} />
-                            <LuChevronDown className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''} />
+                    ].map(col => {
+                      const isSortable = col.key === 'no' || col.key === 'name'
+                      return (
+                        <th key={col.key} onClick={() => isSortable && requestSort(col.key as keyof Transaction)} style={{ cursor: isSortable ? 'pointer' : 'default' }}>
+                          <div className={isSortable ? s.sortableHeader : s.nonSortableHeader}>
+                            <span>{col.label}</span>
+                            {isSortable && (
+                              <div className={s.sortIconsStack}>
+                                <LuChevronUp className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''} />
+                                <LuChevronDown className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''} />
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      </th>
-                    ))}
+                        </th>
+                      )
+                    })}
                     <th className={s.actionHeader}>Action</th>
                   </tr>
                 </thead>

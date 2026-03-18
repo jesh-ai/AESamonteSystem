@@ -560,6 +560,15 @@
   gap: 6px;
 }
 
+.nonSortableHeader {
+  cursor: default;
+  user-select: none;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
 .sortIconsStack {
   display: flex;
   flex-direction: column;
