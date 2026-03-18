@@ -58,7 +58,6 @@ const DEFAULT_STATE = {
   twoFA:      false,
   timezone:   'PHT',
   dateFormat: 'MM/DD/YYYY',
-  currency:   'PHP',
   darkMode:   false,
 };
 
@@ -88,7 +87,6 @@ export default function GeneralSettings({
   // System Settings
   const [timezone,   setTimezone]   = useState(DEFAULT_STATE.timezone);
   const [dateFormat, setDateFormat] = useState(DEFAULT_STATE.dateFormat);
-  const [currency,   setCurrency]   = useState(DEFAULT_STATE.currency);
   const [darkMode,   setDarkMode]   = useState(DEFAULT_STATE.darkMode);
 
   // Notifications
@@ -127,7 +125,6 @@ export default function GeneralSettings({
         if (p.twoFA      !== undefined) { setTwoFA(p.twoFA);          savedState.current.twoFA      = p.twoFA; }
         if (p.timezone)                 { setTimezone(p.timezone);    savedState.current.timezone    = p.timezone; }
         if (p.dateFormat)               { setDateFormat(p.dateFormat);savedState.current.dateFormat  = p.dateFormat; }
-        if (p.currency)                 { setCurrency(p.currency);    savedState.current.currency    = p.currency; }
         if (p.darkMode   !== undefined) { setDarkMode(p.darkMode);    savedState.current.darkMode    = p.darkMode; }
         if (p.adminNotifs) { setAdminNotifs(p.adminNotifs); savedState.current.adminNotifs = p.adminNotifs; }
         if (p.staffNotifs) { setStaffNotifs(p.staffNotifs); savedState.current.staffNotifs = p.staffNotifs; }
@@ -199,7 +196,6 @@ export default function GeneralSettings({
     if (twoFA      !== prev.twoFA)      return true;
     if (timezone   !== prev.timezone)   return true;
     if (dateFormat !== prev.dateFormat) return true;
-    if (currency   !== prev.currency)   return true;
     if (darkMode   !== prev.darkMode)   return true;
     if (pfpFile    !== prev.pfpFile)    return true;
     if ((Object.keys(adminNotifs) as (keyof typeof adminNotifs)[]).some(k => adminNotifs[k] !== prev.adminNotifs[k])) return true;
@@ -229,7 +225,7 @@ export default function GeneralSettings({
     }
 
     // Save preferences to localStorage
-    const toSave = { twoFA, timezone, dateFormat, currency, darkMode, adminNotifs: { ...adminNotifs }, staffNotifs: { ...staffNotifs } };
+    const toSave = { twoFA, timezone, dateFormat, darkMode, adminNotifs: { ...adminNotifs }, staffNotifs: { ...staffNotifs } };
     localStorage.setItem('generalSettings', JSON.stringify(toSave));
     savedState.current = { ...toSave, phone, pfpFile };
 
@@ -422,16 +418,6 @@ export default function GeneralSettings({
               <option value="DD/MM/YYYY">DD/MM/YYYY</option>
               <option value="YYYY-MM-DD">YYYY-MM-DD</option>
               <option value="DD-MM-YYYY">DD-MM-YYYY</option>
-            </select>
-          </div>
-          <div className={s.formRow}>
-            <label>Currency</label>
-            <select className={s.formSelect} value={currency} onChange={e => setCurrency(e.target.value)}>
-              <option value="PHP">PHP — Philippine Peso</option>
-              <option value="USD">USD — US Dollar</option>
-              <option value="EUR">EUR — Euro</option>
-              <option value="SGD">SGD — Singapore Dollar</option>
-              <option value="JPY">JPY — Japanese Yen</option>
             </select>
           </div>
         </div>
