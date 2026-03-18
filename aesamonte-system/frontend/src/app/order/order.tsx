@@ -441,6 +441,42 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
     return pages;
   };
 
+  const renderGrowthPill = (value: number) => {
+    let icon = '—';
+    let textColor = '#ca8a04'; // Yellow-600
+    let bgColor = '#fef08a'; // Yellow-200
+
+    if (value > 0) {
+      icon = '↗';
+      textColor = '#15803d'; // Green-700
+      bgColor = '#dcfce7'; // Green-100
+    } else if (value < 0) {
+      icon = '↘';
+      textColor = '#b91c1c'; // Red-700
+      bgColor = '#fee2e2'; // Red-100
+    }
+
+    const displayValue = Math.abs(value);
+
+    return (
+      <span 
+        style={{ 
+          color: textColor, 
+          backgroundColor: bgColor,
+          fontWeight: 600,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          padding: '2px 8px',
+          borderRadius: '999px',
+          fontSize: '0.85rem'
+        }}
+      >
+        {icon} {displayValue}%
+      </span>
+    );
+  }
+
   return (
     <div className={s.container}>
       <TopHeader role={role} onLogout={onLogout} />
@@ -531,9 +567,7 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
             <div className={s.cardFooter}>
               <span className={s.cardSubtext}>vs last month</span>
               {summary && summary.totalOrders.growth != null && (
-                <span className={summary.totalOrders.growth >= 0 ? s.growthBadge : s.growthBadgeNegative}>
-                  {summary.totalOrders.growth >= 0 ? '↗' : '↘'} {Math.abs(summary.totalOrders.growth)}%
-                </span>
+                renderGrowthPill(summary.totalOrders.growth)
               )}
             </div>
           </section>

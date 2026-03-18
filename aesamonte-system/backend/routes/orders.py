@@ -15,6 +15,7 @@ def orders_summary():
         today = date.today()
         yesterday = today - timedelta(days=1)
 
+        # Helper for counting specific statuses
         def count_orders(status_code, for_date=None):
             query = """
                 SELECT COUNT(*)
@@ -37,6 +38,36 @@ def orders_summary():
         cur.execute("SELECT COUNT(*) FROM order_transaction")
         total_orders = cur.fetchone()[0]
 
+        # --- MTD GROWTH CALCULATION ---
+        this_month_start = today.replace(day=1)
+        last_month_end = this_month_start - timedelta(days=1)
+        last_month_start = last_month_end.replace(day=1)
+
+        current_day = today.day
+        try:
+            last_month_same_day = last_month_start.replace(day=current_day)
+        except ValueError:
+            # Fallback if today is the 31st but last month only had 30 days
+            last_month_same_day = last_month_end
+
+        # Helper for MTD comparison
+        def get_order_count(start_date, end_date=None):
+            query = "SELECT COUNT(*) FROM order_transaction WHERE order_date >= %s"
+            params = [start_date]
+            if end_date:
+                query += " AND order_date <= %s"
+                params.append(end_date)
+            cur.execute(query, params)
+            return float(cur.fetchone()[0])
+
+        mtd_current = get_order_count(this_month_start)
+        mtd_last = get_order_count(last_month_start, last_month_same_day)
+
+        if mtd_last == 0:
+            growth = 100.0 if mtd_current > 0 else 0.0
+        else:
+            growth = round(((mtd_current - mtd_last) / mtd_last) * 100, 1)
+
         return jsonify({
             "shippedToday": {
                 "current": shipped_today,
@@ -47,7 +78,7 @@ def orders_summary():
             },
             "totalOrders": {
                 "count": total_orders,
-                "growth": 3.1
+                "growth": growth 
             }
         })
     except Exception as e:
