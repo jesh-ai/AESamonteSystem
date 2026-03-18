@@ -79,7 +79,7 @@ const LABEL_STYLE: React.CSSProperties = {
 
 const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
   isOpen, onClose, itemData, onSave, onOpenUomModal,
-  suppliers, uoms, existingProducts = []
+  suppliers, brands = [], uoms, existingProducts = []
 }) => {
   const s = styles as Record<string, string>;
 
@@ -214,7 +214,7 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
   };
 
   // ── BRAND VARIANT HANDLERS ──
-  const handleBrandChange = (brandIdx: number, field: keyof BrandVariant, value: string) => {
+  const handleBrandChange = (brandIdx: number, field: keyof BrandVariant, value: string | number | null) => {
     setBrandVariants(prev => {
       const updated = [...prev];
       updated[brandIdx] = { ...updated[brandIdx], [field]: value };
@@ -435,12 +435,22 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
                         {!brand.isNew ? (
                           <div style={{ ...READ_ONLY_STYLE }}>{brand.brandName || '—'}</div>
                         ) : (
-                          <input
+                          <select
                             style={{ ...FIELD_STYLE }}
-                            value={brand.brandName}
-                            onChange={e => handleBrandChange(brandIdx, 'brandName', e.target.value)}
-                            placeholder="e.g. 3M"
-                          />
+                            value={brand.brand_id ?? ''}
+                            onChange={e => {
+                              const selected = brands.find((b: any) => String(b.id) === e.target.value);
+                              handleBrandChange(brandIdx, 'brand_id', selected ? selected.id : null);
+                              handleBrandChange(brandIdx, 'brandName', selected ? selected.name : '');
+                            }}
+                          >
+                            <option value="">Select Brand</option>
+                            {brands.map((b: any) => (
+                              <option key={b.id} value={b.id}>
+                                {b.name === 'No Brand' ? '— No Brand' : b.name}
+                              </option>
+                            ))}
+                          </select>
                         )}
                       </div>
                       <div>

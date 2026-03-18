@@ -20,6 +20,7 @@ interface SupplierEntry {
 }
 
 interface BrandVariant {
+  brand_id: number | null;
   brandName: string;
   description: string;
   qty: string;
@@ -48,6 +49,7 @@ interface AddInventoryModalProps {
 }
 
 const INITIAL_BRAND: BrandVariant = {
+  brand_id: null,
   brandName: '',
   description: '',
   qty: '',
@@ -98,7 +100,7 @@ const LABEL_STYLE: React.CSSProperties = {
 
 const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
   isOpen, onClose, onSave, onOpenSupplierModal, onOpenUomModal,
-  suppliers = [], uoms = [],
+  suppliers = [], brands = [], uoms = [],
   existingProducts = [], defaultSupplierName = ''
 }) => {
   const s = styles as Record<string, string>;
@@ -229,7 +231,7 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
   };
 
   // ── BRAND VARIANT HANDLERS ──
-  const handleBrandChange = (itemIdx: number, brandIdx: number, field: keyof BrandVariant, value: string) => {
+  const handleBrandChange = (itemIdx: number, brandIdx: number, field: keyof BrandVariant, value: string | number | null) => {
     setItemGroups(prev => {
       const updated = [...prev];
       const brands = [...updated[itemIdx].brands];
@@ -301,6 +303,7 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
     const payload = validItems.map(item => ({
       itemName: item.itemName,
       brands: item.brands.filter(b => b.uom && b.uom !== 'Select').map(b => ({
+        brand_id: b.brand_id || undefined,
         brand_name: b.brandName || 'No Brand',
         sku: null,
         uom: b.uom,
@@ -482,12 +485,22 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '10px' }}>
                       <div>
                         <label style={{ ...LABEL_STYLE }}>Brand Name</label>
-                        <input
+                        <select
                           style={{ ...FIELD_STYLE }}
-                          value={brand.brandName}
-                          onChange={e => handleBrandChange(itemIdx, brandIdx, 'brandName', e.target.value)}
-                          placeholder="e.g. 3M"
-                        />
+                          value={brand.brand_id ?? ''}
+                          onChange={e => {
+                            const selected = brands.find(b => String(b.id) === e.target.value);
+                            handleBrandChange(itemIdx, brandIdx, 'brand_id', selected ? selected.id : null);
+                            handleBrandChange(itemIdx, brandIdx, 'brandName', selected ? selected.name : '');
+                          }}
+                        >
+                          <option value="">Select Brand</option>
+                          {brands.map(b => (
+                            <option key={b.id} value={b.id}>
+                              {b.name === 'No Brand' ? '— No Brand' : b.name}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       <div>
                         <label style={{ ...LABEL_STYLE }}>SKU (Auto)</label>
