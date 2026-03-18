@@ -100,6 +100,7 @@ export default function GeneralSettings({
 
   // Password modal
   const [showPwModal, setShowPwModal] = useState(false);
+  const [currentPw,   setCurrentPw]   = useState('');
   const [newPw,       setNewPw]       = useState('');
   const [confirmPw,   setConfirmPw]   = useState('');
   const [pwError,     setPwError]     = useState('');
