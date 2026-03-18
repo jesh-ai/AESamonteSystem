@@ -31,12 +31,7 @@ def get_notifications():
                     ss.status_code,
                     ss.status_name,
                     c.customer_name,
-                    COALESCE(
-                        (SELECT MAX(oal.order_audit_log_date)
-                         FROM order_audit_log oal
-                         WHERE oal.order_id = ot.order_id),
-                        ot.order_date::timestamp
-                    ) AS event_time
+                    ot.order_date::timestamp AS event_time
                 FROM order_transaction ot
                 JOIN static_status ss ON ot.order_status_id = ss.status_id
                 JOIN customer c ON ot.customer_id = c.customer_id
@@ -71,12 +66,7 @@ def get_notifications():
                         'Paid',
                         st.sales_id,
                         c.customer_name,
-                        COALESCE(
-                            (SELECT MAX(oal.order_audit_log_date)
-                             FROM order_audit_log oal
-                             WHERE oal.order_id = ot.order_id),
-                            st.sales_date::timestamp
-                        ) AS event_time
+                        st.sales_date::timestamp AS event_time
                     FROM sales_transaction st
                     JOIN order_transaction ot ON ot.order_id = st.order_id
                     JOIN static_status ss ON st.payment_status_id = ss.status_id
@@ -111,13 +101,11 @@ def get_notifications():
                         i.item_name,
                         'ITEM_ADDED',
                         'New Item Added',
-                        MIN(ial.inventory_audit_log_date) AS event_time
+                        i.item_created_at AS event_time
                     FROM inventory i
-                    JOIN inventory_audit_log ial ON ial.inventory_id = i.inventory_id
                     JOIN static_status ss ON i.item_status_id = ss.status_id
                     WHERE ss.status_code != 'INACTIVE'
-                      AND ial.inventory_audit_log_date >= NOW() - INTERVAL '30 days'
-                    GROUP BY i.inventory_id, i.item_name
+                      AND i.item_created_at >= NOW() - INTERVAL '30 days'
                     ORDER BY event_time DESC
                     LIMIT 10
                 """)
@@ -147,12 +135,7 @@ def get_notifications():
                         i.item_name,
                         'OUT_OF_STOCK',
                         'Out of Stock',
-                        COALESCE(
-                            (SELECT MAX(ial.inventory_audit_log_date)
-                             FROM inventory_audit_log ial
-                             WHERE ial.inventory_id = i.inventory_id),
-                            NOW()
-                        ) AS event_time
+                        i.item_created_at AS event_time
                     FROM inventory i
                     JOIN static_status ss ON i.item_status_id = ss.status_id
                     WHERE ss.status_code != 'INACTIVE'
@@ -186,12 +169,7 @@ def get_notifications():
                         i.item_name,
                         'LOW_STOCK',
                         'Low Stock',
-                        COALESCE(
-                            (SELECT MAX(ial.inventory_audit_log_date)
-                             FROM inventory_audit_log ial
-                             WHERE ial.inventory_id = i.inventory_id),
-                            NOW()
-                        ) AS event_time
+                        i.item_created_at AS event_time
                     FROM inventory i
                     LEFT JOIN inventory_action ia ON ia.inventory_id = i.inventory_id
                     JOIN static_status ss ON i.item_status_id = ss.status_id

@@ -3,7 +3,8 @@
     "allow": [
       "Bash(python -c \":*)",
       "Bash(curl -s -X PUT \"http://localhost:5000/api/orders/update/OR2026-000543\" -H \"Content-Type: application/json\" -d '{\"\"status\"\":\"\"Preparing\"\",\"\"paymentMethod\"\":\"\"Cash\"\",\"\"customerName\"\":\"\"Test\"\",\"\"contact\"\":\"\"09123456789\"\",\"\"address\"\":\"\"Test Address\"\",\"\"items\"\":[{\"\"inventory_id\"\":\"\"INV-0000001\"\",\"\"quantity\"\":1,\"\"amount\"\":100}]}')",
-      "Bash(curl -s -X PUT \"http://localhost:5000/api/orders/update/OR2026-000543\" -H \"Content-Type: application/json\" -d '{\"\"status\"\":\"\"Received\"\",\"\"paymentMethod\"\":\"\"Cash\"\",\"\"customerName\"\":\"\"Test\"\",\"\"contact\"\":\"\"09123456789\"\",\"\"address\"\":\"\"Test Address\"\",\"\"items\"\":[{\"\"inventory_id\"\":\"\"INV-0000001\"\",\"\"quantity\"\":1,\"\"amount\"\":100}]}')"
+      "Bash(curl -s -X PUT \"http://localhost:5000/api/orders/update/OR2026-000543\" -H \"Content-Type: application/json\" -d '{\"\"status\"\":\"\"Received\"\",\"\"paymentMethod\"\":\"\"Cash\"\",\"\"customerName\"\":\"\"Test\"\",\"\"contact\"\":\"\"09123456789\"\",\"\"address\"\":\"\"Test Address\"\",\"\"items\"\":[{\"\"inventory_id\"\":\"\"INV-0000001\"\",\"\"quantity\"\":1,\"\"amount\"\":100}]}')",
+      "Bash(curl -s \"http://localhost:5000/api/notifications\")"
     ]
   }
 }

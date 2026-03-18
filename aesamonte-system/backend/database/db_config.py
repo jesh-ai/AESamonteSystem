@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import atexit
 import time
 import psycopg2
 import psycopg2.pool
@@ -15,8 +16,8 @@ def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
     global _pool
     if _pool is None or _pool.closed:
         _pool = psycopg2.pool.ThreadedConnectionPool(
-            minconn=2,
-            maxconn=10,  # raised from 5; stays under Supabase free-tier limit (15 direct)
+            minconn=1,
+            maxconn=8,
             user=os.getenv("PGUSER"),
             password=os.getenv("PGPASSWORD"),
             host=os.getenv("PGHOST"),
@@ -25,6 +26,19 @@ def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
             sslmode="require",
         )
     return _pool
+
+
+def _close_pool():
+    global _pool
+    if _pool is not None and not _pool.closed:
+        try:
+            _pool.closeall()
+        except Exception:
+            pass
+        _pool = None
+
+
+atexit.register(_close_pool)
 
 
 class _PooledConnection:
@@ -71,15 +85,23 @@ class _PooledConnection:
 
 
 def get_connection() -> _PooledConnection:
-    pool = _get_pool()
-    # Retry up to 3 times with a short backoff before giving up.
-    # Handles brief bursts where all connections are momentarily checked out.
+    global _pool
     last_err: Exception | None = None
     for attempt in range(3):
         try:
+            pool = _get_pool()
             conn = pool.getconn()
+            # Verify the connection is alive before returning it
+            conn.cursor().execute("SELECT 1")
             return _PooledConnection(conn, pool)
-        except psycopg2.pool.PoolError as e:
+        except (psycopg2.pool.PoolError, psycopg2.OperationalError, psycopg2.InterfaceError) as e:
             last_err = e
-            time.sleep(0.1 * (attempt + 1))  # 100ms, 200ms, 300ms
+            # If the pool or connection itself is broken, recreate it next attempt
+            try:
+                if _pool is not None:
+                    _pool.closeall()
+            except Exception:
+                pass
+            _pool = None
+            time.sleep(0.2 * (attempt + 1))
     raise last_err  # type: ignore[misc]
