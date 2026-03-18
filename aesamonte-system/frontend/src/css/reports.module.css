@@ -1,6 +1,5 @@
 /* ─── reports.module.css ─────────────────────────────────────────────────── */
 
-/* Outer container — assumes sidebar is already rendered by the parent layout */
 .container {
   display: flex;
   flex-direction: column;
@@ -15,7 +14,7 @@
   padding: 8px 28px 32px;
 }
 
-/* Header row: welcome text left, Export button right */
+/* Export button pinned to the right */
 .headerActions {
   display: flex;
   justify-content: space-between;
@@ -34,6 +33,7 @@
 .reportsGrid {
   display: grid;
   grid-template-columns: 1fr 1fr 300px;
+  grid-template-rows: auto auto auto;
   gap: 18px;
   align-items: start;
 }
@@ -51,7 +51,7 @@
   font-size: 1.05rem;
   font-weight: 500;
   color: #1e293b;
-  margin: 0 0 16px 0;
+  margin: 0 0 16px ;
 }
 
 .cardSubtitle {
@@ -60,62 +60,57 @@
   margin: -10px 0 18px 0;
 }
 
-/* Span helpers */
-.spanTwo {
-  grid-column: span 2;
+/* ─── EXPLICIT GRID PLACEMENT ───────────────────────────────────────────── */
+
+/* Row 1, col 1 */
+.salesCard {
+  grid-column: 1;
+  grid-row: 1;
 }
 
-/* Yearly Sales: column 3, rows 2–3 */
-.yearlyCard {
+/* Row 1, col 2 */
+.inventoryCard {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+/* Row 2, col 1–2 */
+.topClientsCard {
+  grid-column: 1 / span 2;
+  grid-row: 2;
+}
+
+/* Row 3, col 1–2 */
+.mostStockCard {
+  grid-column: 1 / span 2;
+  grid-row: 3;
+  margin-bottom: 50px;
+}
+
+/* Right column — single cell spanning all 3 rows, flex column inside */
+.rightColumn {
   grid-column: 3;
-  grid-row: 2 / span 2;
-}
-
-/* ─── SALES / INVENTORY LIST ROWS ───────────────────────────────────────── */
-.listGroup {
+  grid-row: 1 / span 3;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 18px;
 }
 
-.listRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 9px 10px;
-  border-radius: 7px;
+/* Total Orders / Total Sales — compact height */
+.totalOrdersCard,
+.totalSalesCard {
+  flex-shrink: 0;
 }
 
-.listRowAlt {
-  background: #f8f4ec;
-}
-
-.listLabel {
-  color: #64748b;
-  font-size: 0.9rem;
-}
-
-/* Value colour utilities */
-.valRed    { color: #e74c3c; font-weight: 600; font-size: 0.95rem; }
-.valBlue   { color: #3b82f6; font-weight: 600; font-size: 0.95rem; }
-.valYellow { color: #f0ad4e; font-weight: 600; font-size: 0.95rem; }
-.valDark   { color: #334155; font-weight: 500; font-size: 0.95rem; }
-
-/* ─── STAT MINI-CARDS (Total Orders / Total Sales) ───────────────────────── */
-.statsColumn {
+/* Yearly Sales — fills remaining space */
+.yearlyCard {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  margin-bottom: 50px;
 }
 
-.miniCard {
-  background: #ffffff;
-  border-radius: 14px;
-  padding: 18px 20px;
-  border: 1px solid #e8dcc8;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
+/* ─── MINI CARD (Total Orders / Total Sales) ────────────────────────────── */
 .miniLabel {
   color: #64748b;
   font-size: 0.88rem;
@@ -138,9 +133,7 @@
 .bigNumBlue   { color: #1e3a5f; }
 .bigNumYellow { color: #f59e0b; }
 
-.growthWrap {
-  text-align: right;
-}
+.growthWrap { text-align: right; }
 
 .vsLabel {
   font-size: 0.72rem;
@@ -160,6 +153,30 @@
 
 .badgeUp   { background: #dcfce7; color: #16a34a; }
 .badgeDown { background: #fee2e2; color: #dc2626; }
+
+/* ─── SALES / INVENTORY LIST ROWS ───────────────────────────────────────── */
+.listGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.listRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 10px;
+  border-radius: 7px;
+}
+
+.listRowAlt { background: #f8f4ec; }
+
+.listLabel { color: #64748b; font-size: 0.9rem; }
+
+.valRed    { color: #e74c3c; font-weight: 600; font-size: 0.95rem; }
+.valBlue   { color: #3b82f6; font-weight: 600; font-size: 0.95rem; }
+.valYellow { color: #f0ad4e; font-weight: 600; font-size: 0.95rem; }
+.valDark   { color: #334155; font-weight: 500; font-size: 0.95rem; }
 
 /* ─── TOP CLIENTS BAR CHART ─────────────────────────────────────────────── */
 .barArea {
@@ -259,6 +276,7 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
+  flex: 1;
 }
 
 .yrRow {
@@ -298,11 +316,11 @@
 }
 
 /* ─── EXPORT BUTTON ─────────────────────────────────────────────────────── */
-/* Base Export Button (Navy/Dark Gray) */
 .exportBtn {
-  background-color: #1a4263; 
+  background-color: #1a4263;
   color: white;
   padding: 10px 20px;
+  margin-top: 10px;
   border: none;
   border-radius: 8px;
   display: flex;
@@ -311,19 +329,16 @@
   cursor: pointer;
   font-weight: 600;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  /* Smooth transition for background and color */
   transition: all 0.3s ease-in-out;
 }
 
-/* Hover State - Slight brightness change */
 .exportBtn:hover {
   background-color: #3e73b1;
   transform: translateY(-1px);
 }
 
-/* Active State - Yellow Background with Black Text */
 .exportBtn:active {
-  background-color: #ffd54f !important; /* Yellow bg from your pic */
-  color: #000000 !important; /* Black text for visibility */
+  background-color: #ffd54f !important;
+  color: #000000 !important;
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
