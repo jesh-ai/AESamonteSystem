@@ -15,8 +15,6 @@ import {
 } from 'react-icons/lu'
 import { printSalesInvoice, printDeliveryReceipt } from './salesPrint'
 
-/* ================= TYPES ================= */
-
 interface SalesSummary {
   totalSales: number; totalSalesChange: number
   weeklySales: number; monthlySales: number; yearlySales: number
@@ -45,10 +43,10 @@ export default function SalesPage({ role = 'Admin', employeeId = 0, onLogout, in
   const s = styles as Record<string, string>
 
   // ── Permission Logic ──
- const isSalesHead       = role === 'Sales Head';
-const isInventoryHead   = role === 'Inventory Head';
-const canExport         = ['Admin', 'Manager'].includes(role) || isSalesHead;
-const mustRequestExport = isInventoryHead || role === 'Staff';
+  const isSalesHead       = role === 'Sales Head'
+  const isInventoryHead   = role === 'Inventory Head'
+  const canExport         = ['Admin', 'Manager'].includes(role) || isSalesHead
+  const mustRequestExport = isInventoryHead || role === 'Staff'
 
   // ── State ──
   const [showExportRequestModal, setShowExportRequestModal] = useState(false)
@@ -57,6 +55,7 @@ const mustRequestExport = isInventoryHead || role === 'Staff';
   const [isLoading, setIsLoading]       = useState(true)
   const [searchTerm, setSearchTerm]     = useState(initialSearch ?? '')
   const [showExportModal, setShowExportModal] = useState(false)
+  const [exportType, setExportType]     = useState<'pdf' | 'xlsx' | 'csv' | null>(null) // ── ADDED ──
   const [isArchiveView, setIsArchiveView]     = useState(false)
   const [currentPage, setCurrentPage]         = useState(1)
   const itemsPerPage = 10
@@ -131,7 +130,6 @@ const mustRequestExport = isInventoryHead || role === 'Staff';
     }
   }
 
-  // ── Helpers ──
   const handleExportSuccess = (msg: string, type: 'success' | 'error' = 'success') => {
     setToastMessage(msg); setIsError(type === 'error'); setShowToast(true)
   }
@@ -205,7 +203,6 @@ const mustRequestExport = isInventoryHead || role === 'Staff';
 
   const closeViewModal = () => { setShowViewModal(false); setSelectedTx(null) }
 
-  // ── Filter + Sort + Paginate ──
   const filteredTx = transactions.filter(tx => {
     const matchesArchiveView = isArchiveView ? tx.is_archived === true : !tx.is_archived
     const searchStr = `${tx.no} ${tx.name} ${tx.address} ${tx.paymentMethod || ''}`.toLowerCase()
@@ -288,6 +285,7 @@ const mustRequestExport = isInventoryHead || role === 'Staff';
 
       <main className={s.mainContent}>
 
+        {/* ── HEADER ROW ── */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', margin: 0 }}>
           <div>
             <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#164163', margin: 0 }}>SALES</h1>
@@ -296,7 +294,12 @@ const mustRequestExport = isInventoryHead || role === 'Staff';
             </p>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            {canExport && <div onClick={() => setShowExportModal(true)}><ExportButton /></div>}
+            {canExport && (
+              <ExportButton onSelect={(type) => {
+                setExportType(type)
+                setShowExportModal(true)
+              }} />
+            )}
             {mustRequestExport && (
               <button
                 onClick={() => setShowExportRequestModal(true)}
@@ -306,7 +309,7 @@ const mustRequestExport = isInventoryHead || role === 'Staff';
               </button>
             )}
           </div>
-        </div>
+        </div>{/* ── END HEADER ROW ── */}
 
         {/* Summary Cards */}
         <div className={s.topGrid}>
@@ -491,9 +494,15 @@ const mustRequestExport = isInventoryHead || role === 'Staff';
         )}
       </main>
 
-      <ExportModal isOpen={showExportModal} onClose={() => setShowExportModal(false)} onSuccess={handleExportSuccess} data={transactions.filter(tx => !tx.is_archived)} summary={safeSummary} />
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => { setShowExportModal(false); setExportType(null) }}
+        onSuccess={handleExportSuccess}
+        data={transactions.filter(tx => !tx.is_archived)}
+        summary={safeSummary}
+        exportType={exportType}
+      />
 
-      {/* ✅ FIX: pass type through so errors show red toast */}
       <ExportRequestModal
         isOpen={showExportRequestModal}
         onClose={() => setShowExportRequestModal(false)}
@@ -502,7 +511,6 @@ const mustRequestExport = isInventoryHead || role === 'Staff';
         onSuccess={(msg, type) => handleExportSuccess(msg, type)}
       />
 
-      {/* View Modal */}
       {showViewModal && selectedTx && (
         <div className={s.viewBackdrop} onClick={closeViewModal}>
           <div className={s.viewModal} onClick={e => e.stopPropagation()}>

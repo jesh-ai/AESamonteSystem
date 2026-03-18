@@ -141,6 +141,7 @@ const mustRequestExport = isSalesHead || role === 'Staff';
   const [isError, setIsError] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const [exportType, setExportType] = useState<'pdf' | 'xlsx' | 'csv' | null>(null);
 
   const handleExportSuccess = (msg: string, type: 'success' | 'error' = 'success') => {
     setToastMessage(msg);
@@ -410,8 +411,12 @@ const mustRequestExport = isSalesHead || role === 'Staff';
             </p>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            {canExport && <div onClick={() => setShowExportModal(true)}><ExportButton /></div>}
-            {mustRequestExport && (
+            {canExport && (
+  <ExportButton onSelect={(type) => {
+    setExportType(type);
+    setShowExportModal(true);
+  }} />
+)}{mustRequestExport && (
               <button onClick={() => setShowExportRequestModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#475569', color: 'white', padding: '8px 18px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 500, fontSize: '0.9rem' }}>
                 Request Export
               </button>
@@ -582,7 +587,14 @@ const mustRequestExport = isSalesHead || role === 'Staff';
       </div>
 
       {/* MODALS */}
-      <ExportModal isOpen={showExportModal} onClose={() => setShowExportModal(false)} onSuccess={handleExportSuccess} data={products.filter(p => !p.is_archived)} summary={data} />
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => { setShowExportModal(false); setExportType(null); }}
+        onSuccess={handleExportSuccess}
+        data={products.filter(p => !p.is_archived)}
+        summary={data}
+        exportType={exportType}
+      />
 
       <ExportRequestModal
         isOpen={showExportRequestModal}
