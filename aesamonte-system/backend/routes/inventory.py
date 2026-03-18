@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from database.db_config import get_connection
-from datetime import datetime
+from datetime import datetime, date, timedelta
 
 inventory_bp = Blueprint("inventory", __name__)
 
@@ -611,6 +611,45 @@ def get_inventory_summary():
     conn = get_connection()
     cur = conn.cursor()
     try:
+        # 1. Date boundaries for Apples-to-Apples (MTD)
+        today = date.today()
+        this_month_start = today.replace(day=1)
+        last_month_end = this_month_start - timedelta(days=1)
+        last_month_start = last_month_end.replace(day=1)
+
+        # Match the exact day last month (e.g., March 19 vs Feb 19)
+        current_day = today.day
+        try:
+            last_month_same_day = last_month_start.replace(day=current_day)
+        except ValueError:
+            # Fallback if today is the 31st but last month only had 30 days
+            last_month_same_day = last_month_end
+
+        # Helper to get inventory movement (items ordered)
+        def get_movement(start_date, end_date=None):
+            query = """
+                SELECT COALESCE(SUM(od.order_quantity), 0) 
+                FROM order_details od 
+                JOIN order_transaction ot ON od.order_id = ot.order_id 
+                WHERE ot.order_date >= %s
+            """
+            params = [start_date]
+            if end_date:
+                query += " AND ot.order_date <= %s"
+                params.append(end_date)
+            cur.execute(query, params)
+            return float(cur.fetchone()[0])
+
+        # Calculate MTD Growth
+        monthly_mtd = get_movement(this_month_start)
+        last_monthly_mtd = get_movement(last_month_start, last_month_same_day)
+
+        if last_monthly_mtd == 0:
+            total_products_change = 100.0 if monthly_mtd > 0 else 0.0
+        else:
+            total_products_change = round(((monthly_mtd - last_monthly_mtd) / last_monthly_mtd) * 100, 1)
+
+        # 2. Original static counts for the list view
         cur.execute("""
             SELECT
                 COALESCE(SUM(od.order_quantity) FILTER (WHERE ot.order_date >= NOW() - INTERVAL '7 days'), 0) AS weekly_count,
@@ -620,10 +659,17 @@ def get_inventory_summary():
             JOIN order_transaction ot ON od.order_id = ot.order_id
         """)
         row = cur.fetchone()
-        return jsonify({"weekly": row[0], "monthly": row[1], "yearly": row[2]})
+
+        return jsonify({
+            "weekly": int(row[0]),
+            "monthly": int(row[1]),
+            "yearly": int(row[2]),
+            "totalProductsChange": total_products_change 
+        })
+
     except Exception as e:
         print("Error fetching inventory summary:", e)
-        return jsonify({"weekly": 0, "monthly": 0, "yearly": 0}), 200
+        return jsonify({"weekly": 0, "monthly": 0, "yearly": 0, "totalProductsChange": 0.0}), 200
     finally:
         cur.close()
         conn.close()

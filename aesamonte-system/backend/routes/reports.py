@@ -44,17 +44,26 @@ def get_dashboard_extra():
     cur = conn.cursor()
     try:
         today = date.today()
-        start_of_month = today.replace(day=1)
-        end_of_prev_month = start_of_month - timedelta(days=1)
-        start_of_prev_month = end_of_prev_month.replace(day=1)
+        
+        # --- Apples-to-Apples (MTD) Date Boundaries ---
+        this_month_start = today.replace(day=1)
+        last_month_end = this_month_start - timedelta(days=1)
+        last_month_start = last_month_end.replace(day=1)
+
+        current_day = today.day
+        try:
+            last_month_same_day = last_month_start.replace(day=current_day)
+        except ValueError:
+            last_month_same_day = last_month_end
 
         # ----- 1. TOTAL ORDERS -----
         cur.execute("SELECT COUNT(order_id) FROM order_transaction")
         total_orders = int(cur.fetchone()[0] or 0)
         
-        cur.execute("SELECT COUNT(order_id) FROM order_transaction WHERE order_date >= %s", (start_of_month,))
+        cur.execute("SELECT COUNT(order_id) FROM order_transaction WHERE order_date >= %s", (this_month_start,))
         curr_orders = int(cur.fetchone()[0] or 0)
-        cur.execute("SELECT COUNT(order_id) FROM order_transaction WHERE order_date >= %s AND order_date <= %s", (start_of_prev_month, end_of_prev_month))
+        
+        cur.execute("SELECT COUNT(order_id) FROM order_transaction WHERE order_date >= %s AND order_date <= %s", (last_month_start, last_month_same_day))
         prev_orders = int(cur.fetchone()[0] or 0)
         
         if prev_orders > 0:
@@ -76,7 +85,7 @@ def get_dashboard_extra():
             JOIN order_transaction ot ON st.order_id = ot.order_id
             JOIN static_status ss ON st.payment_status_id = ss.status_id
             WHERE ss.status_code = 'PAID' AND st.sales_date >= %s
-        """, (start_of_month,))
+        """, (this_month_start,))
         curr_sales = float(cur.fetchone()[0] or 0)
 
         cur.execute("""
@@ -84,7 +93,7 @@ def get_dashboard_extra():
             JOIN order_transaction ot ON st.order_id = ot.order_id
             JOIN static_status ss ON st.payment_status_id = ss.status_id
             WHERE ss.status_code = 'PAID' AND st.sales_date >= %s AND st.sales_date <= %s
-        """, (start_of_prev_month, end_of_prev_month))
+        """, (last_month_start, last_month_same_day))
         prev_sales = float(cur.fetchone()[0] or 0)
         
         if prev_sales > 0:
@@ -130,12 +139,10 @@ def get_dashboard_extra():
         """)
         yearly_history_db = cur.fetchall()
         
-        # Zero-Division Protection
         max_year_sales = max([float(row[1]) for row in yearly_history_db]) if yearly_history_db else 1
         if max_year_sales <= 0: max_year_sales = 1
         
         yearly_history = [{"year": int(row[0] or date.today().year), "sales": float(row[1]), "percentage": (float(row[1])/max_year_sales)*100} for row in yearly_history_db]
-
 
         return jsonify({
             "totals": { 

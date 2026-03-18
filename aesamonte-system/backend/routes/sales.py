@@ -29,13 +29,25 @@ def sales_summary():
     # Run auto-fix FIRST
     auto_fix_pending_payments(conn, cur)
 
+    # 1. Calculate precise date boundaries
     today = date.today()
     week_ago = today - timedelta(days=7)
-    month_ago = today.replace(day=1)
     year_ago = today.replace(month=1, day=1)
+    
+    this_month_start = today.replace(day=1)
+    last_month_end = this_month_start - timedelta(days=1)
+    last_month_start = last_month_end.replace(day=1)
 
-    # THE FIX: Exactly mirrors reports.py by summing `ot.total_amount` directly!
-    def sum_sales(since=None):
+    # MTD Apples-to-Apples setup
+    current_day = today.day
+    try:
+        last_month_same_day = last_month_start.replace(day=current_day)
+    except ValueError:
+        # Fallback if today is the 31st but last month only had 30 days
+        last_month_same_day = last_month_end
+
+    # 2. Upgraded helper function to support date ranges
+    def sum_sales(start_date=None, end_date=None):
         query = """
             SELECT COALESCE(SUM(ot.total_amount), 0)
             FROM sales_transaction st
@@ -44,45 +56,92 @@ def sales_summary():
             WHERE ss.status_code = 'PAID'
         """
         params = []
-        if since:
+        if start_date:
             query += " AND st.sales_date >= %s"
-            params.append(since)
+            params.append(start_date)
+        if end_date:
+            query += " AND st.sales_date <= %s"
+            params.append(end_date)
             
         cur.execute(query, params)
         res = cur.fetchone()
         return float(res[0] if res and res[0] else 0)
 
+    # Calculate basic stats
     total_sales = sum_sales()
-    weekly_sales = sum_sales(week_ago)
-    monthly_sales = sum_sales(month_ago)
-    yearly_sales = sum_sales(year_ago)
+    weekly_sales = sum_sales(start_date=week_ago)
+    monthly_sales = sum_sales(start_date=this_month_start) # Current month to date
+    yearly_sales = sum_sales(start_date=year_ago)
+    
+    # Calculate Last Month MTD sales for the fair % change
+    last_month_mtd_sales = sum_sales(start_date=last_month_start, end_date=last_month_same_day)
 
-    # THE FIX: Top Client now strictly uses `ot.total_amount` to prevent duplication
+    # Safe percentage calculator
+    def calc_growth(current, previous):
+        if previous == 0:
+            return 100.0 if current > 0 else 0.0
+        return round(((current - previous) / previous) * 100, 1)
+
+    total_sales_change = calc_growth(monthly_sales, last_month_mtd_sales)
+
+    # 3. Get Top Client overall, plus their ID for further filtering
     cur.execute("""
-        SELECT c.customer_name, COALESCE(SUM(ot.total_amount), 0) AS total_sales
+        SELECT c.customer_id, c.customer_name, COALESCE(SUM(ot.total_amount), 0) AS total_sales
         FROM sales_transaction st
         JOIN order_transaction ot ON st.order_id = ot.order_id
         JOIN customer c ON ot.customer_id = c.customer_id
         JOIN static_status ss ON st.payment_status_id = ss.status_id
         WHERE ss.status_code = 'PAID'
-        GROUP BY c.customer_name
+        GROUP BY c.customer_id, c.customer_name
         ORDER BY total_sales DESC
         LIMIT 1
     """)
-    top_client = cur.fetchone()
+    top_client_data = cur.fetchone()
+
+    top_client_name = "None"
+    top_client_sales = 0.0
+    top_client_change = 0.0
+
+    # 4. If a top client exists, calculate their specific MTD growth
+    if top_client_data:
+        client_id = top_client_data[0]
+        top_client_name = top_client_data[1]
+        top_client_sales = float(top_client_data[2])
+
+        # Get Top Client's Current Month Sales
+        cur.execute("""
+            SELECT COALESCE(SUM(ot.total_amount), 0)
+            FROM sales_transaction st
+            JOIN order_transaction ot ON st.order_id = ot.order_id
+            JOIN static_status ss ON st.payment_status_id = ss.status_id
+            WHERE ss.status_code = 'PAID' AND ot.customer_id = %s AND st.sales_date >= %s
+        """, (client_id, this_month_start))
+        client_current_month = float(cur.fetchone()[0])
+
+        # Get Top Client's Last Month MTD Sales
+        cur.execute("""
+            SELECT COALESCE(SUM(ot.total_amount), 0)
+            FROM sales_transaction st
+            JOIN order_transaction ot ON st.order_id = ot.order_id
+            JOIN static_status ss ON st.payment_status_id = ss.status_id
+            WHERE ss.status_code = 'PAID' AND ot.customer_id = %s AND st.sales_date >= %s AND st.sales_date <= %s
+        """, (client_id, last_month_start, last_month_same_day))
+        client_last_month_mtd = float(cur.fetchone()[0])
+
+        top_client_change = calc_growth(client_current_month, client_last_month_mtd)
 
     cur.close()
     conn.close()
 
     return jsonify({
         "totalSales": total_sales,
-        "totalSalesChange": 5.2,
+        "totalSalesChange": total_sales_change,
         "weeklySales": weekly_sales,
         "monthlySales": monthly_sales,
         "yearlySales": yearly_sales,
-        "topClientName": top_client[0] if top_client else "None",
-        "topClientSales": float(top_client[1]) if top_client else 0,
-        "topClientChange": 3.8 
+        "topClientName": top_client_name,
+        "topClientSales": top_client_sales,
+        "topClientChange": top_client_change 
     })
 
 
