@@ -100,6 +100,42 @@ export default function ReportsPage({ role = "Admin", onLogout }: { role?: strin
     ? Math.max(...extraData.topClients.map(c => c.orders))
     : 100;
 
+  const renderGrowthPill = (value: number) => {
+      let icon = '—';
+      let textColor = '#ca8a04'; // Yellow-600
+      let bgColor = '#fef08a'; // Yellow-200
+
+      if (value > 0) {
+        icon = '↗';
+        textColor = '#15803d'; // Green-700
+        bgColor = '#dcfce7'; // Green-100
+      } else if (value < 0) {
+        icon = '↘';
+        textColor = '#b91c1c'; // Red-700
+        bgColor = '#fee2e2'; // Red-100
+      }
+
+      const displayValue = Math.abs(value);
+
+      return (
+        <span 
+          style={{ 
+            color: textColor, 
+            backgroundColor: bgColor,
+            fontWeight: 600,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '2px 8px',
+            borderRadius: '999px',
+            fontSize: '0.85rem'
+          }}
+        >
+          {icon} {displayValue}%
+        </span>
+      );
+    }
+
   return (
     <div className={styles.container}>
       <TopHeader role={role} onLogout={onLogout} />
@@ -213,9 +249,7 @@ export default function ReportsPage({ role = "Admin", onLogout }: { role?: strin
                   </p>
                   <div className={styles.growthWrap}>
                     <p className={styles.vsLabel}>vs last month</p>
-                    <span className={`${styles.badge} ${extraData.totals.ordersGrowth >= 0 ? styles.badgeUp : styles.badgeDown}`}>
-                      {extraData.totals.ordersGrowth >= 0 ? '↗' : '↘'} {Math.abs(extraData.totals.ordersGrowth)}%
-                    </span>
+                    {renderGrowthPill(extraData.totals.ordersGrowth)}
                   </div>
                 </div>
               </div>
@@ -230,9 +264,7 @@ export default function ReportsPage({ role = "Admin", onLogout }: { role?: strin
                   </p>
                   <div className={styles.growthWrap}>
                     <p className={styles.vsLabel}>vs last month</p>
-                    <span className={`${styles.badge} ${extraData.totals.salesGrowth >= 0 ? styles.badgeUp : styles.badgeDown}`}>
-                      {extraData.totals.salesGrowth >= 0 ? '↗' : '↘'} {Math.abs(extraData.totals.salesGrowth)}%
-                    </span>
+                    {renderGrowthPill(extraData.totals.salesGrowth)}
                   </div>
                 </div>
               </div>

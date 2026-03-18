@@ -38,6 +38,14 @@ def sales_summary():
     last_month_end = this_month_start - timedelta(days=1)
     last_month_start = last_month_end.replace(day=1)
 
+    # MTD Apples-to-Apples setup
+    current_day = today.day
+    try:
+        last_month_same_day = last_month_start.replace(day=current_day)
+    except ValueError:
+        # Fallback if today is the 31st but last month only had 30 days
+        last_month_same_day = last_month_end
+
     # 2. Upgraded helper function to support date ranges
     def sum_sales(start_date=None, end_date=None):
         query = """
@@ -65,8 +73,8 @@ def sales_summary():
     monthly_sales = sum_sales(start_date=this_month_start) # Current month to date
     yearly_sales = sum_sales(start_date=year_ago)
     
-    # Calculate Last Month overall sales for the % change
-    last_month_overall_sales = sum_sales(start_date=last_month_start, end_date=last_month_end)
+    # Calculate Last Month MTD sales for the fair % change
+    last_month_mtd_sales = sum_sales(start_date=last_month_start, end_date=last_month_same_day)
 
     # Safe percentage calculator
     def calc_growth(current, previous):
@@ -74,7 +82,7 @@ def sales_summary():
             return 100.0 if current > 0 else 0.0
         return round(((current - previous) / previous) * 100, 1)
 
-    total_sales_change = calc_growth(monthly_sales, last_month_overall_sales)
+    total_sales_change = calc_growth(monthly_sales, last_month_mtd_sales)
 
     # 3. Get Top Client overall, plus their ID for further filtering
     cur.execute("""
@@ -94,7 +102,7 @@ def sales_summary():
     top_client_sales = 0.0
     top_client_change = 0.0
 
-    # 4. If a top client exists, calculate their specific MoM growth
+    # 4. If a top client exists, calculate their specific MTD growth
     if top_client_data:
         client_id = top_client_data[0]
         top_client_name = top_client_data[1]
@@ -110,17 +118,17 @@ def sales_summary():
         """, (client_id, this_month_start))
         client_current_month = float(cur.fetchone()[0])
 
-        # Get Top Client's Last Month Sales
+        # Get Top Client's Last Month MTD Sales
         cur.execute("""
             SELECT COALESCE(SUM(ot.total_amount), 0)
             FROM sales_transaction st
             JOIN order_transaction ot ON st.order_id = ot.order_id
             JOIN static_status ss ON st.payment_status_id = ss.status_id
             WHERE ss.status_code = 'PAID' AND ot.customer_id = %s AND st.sales_date >= %s AND st.sales_date <= %s
-        """, (client_id, last_month_start, last_month_end))
-        client_last_month = float(cur.fetchone()[0])
+        """, (client_id, last_month_start, last_month_same_day))
+        client_last_month_mtd = float(cur.fetchone()[0])
 
-        top_client_change = calc_growth(client_current_month, client_last_month)
+        top_client_change = calc_growth(client_current_month, client_last_month_mtd)
 
     cur.close()
     conn.close()
