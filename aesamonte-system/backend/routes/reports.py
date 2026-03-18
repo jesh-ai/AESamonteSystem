@@ -20,7 +20,7 @@ def get_sales_report():
                 SELECT COALESCE(SUM(ot.total_amount), 0)
                 FROM sales_transaction st
                 JOIN order_transaction ot ON st.order_id = ot.order_id
-                JOIN static_status ss ON st.sales_status_id = ss.status_id
+                JOIN static_status ss ON st.payment_status_id = ss.status_id
                 WHERE ss.status_code = 'PAID' AND st.sales_date >= %s
             """, (start_date,))
             return float(cur.fetchone()[0] or 0)
@@ -66,7 +66,7 @@ def get_dashboard_extra():
         cur.execute("""
             SELECT COALESCE(SUM(ot.total_amount), 0) FROM sales_transaction st
             JOIN order_transaction ot ON st.order_id = ot.order_id
-            JOIN static_status ss ON st.sales_status_id = ss.status_id
+            JOIN static_status ss ON st.payment_status_id = ss.status_id
             WHERE ss.status_code = 'PAID'
         """)
         total_sales = float(cur.fetchone()[0] or 0)
@@ -74,7 +74,7 @@ def get_dashboard_extra():
         cur.execute("""
             SELECT COALESCE(SUM(ot.total_amount), 0) FROM sales_transaction st
             JOIN order_transaction ot ON st.order_id = ot.order_id
-            JOIN static_status ss ON st.sales_status_id = ss.status_id
+            JOIN static_status ss ON st.payment_status_id = ss.status_id
             WHERE ss.status_code = 'PAID' AND st.sales_date >= %s
         """, (start_of_month,))
         curr_sales = float(cur.fetchone()[0] or 0)
@@ -82,7 +82,7 @@ def get_dashboard_extra():
         cur.execute("""
             SELECT COALESCE(SUM(ot.total_amount), 0) FROM sales_transaction st
             JOIN order_transaction ot ON st.order_id = ot.order_id
-            JOIN static_status ss ON st.sales_status_id = ss.status_id
+            JOIN static_status ss ON st.payment_status_id = ss.status_id
             WHERE ss.status_code = 'PAID' AND st.sales_date >= %s AND st.sales_date <= %s
         """, (start_of_prev_month, end_of_prev_month))
         prev_sales = float(cur.fetchone()[0] or 0)
@@ -124,7 +124,7 @@ def get_dashboard_extra():
             SELECT EXTRACT(YEAR FROM st.sales_date) as yr, COALESCE(SUM(ot.total_amount), 0)
             FROM sales_transaction st
             JOIN order_transaction ot ON st.order_id = ot.order_id
-            JOIN static_status ss ON st.sales_status_id = ss.status_id
+            JOIN static_status ss ON st.payment_status_id = ss.status_id
             WHERE ss.status_code = 'PAID'
             GROUP BY yr ORDER BY yr DESC LIMIT 5
         """)

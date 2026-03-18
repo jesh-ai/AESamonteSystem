@@ -8,9 +8,9 @@ sales_bp = Blueprint("sales", __name__, url_prefix="/api/sales")
 def auto_fix_pending_payments(conn, cur):
     try:
         cur.execute("""
-            UPDATE sales_transaction 
-            SET sales_status_id = (SELECT status_id FROM static_status WHERE status_scope = 'SALES_STATUS' AND status_code = 'PAID' LIMIT 1)
-            WHERE sales_status_id = (SELECT status_id FROM static_status WHERE status_scope = 'SALES_STATUS' AND status_code = 'PENDING' LIMIT 1)
+            UPDATE sales_transaction
+            SET payment_status_id = (SELECT status_id FROM static_status WHERE status_scope = 'SALES_STATUS' AND status_code = 'PAID' LIMIT 1)
+            WHERE payment_status_id = (SELECT status_id FROM static_status WHERE status_scope = 'SALES_STATUS' AND status_code = 'PENDING' LIMIT 1)
             AND payment_method_id IN (
                 SELECT status_id FROM static_status WHERE status_scope = 'PAYMENT_METHOD' AND status_name NOT ILIKE '%Bank%'
             )
@@ -40,7 +40,7 @@ def sales_summary():
             SELECT COALESCE(SUM(ot.total_amount), 0)
             FROM sales_transaction st
             JOIN order_transaction ot ON st.order_id = ot.order_id
-            JOIN static_status ss ON st.sales_status_id = ss.status_id
+            JOIN static_status ss ON st.payment_status_id = ss.status_id
             WHERE ss.status_code = 'PAID'
         """
         params = []
@@ -63,7 +63,7 @@ def sales_summary():
         FROM sales_transaction st
         JOIN order_transaction ot ON st.order_id = ot.order_id
         JOIN customer c ON ot.customer_id = c.customer_id
-        JOIN static_status ss ON st.sales_status_id = ss.status_id
+        JOIN static_status ss ON st.payment_status_id = ss.status_id
         WHERE ss.status_code = 'PAID'
         GROUP BY c.customer_name
         ORDER BY total_sales DESC
@@ -107,7 +107,7 @@ def sales_transactions():
             ss.status_code AS status,
             pm.status_name AS payment_method
         FROM sales_transaction st
-        JOIN static_status ss ON st.sales_status_id = ss.status_id
+        JOIN static_status ss ON st.payment_status_id = ss.status_id
         LEFT JOIN static_status pm ON st.payment_method_id = pm.status_id
         JOIN order_transaction ot ON st.order_id = ot.order_id
         JOIN customer c ON ot.customer_id = c.customer_id
@@ -157,7 +157,7 @@ def toggle_payment_status(sales_id):
         cur.execute("""
             SELECT ss.status_code 
             FROM sales_transaction st
-            JOIN static_status ss ON st.sales_status_id = ss.status_id
+            JOIN static_status ss ON st.payment_status_id = ss.status_id
             WHERE TRIM(st.sales_id) = %s
         """, (sales_id,))
         row = cur.fetchone()
@@ -176,7 +176,7 @@ def toggle_payment_status(sales_id):
 
         cur.execute("SELECT status_id FROM static_status WHERE status_scope = 'SALES_STATUS' AND status_code = %s", (target_code,))
         new_id = cur.fetchone()[0]
-        cur.execute("UPDATE sales_transaction SET sales_status_id = %s WHERE TRIM(sales_id) = %s", (new_id, sales_id))
+        cur.execute("UPDATE sales_transaction SET payment_status_id = %s WHERE TRIM(sales_id) = %s", (new_id, sales_id))
         
         conn.commit()
         
@@ -207,7 +207,7 @@ def toggle_archive(sales_id):
         cur.execute("""
             SELECT ss.status_code 
             FROM sales_transaction st
-            JOIN static_status ss ON st.sales_status_id = ss.status_id
+            JOIN static_status ss ON st.payment_status_id = ss.status_id
             WHERE TRIM(st.sales_id) = %s
         """, (sales_id,))
         current_status = cur.fetchone()[0]
@@ -223,7 +223,7 @@ def toggle_archive(sales_id):
             is_archived = True
             new_status_code = 'INACTIVE' 
 
-        cur.execute("UPDATE sales_transaction SET sales_status_id = %s WHERE TRIM(sales_id) = %s", (new_status_id, sales_id))
+        cur.execute("UPDATE sales_transaction SET payment_status_id = %s WHERE TRIM(sales_id) = %s", (new_status_id, sales_id))
         conn.commit()
         
         return jsonify({

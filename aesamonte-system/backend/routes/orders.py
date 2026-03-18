@@ -390,9 +390,9 @@ def update_order(order_id):
         if new_pm_id:
             cur.execute("UPDATE order_transaction SET payment_method_id = %s WHERE order_id = %s", (new_pm_id, order_id))
 
-        # When status changes to RECEIVED, sync total_amount and auto-create sales_transaction
+        # When status changes to RECEIVED, sync total_amount on order_transaction
+        # (sales_transaction is created automatically by trg_move_received_order trigger)
         if status_name.upper() == 'RECEIVED':
-            # 1. Sync total_amount on order_transaction from order_details
             cur.execute("""
                 UPDATE order_transaction
                 SET total_amount = (
@@ -400,40 +400,6 @@ def update_order(order_id):
                 )
                 WHERE order_id = %s
             """, (order_id, order_id))
-
-            # 2. Create sales_transaction only if one doesn't already exist
-            cur.execute("SELECT sales_id FROM sales_transaction WHERE order_id = %s", (order_id,))
-            if not cur.fetchone():
-                # Determine payment method to set PAID vs PENDING status
-                cur.execute("""
-                    SELECT ss.status_name
-                    FROM order_transaction ot
-                    LEFT JOIN static_status ss ON ot.payment_method_id = ss.status_id
-                    WHERE ot.order_id = %s
-                """, (order_id,))
-                pm_row = cur.fetchone()
-                pm_name = pm_row[0] if pm_row else ''
-                sales_status_code = 'PENDING' if pm_name and 'bank' in pm_name.lower() else 'PAID'
-
-                cur.execute("""
-                    SELECT status_id FROM static_status
-                    WHERE status_scope = 'SALES_STATUS' AND status_code = %s
-                """, (sales_status_code,))
-                sales_status_id = cur.fetchone()[0]
-
-                # Generate sales_id in the format SR{YEAR}-{6-digit sequence}
-                cur.execute("""
-                    SELECT COUNT(*) + 1 FROM sales_transaction
-                    WHERE EXTRACT(YEAR FROM sales_date) = %s
-                """, (date.today().year,))
-                next_num = cur.fetchone()[0]
-                sales_id = f"SR{date.today().year}-{str(next_num).zfill(6)}"
-
-                cur.execute("""
-                    INSERT INTO sales_transaction (sales_id, order_id, sales_date, sales_status_id, payment_method_id)
-                    SELECT %s, %s, %s, %s, payment_method_id
-                    FROM order_transaction WHERE order_id = %s
-                """, (sales_id, order_id, date.today(), sales_status_id, order_id))
 
         conn.commit()
         return jsonify({"message": "Order updated successfully"}), 200

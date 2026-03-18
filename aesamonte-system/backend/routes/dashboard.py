@@ -41,7 +41,7 @@ def get_dashboard_metrics():
             SELECT COALESCE(SUM(ot.total_amount), 0)
             FROM sales_transaction st
             JOIN order_transaction ot ON st.order_id = ot.order_id
-            JOIN static_status ss ON st.sales_status_id = ss.status_id
+            JOIN static_status ss ON st.payment_status_id = ss.status_id
             WHERE ss.status_code = 'PAID' AND st.sales_date = %s
         """, (today,))
         sales_today = float(cur.fetchone()[0] or 0)
@@ -50,7 +50,7 @@ def get_dashboard_metrics():
             SELECT COALESCE(SUM(ot.total_amount), 0)
             FROM sales_transaction st
             JOIN order_transaction ot ON st.order_id = ot.order_id
-            JOIN static_status ss ON st.sales_status_id = ss.status_id
+            JOIN static_status ss ON st.payment_status_id = ss.status_id
             WHERE ss.status_code = 'PAID' AND st.sales_date = %s
         """, (yesterday,))
         sales_yesterday = float(cur.fetchone()[0] or 0)
@@ -178,7 +178,7 @@ def get_dashboard_charts():
                 COALESCE(SUM(ot.total_amount), 0) AS total
             FROM sales_transaction st
             JOIN order_transaction ot ON st.order_id = ot.order_id
-            JOIN static_status ss ON st.sales_status_id = ss.status_id
+            JOIN static_status ss ON st.payment_status_id = ss.status_id
             WHERE ss.status_code = 'PAID'
               AND EXTRACT(YEAR FROM st.sales_date) = %s
             GROUP BY month
@@ -198,7 +198,7 @@ def get_dashboard_charts():
                 SELECT COALESCE(SUM(ot.total_amount), 0)
                 FROM sales_transaction st
                 JOIN order_transaction ot ON st.order_id = ot.order_id
-                JOIN static_status ss ON st.sales_status_id = ss.status_id
+                JOIN static_status ss ON st.payment_status_id = ss.status_id
                 WHERE ss.status_code = 'PAID'
                   AND EXTRACT(YEAR FROM st.sales_date) = %s
                   AND EXTRACT(MONTH FROM st.sales_date) BETWEEN %s AND %s
@@ -237,7 +237,7 @@ def get_dashboard_charts():
                 SELECT COALESCE(SUM(ot.total_amount), 0)
                 FROM sales_transaction st
                 JOIN order_transaction ot ON st.order_id = ot.order_id
-                JOIN static_status ss ON st.sales_status_id = ss.status_id
+                JOIN static_status ss ON st.payment_status_id = ss.status_id
                 WHERE ss.status_code = 'PAID'
                   AND st.sales_date BETWEEN %s AND %s
             """, (prev_start, prev_end))
@@ -265,7 +265,7 @@ def get_dashboard_charts():
                 SELECT COALESCE(SUM(ot.total_amount), 0)
                 FROM sales_transaction st
                 JOIN order_transaction ot ON st.order_id = ot.order_id
-                JOIN static_status ss ON st.sales_status_id = ss.status_id
+                JOIN static_status ss ON st.payment_status_id = ss.status_id
                 WHERE ss.status_code = 'PAID'
                   AND st.sales_date BETWEEN %s AND %s
             """, (prev_start, prev_end))
@@ -284,7 +284,7 @@ def get_dashboard_charts():
                 COALESCE(SUM(ot.total_amount), 0) AS total
             FROM sales_transaction st
             JOIN order_transaction ot ON st.order_id = ot.order_id
-            JOIN static_status ss ON st.sales_status_id = ss.status_id
+            JOIN static_status ss ON st.payment_status_id = ss.status_id
             WHERE ss.status_code = 'PAID'
             GROUP BY yr
             ORDER BY yr DESC
@@ -318,7 +318,7 @@ def get_dashboard_charts():
             SELECT COALESCE(SUM(ot.total_amount), 0)
             FROM sales_transaction st
             JOIN order_transaction ot ON st.order_id = ot.order_id
-            JOIN static_status ss ON st.sales_status_id = ss.status_id
+            JOIN static_status ss ON st.payment_status_id = ss.status_id
             WHERE ss.status_code = 'PAID'
               AND EXTRACT(YEAR FROM st.sales_date) = %s
         """, (current_year,))
@@ -328,7 +328,7 @@ def get_dashboard_charts():
             SELECT COALESCE(SUM(ot.total_amount), 0)
             FROM sales_transaction st
             JOIN order_transaction ot ON st.order_id = ot.order_id
-            JOIN static_status ss ON st.sales_status_id = ss.status_id
+            JOIN static_status ss ON st.payment_status_id = ss.status_id
             WHERE ss.status_code = 'PAID'
               AND EXTRACT(YEAR FROM st.sales_date) = %s
         """, (current_year - 1,))
@@ -379,7 +379,7 @@ def get_dashboard_insights():
                 SELECT od.inventory_id, COALESCE(SUM(od.order_quantity), 0) AS units_sold
                 FROM order_details od
                 JOIN sales_transaction st ON st.order_id = od.order_id
-                JOIN static_status ss ON st.sales_status_id = ss.status_id
+                JOIN static_status ss ON st.payment_status_id = ss.status_id
                 WHERE ss.status_code = 'PAID' AND st.sales_date >= %s
                 GROUP BY od.inventory_id
             )

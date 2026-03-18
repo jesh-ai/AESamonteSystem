@@ -79,7 +79,7 @@ def get_notifications():
                         ) AS event_time
                     FROM sales_transaction st
                     JOIN order_transaction ot ON ot.order_id = st.order_id
-                    JOIN static_status ss ON st.sales_status_id = ss.status_id
+                    JOIN static_status ss ON st.payment_status_id = ss.status_id
                     JOIN customer c ON ot.customer_id = c.customer_id
                     WHERE ss.status_code = 'PAID'
                     ORDER BY event_time DESC

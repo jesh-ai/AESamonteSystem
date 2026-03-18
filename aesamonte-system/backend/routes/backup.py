@@ -142,7 +142,7 @@ def _build_zip_bytes():
                 FROM sales_transaction st
                 JOIN order_transaction ot ON st.order_id = ot.order_id
                 JOIN customer c ON ot.customer_id = c.customer_id
-                JOIN static_status ss ON st.sales_status_id = ss.status_id
+                JOIN static_status ss ON st.payment_status_id = ss.status_id
                 LEFT JOIN static_status pm ON st.payment_method_id = pm.status_id
                 ORDER BY st.sales_date DESC
             """)
@@ -435,7 +435,7 @@ def restore_sales(cur, rows):
             st_res = cur.fetchone()
             if st_res:
                 cur.execute(
-                    "UPDATE sales_transaction SET sales_status_id = %s WHERE TRIM(sales_id) = %s",
+                    "UPDATE sales_transaction SET payment_status_id = %s WHERE TRIM(sales_id) = %s",
                     (st_res[0], sales_id)
                 )
         count += 1

@@ -90,7 +90,6 @@ export default function Login({ onLogin }: LoginProps) {
         employeeId:   data.employee_id,
         roleName:     data.role,
         employeeName: data.employee_name ?? '',
-        department:   data.department ?? null,
         permissions:  data.permissions,
         token:        data.token,
       });
@@ -109,7 +108,6 @@ export default function Login({ onLogin }: LoginProps) {
       employeeId:   data.employee_id,
       roleName:     data.role,
       employeeName: data.employee_name ?? '',
-      department:   data.department ?? null,
       permissions:  data.permissions as never,
       token:        data.token,
     });
