@@ -31,6 +31,22 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
 
   const activeInventory = (inventoryItems || []).filter((inv: any) => !inv.is_archived);
 
+  // Flatten to one entry per brand variant so each brand is selectable separately
+  const searchableItems = activeInventory.flatMap((inv: any) =>
+    (inv.brands || [])
+      .filter((b: any) => Number(b.qty) > 0)
+      .map((b: any) => ({
+        inventory_id: inv.id,
+        brand_id: b.brand_id,
+        brand_name: b.brand_name !== 'No Brand' ? b.brand_name : '—',
+        item_name: inv.item_name,
+        item_description: inv.item_description,
+        uom: inv.uom,
+        price: Number(b.selling_price ?? 0),
+        qty: Number(b.qty),
+      }))
+  );
+
   const getDefaultStatus = () => {
     if (!statuses || statuses.length === 0) return 'Preparing';
     const match = statuses.find(st => st.status_name.trim().toLowerCase() === 'preparing');
@@ -92,6 +108,8 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
       setCustomerData({ ...INITIAL_CUSTOMER });
       setItems([{
         inventory_id: '',
+        brand_id: '',
+        brand_name: '—',
         item: '',
         itemDescription: '—',
         quantity: '1',
@@ -143,20 +161,20 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
     onClose();
   };
 
-  const handleItemSelect = (index: number, selectedInvId: string) => {
+  const handleItemSelect = (index: number, entry: any) => {
     const newItems = [...items];
-    const selectedInv = activeInventory.find((inv: any) => String(inv.id) === selectedInvId);
-    if (selectedInv) {
-      const currentQty = Number(newItems[index].quantity) || 1;
-      newItems[index] = {
-        ...newItems[index],
-        inventory_id: selectedInv.id,
-        item: selectedInv.item_name,
-        itemDescription: selectedInv.item_description || 'No Description',
-        quantity: currentQty,
-        amount: currentQty * Number(selectedInv.price)
-      };
-    }
+    const currentQty = Number(newItems[index].quantity) || 1;
+    newItems[index] = {
+      ...newItems[index],
+      inventory_id: entry.inventory_id,
+      brand_id: entry.brand_id,
+      brand_name: entry.brand_name,
+      item: entry.item_name,
+      itemDescription: entry.item_description || 'No Description',
+      uom: entry.uom || '',
+      quantity: currentQty,
+      amount: currentQty * entry.price
+    };
     setItems(newItems);
     setActiveSearchIndex(null);
   };
@@ -164,18 +182,19 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
   const handleItemTextChange = (index: number, text: string) => {
     const newItems = [...items];
     newItems[index].item = text;
-    const match = activeInventory.find((inv: any) => inv.item_name.toLowerCase().trim() === text.toLowerCase().trim());
-    if (match && Number(match.qty) > 0) {
-      newItems[index].inventory_id = match.id;
+    const match = searchableItems.find((s: any) => s.item_name.toLowerCase().trim() === text.toLowerCase().trim());
+    if (match) {
+      newItems[index].inventory_id = match.inventory_id;
+      newItems[index].brand_id = match.brand_id;
+      newItems[index].brand_name = match.brand_name;
       newItems[index].itemDescription = match.item_description || 'No Description';
+      newItems[index].uom = match.uom || '';
       const qtyNum = Number(newItems[index].quantity) || 1;
-      newItems[index].amount = qtyNum * Number(match.price);
-    } else if (match && Number(match.qty) <= 0) {
-      newItems[index].inventory_id = '';
-      newItems[index].itemDescription = 'Out of Stock (Please remove)';
-      newItems[index].amount = 0;
+      newItems[index].amount = qtyNum * match.price;
     } else {
       newItems[index].inventory_id = '';
+      newItems[index].brand_id = '';
+      newItems[index].brand_name = '—';
       newItems[index].itemDescription = '—';
       newItems[index].amount = 0;
     }
@@ -185,9 +204,12 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
   const handleQtyChange = (index: number, newQty: string) => {
     const newItems = [...items];
     const qtyNum = Number(newQty) || 0;
-    const invItem = activeInventory.find((inv: any) => String(inv.id) === String(newItems[index].inventory_id));
+    const entry = searchableItems.find((s: any) =>
+      String(s.inventory_id) === String(newItems[index].inventory_id) &&
+      String(s.brand_id) === String(newItems[index].brand_id)
+    );
     const existingPrice = (Number(newItems[index].amount) / (Number(newItems[index].quantity) || 1)) || 0;
-    const price = invItem ? Number(invItem.price) : existingPrice;
+    const price = entry ? entry.price : existingPrice;
     newItems[index] = { ...newItems[index], quantity: newQty, amount: price * qtyNum };
     setItems(newItems);
   };
@@ -201,6 +223,8 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
   const handleAddItem = () => {
     setItems([...items, {
       inventory_id: '',
+      brand_id: '',
+      brand_name: '—',
       item: '',
       itemDescription: '—',
       quantity: '1',
@@ -313,7 +337,7 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
                   )}
                 </div>
 
-                <div className={s.itemTopGrid}>
+                <div className={s.itemTopGrid} style={{ gridTemplateColumns: '2fr 1fr 1.5fr' }}>
 
                   {/* Search field */}
                   <div className={s.searchFieldWrapper}>
@@ -335,36 +359,43 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
 
                     {activeSearchIndex === index && (
                       <div className={s.searchDropdown}>
-                        {activeInventory
-                          .filter((inv: any) => Number(inv.qty) > 0)
-                          .filter((inv: any) =>
-                            inv.item_name.toLowerCase().includes((item.item || '').toLowerCase()) ||
-                            (inv.item_description && inv.item_description.toLowerCase().includes((item.item || '').toLowerCase()))
+                        {searchableItems
+                          .filter((entry: any) =>
+                            entry.item_name.toLowerCase().includes((item.item || '').toLowerCase()) ||
+                            (entry.item_description && entry.item_description.toLowerCase().includes((item.item || '').toLowerCase()))
                           )
-                          .map((inv: any) => (
+                          .map((entry: any, i: number) => (
                             <div
-                              key={inv.id}
-                              onMouseDown={() => handleItemSelect(index, String(inv.id))}
+                              key={`${entry.inventory_id}-${entry.brand_id}-${i}`}
+                              onMouseDown={() => handleItemSelect(index, entry)}
                               className={s.searchDropdownItem}
                             >
                               <div className={s.searchDropdownItemLeft}>
-                                <div className={s.searchDropdownItemName}>{inv.item_name}</div>
-                                <div className={s.searchDropdownItemDesc}>{inv.item_description || 'No desc'}</div>
+                                <div className={s.searchDropdownItemName}>{entry.item_name}</div>
+                                <div className={s.searchDropdownItemDesc}>
+                                  {entry.brand_name !== '—' ? entry.brand_name : (entry.item_description || 'No desc')}
+                                </div>
                               </div>
                               <div className={s.searchDropdownItemRight}>
-                                <div className={s.searchDropdownItemPrice}>₱{inv.price}</div>
-                                <div className={s.searchDropdownItemQty}>Avail: {inv.qty}</div>
+                                <div className={s.searchDropdownItemPrice}>₱{entry.price.toLocaleString()}</div>
+                                <div className={s.searchDropdownItemQty}>Avail: {entry.qty} {entry.uom || ''}</div>
                               </div>
                             </div>
                           ))
                         }
-                        {activeInventory.filter((inv: any) => Number(inv.qty) <= 0 && inv.item_name.toLowerCase().includes((item.item || '').toLowerCase())).length > 0 && (
-                          <div className={s.outOfStockNotice}>
-                            Some matches are currently Out of Stock.
-                          </div>
+                        {searchableItems.filter((entry: any) =>
+                          entry.item_name.toLowerCase().includes((item.item || '').toLowerCase())
+                        ).length === 0 && item.item.length > 0 && (
+                          <div className={s.outOfStockNotice}>No available items found.</div>
                         )}
                       </div>
                     )}
+                  </div>
+
+                  {/* Brand */}
+                  <div className={s.formGroup} style={{ minWidth: 0 }}>
+                    <label className={s.miniLabel}>Brand</label>
+                    <div className={s.descFieldValid}>{item.brand_name || '—'}</div>
                   </div>
 
                   {/* Description */}

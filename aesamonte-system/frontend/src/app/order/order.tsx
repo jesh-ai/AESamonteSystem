@@ -520,7 +520,7 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
         ) : (
           <div className={s.tableContainer}>
             <div className={s.header}>
-              <h2 className={s.title}>List of Orders</h2>
+              <h2 className={s.title}>Orders</h2>
               <div className={s.controls}>
                 <button 
                   className={s.archiveIconBtn} 

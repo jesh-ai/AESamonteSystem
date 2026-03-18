@@ -24,6 +24,21 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
 
   const activeInventory = (inventoryItems || []).filter((inv: any) => !inv.is_archived);
 
+  const searchableItems = activeInventory.flatMap((inv: any) =>
+    (inv.brands || [])
+      .filter((b: any) => Number(b.qty) > 0)
+      .map((b: any) => ({
+        inventory_id: inv.id,
+        brand_id: b.brand_id,
+        brand_name: b.brand_name !== 'No Brand' ? b.brand_name : '—',
+        item_name: inv.item_name,
+        item_description: inv.item_description,
+        uom: inv.uom,
+        price: Number(b.selling_price ?? 0),
+        qty: Number(b.qty),
+      }))
+  );
+
   useEffect(() => {
     if (orderData) {
       const initialItems = orderData.items && orderData.items.length > 0 
@@ -57,41 +72,42 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
     return JSON.stringify(formData) !== JSON.stringify(originalData);
   };
 
-  const handleItemSelect = (index: number, selectedInvId: string) => {
+  const handleItemSelect = (index: number, entry: any) => {
     const safeItems = formData.items || [];
     const newItems = [...safeItems];
-    const selectedInv = activeInventory.find((inv: any) => String(inv.id) === selectedInvId);
-    if (selectedInv) {
-      const currentQty = Number(newItems[index].quantity) || 1;
-      newItems[index] = {
-        ...newItems[index],
-        inventory_id: selectedInv.id,
-        item: selectedInv.item_name, 
-        itemDescription: selectedInv.item_description || 'No Description',
-        quantity: currentQty,
-        amount: currentQty * Number(selectedInv.price) 
-      };
-    }
+    const currentQty = Number(newItems[index].quantity) || 1;
+    newItems[index] = {
+      ...newItems[index],
+      inventory_id: entry.inventory_id,
+      brand_id: entry.brand_id,
+      brand_name: entry.brand_name,
+      item: entry.item_name,
+      itemDescription: entry.item_description || 'No Description',
+      uom: entry.uom || '',
+      quantity: currentQty,
+      amount: currentQty * entry.price
+    };
     setFormData({ ...formData, items: newItems });
-    setActiveSearchIndex(null); 
+    setActiveSearchIndex(null);
   };
 
   const handleItemTextChange = (index: number, text: string) => {
     const safeItems = formData.items || [];
     const newItems = [...safeItems];
     newItems[index].item = text;
-    const match = activeInventory.find((inv: any) => inv.item_name.toLowerCase().trim() === text.toLowerCase().trim());
-    if (match && Number(match.qty) > 0) {
-        newItems[index].inventory_id = match.id;
+    const match = searchableItems.find((s: any) => s.item_name.toLowerCase().trim() === text.toLowerCase().trim());
+    if (match) {
+        newItems[index].inventory_id = match.inventory_id;
+        newItems[index].brand_id = match.brand_id;
+        newItems[index].brand_name = match.brand_name;
         newItems[index].itemDescription = match.item_description || 'No Description';
+        newItems[index].uom = match.uom || '';
         const qtyNum = Number(newItems[index].quantity) || 1;
-        newItems[index].amount = qtyNum * Number(match.price);
-    } else if (match && Number(match.qty) <= 0) {
-        newItems[index].inventory_id = '';
-        newItems[index].itemDescription = 'Out of Stock (Please remove)';
-        newItems[index].amount = 0;
+        newItems[index].amount = qtyNum * match.price;
     } else {
         newItems[index].inventory_id = '';
+        newItems[index].brand_id = '';
+        newItems[index].brand_name = '—';
         newItems[index].itemDescription = '—';
         newItems[index].amount = 0;
     }
@@ -102,9 +118,12 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
     const safeItems = formData.items || [];
     const newItems = [...safeItems];
     const qtyNum = Number(newQty) || 0;
-    const invItem = activeInventory.find((inv: any) => String(inv.id) === String(newItems[index].inventory_id));
+    const entry = searchableItems.find((s: any) =>
+      String(s.inventory_id) === String(newItems[index].inventory_id) &&
+      String(s.brand_id) === String(newItems[index].brand_id)
+    );
     const existingPrice = (Number(newItems[index].amount) / (Number(newItems[index].quantity) || 1)) || 0;
-    const price = invItem ? Number(invItem.price) : existingPrice;
+    const price = entry ? entry.price : existingPrice;
     newItems[index] = { ...newItems[index], quantity: newQty, amount: price * qtyNum };
     setFormData({ ...formData, items: newItems });
   };
@@ -220,7 +239,7 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
                     )}
                  </div>
 
-                 <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.2fr 0.6fr 1fr', gap: '10px' }}>
+                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 0.6fr 1fr', gap: '10px' }}>
                    
                    <div className={s.formGroup} style={{ position: 'relative', minWidth: 0 }}>
                       <label className={s.miniLabel} style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -251,46 +270,55 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
                           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', maxHeight: '250px', overflowY: 'auto',
                           marginTop: '4px'
                         }}>
-                          {activeInventory
-                            .filter((inv: any) => Number(inv.qty) > 0)
-                            .filter((inv: any) => 
-                              inv.item_name.toLowerCase().includes((item.item || '').toLowerCase()) ||
-                              (inv.item_description && inv.item_description.toLowerCase().includes((item.item || '').toLowerCase()))
+                          {searchableItems
+                            .filter((entry: any) =>
+                              entry.item_name.toLowerCase().includes((item.item || '').toLowerCase()) ||
+                              (entry.item_description && entry.item_description.toLowerCase().includes((item.item || '').toLowerCase()))
                             )
-                            .map((inv: any) => (
+                            .map((entry: any, i: number) => (
                               <div
-                                key={inv.id}
-                                onMouseDown={() => handleItemSelect(index, String(inv.id))} 
+                                key={`${entry.inventory_id}-${entry.brand_id}-${i}`}
+                                onMouseDown={() => handleItemSelect(index, entry)}
                                 style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
                                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fff'}
                               >
                                 <div style={{ overflow: 'hidden', paddingRight: '10px' }}>
-                                  <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{inv.item_name}</div>
-                                  <div style={{ fontSize: '0.75rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{inv.item_description || 'No desc'}</div>
+                                  <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{entry.item_name}</div>
+                                  <div style={{ fontSize: '0.75rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {entry.brand_name !== '—' ? entry.brand_name : (entry.item_description || 'No desc')}
+                                  </div>
                                 </div>
                                 <div style={{ textAlign: 'right', minWidth: '70px' }}>
-                                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#059669' }}>₱{inv.price}</div>
-                                  <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Avail: {inv.qty}</div>
+                                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#059669' }}>₱{entry.price.toLocaleString()}</div>
+                                  <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Avail: {entry.qty} {entry.uom || ''}</div>
                                 </div>
                               </div>
                             ))
                           }
-                          
-                          {activeInventory.filter((inv: any) => Number(inv.qty) <= 0 && inv.item_name.toLowerCase().includes((item.item || '').toLowerCase())).length > 0 && (
-                             <div style={{ padding: '10px 12px', fontSize: '0.8rem', color: '#ef4444', textAlign: 'center', backgroundColor: '#fef2f2' }}>
-                                Some matches are currently Out of Stock.
-                             </div>
+                          {searchableItems.filter((entry: any) =>
+                            entry.item_name.toLowerCase().includes((item.item || '').toLowerCase())
+                          ).length === 0 && item.item.length > 0 && (
+                            <div style={{ padding: '10px 12px', fontSize: '0.8rem', color: '#ef4444', textAlign: 'center', backgroundColor: '#fef2f2' }}>
+                              No available items found.
+                            </div>
                           )}
                         </div>
                       )}
                    </div>
                    
                    <div className={s.formGroup} style={{ minWidth: 0 }}>
+                      <label className={s.miniLabel}>Brand</label>
+                      <div style={{ padding: '0 12px', height: '38px', borderRadius: '6px', border: '1px solid #e5e7eb', fontSize: '0.9rem', display: 'block', lineHeight: '36px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', width: '100%', backgroundColor: '#f3f4f6', color: '#6b7280' }}>
+                        {item.brand_name || '—'}
+                      </div>
+                   </div>
+
+                   <div className={s.formGroup} style={{ minWidth: 0 }}>
                       <label className={s.miniLabel}>Description</label>
-                      <div style={{ 
-                            padding: '0 12px', height: '38px', borderRadius: '6px', border: '1px solid #e5e7eb', fontSize: '0.9rem', 
-                            display: 'block', lineHeight: '36px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', width: '100%',            
+                      <div style={{
+                            padding: '0 12px', height: '38px', borderRadius: '6px', border: '1px solid #e5e7eb', fontSize: '0.9rem',
+                            display: 'block', lineHeight: '36px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', width: '100%',
                             backgroundColor: (!item.inventory_id && item.item.length > 0) ? '#fef2f2' : '#f3f4f6',
                             color: (!item.inventory_id && item.item.length > 0) ? '#ef4444' : '#6b7280'
                           }}>
