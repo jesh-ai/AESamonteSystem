@@ -100,7 +100,7 @@ export default function Login({ onLogin }: LoginProps) {
   };
 
   // ── Store trust token after OTP, then complete login ──
-  const completeLoginWithTrust = (data: { token: string; role: string; employee_id: number; department?: string; permissions: unknown; device_trust_token?: string }) => {
+  const completeLoginWithTrust = (data: { token: string; role: string; employee_id: number; employee_name?: string; department?: string; permissions: unknown; device_trust_token?: string }) => {
     if (data.device_trust_token) {
       localStorage.setItem(`2fa_trust_${data.employee_id}`, data.device_trust_token);
     }
