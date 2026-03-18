@@ -622,7 +622,7 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
             )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
               <button type="button" onClick={handleCancelClick} className={s.cancelBtn}>Cancel</button>
-              <button type="submit" className={s.saveBtn} style={{ backgroundColor: '#111827', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: '8px', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer' }}>
+              <button type="submit" className={s.saveBtn} style={{ backgroundColor: '#1a4263', color: 'white', border: 'none', padding: '8px 20px', borderRadius: '8px', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer' }}>
                 Save All Items
               </button>
             </div>
