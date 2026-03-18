@@ -386,42 +386,6 @@ export default function GeneralSettings({
         {/* ── SYSTEM SETTINGS ── */}
         <h3 className={s.mainSectionLabel} style={{ marginTop: '2.5rem' }}>System Settings</h3>
 
-        <h4 className={s.subSectionLabel}>Regional Settings</h4>
-        <div className={s.settingsForm}>
-          <div className={s.formRow}>
-            <label>Timezone</label>
-            <select className={s.formSelect} value={timezone} onChange={e => setTimezone(e.target.value)}>
-              <optgroup label="Asia / Pacific">
-                <option value="PHT">PHT — Manila (UTC+8)</option>
-                <option value="SGT">SGT — Singapore (UTC+8)</option>
-                <option value="JST">JST — Tokyo (UTC+9)</option>
-                <option value="AEST">AEST — Sydney (UTC+10)</option>
-                <option value="ICT">ICT — Bangkok (UTC+7)</option>
-              </optgroup>
-              <optgroup label="Universal">
-                <option value="UTC">UTC — Coordinated Universal Time</option>
-              </optgroup>
-              <optgroup label="Europe">
-                <option value="CET">CET — Central European (UTC+1)</option>
-                <option value="GMT">GMT — London (UTC+0)</option>
-              </optgroup>
-              <optgroup label="Americas">
-                <option value="EST">EST — New York (UTC−5)</option>
-                <option value="PST">PST — Los Angeles (UTC−8)</option>
-              </optgroup>
-            </select>
-          </div>
-          <div className={s.formRow}>
-            <label>Date Format</label>
-            <select className={s.formSelect} value={dateFormat} onChange={e => setDateFormat(e.target.value)}>
-              <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-              <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-              <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-              <option value="DD-MM-YYYY">DD-MM-YYYY</option>
-            </select>
-          </div>
-        </div>
-
         <h4 className={s.subSectionLabel}>Display Preferences</h4>
         <div className={s.notifForm} style={{ maxWidth: '450px' }}>
           <div className={s.notifRow}>
