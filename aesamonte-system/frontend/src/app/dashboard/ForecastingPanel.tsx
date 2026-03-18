@@ -48,7 +48,11 @@ export default function ForecastingPanel({ charts, insights, loading }: Forecast
           </div>
         </div>
 
-        <div className={styles.sliderOuter} style={{ height: slideIndex === 0 ? "210px" : "270px" }}>
+        <div
+          className={styles.sliderOuter}
+          style={{ height: slideIndex === 0 ? "210px" : "270px", cursor: "pointer" }}
+          onClick={() => setSlideIndex((prev) => (prev + 1) % 3)}
+        >
           <div
             className={styles.sliderTrack}
             style={{ transform: `translateX(-${slideIndex * 100}%)` }}
@@ -60,14 +64,14 @@ export default function ForecastingPanel({ charts, insights, loading }: Forecast
               ) : (
                 <div
                   className={`${styles.forecastCards} ${
-                    forecastView === "Yearly" ? styles.forecastCardsScroll : ""
+                    forecastView === "Monthly" ? styles.forecastCardsScroll : ""
                   }`}
                 >
                   {forecastPeriods.map((p, i) => {
                     const isTop = p.total === maxPeriod && p.total > 0;
                     const hasFire = fireTotals.has(p.total);
                     const subLabel =
-                      forecastView === "Yearly"
+                      forecastView === "Monthly"
                         ? (p as PeriodSalesMonth).year ?? ""
                         : p.dateRange;
                     return (
@@ -186,7 +190,7 @@ export default function ForecastingPanel({ charts, insights, loading }: Forecast
 
         {slideIndex === 0 && (
           <div className={styles.forecastTabs}>
-            {(["Weekly", "Quarterly", "Yearly"] as ForecastView[]).map((v) => (
+            {(["Weekly", "Quarterly", "Monthly"] as ForecastView[]).map((v) => (
               <button
                 key={v}
                 className={`${styles.forecastTab} ${forecastView === v ? styles.forecastTabActive : ""}`}

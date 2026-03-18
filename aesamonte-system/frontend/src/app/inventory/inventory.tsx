@@ -553,7 +553,7 @@ const mustRequestExport = isSalesHead || role === 'Staff';
                 </thead>
                 <tbody>
                   {paginatedProducts.map(p => (
-                  <tr key={p.id} onClick={() => handleViewClick(p)} style={{ cursor: 'pointer', height: '42px' }}>  <td>{p.id}</td>
+                  <tr key={p.id} onClick={() => handleViewClick(p)} style={{ cursor: 'pointer', height: '42px' }}><td>{p.id}</td>
                       <td>{p.item_name}</td>
                      <td style={{ fontSize: '0.83rem', color: '#374151' }}>
                           {(p.brands || []).length === 0 ? (

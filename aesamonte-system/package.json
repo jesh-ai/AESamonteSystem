@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "next-dev": "cd frontend && npm run dev",
-    "flask-server": "python backend/app.py",
+    "flask-server": "py backend/app.py",
     "dev": "concurrently -n \"NEXT,FLASK\" -c \"cyan,yellow\" \"npm run next-dev\" \"npm run flask-server\"",
     "build": "cd frontend && npm install && npm run build",
     "start": "cd frontend && npm run start",

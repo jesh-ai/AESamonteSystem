@@ -96,4 +96,4 @@ export interface InsightsData {
   stockoutPredictions: StockoutPrediction[];
 }
 
-export type ForecastView = "Weekly" | "Quarterly" | "Yearly";
+export type ForecastView = "Weekly" | "Quarterly" | "Monthly";
