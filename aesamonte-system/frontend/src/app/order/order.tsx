@@ -56,6 +56,7 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
   useEffect(() => {
     if (initialSearch) setSearchTerm(initialSearch);
   }, [initialSearch]);
+
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState<{ key: Exclude<SortKey, null> | null; direction: 'asc' | 'desc' | null }>({ key: null, direction: null });
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
@@ -71,6 +72,7 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [inventoryItems, setInventoryItems] = useState<any[]>([]);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [exportType, setExportType] = useState<'pdf' | 'xlsx' | 'csv' | null>(null); // ── ADDED ──
   const [showToast, setShowToast] = useState(false);
   const [toastTitle, setToastTitle] = useState('');
   const [toastMessage, setToastMessage] = useState('');
@@ -94,19 +96,20 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
     } catch (err) { console.error('Error fetching orders:', err); }
   };
 
-        const fetchSummary = async () => {
-        const r = await fetch('/api/orders/summary');
-        if (r.ok) {
-          const d = await r.json();
-          if (d && d.shippedToday) setSummary(d);
-        }
-      };
-
+  const fetchSummary = async () => {
+    try {
+      const r = await fetch('/api/orders/summary');
+      if (r.ok) {
+        const d = await r.json();
+        if (d && d.shippedToday) setSummary(d);
+      }
+    } catch (err) { console.error('Error fetching summary:', err); }
+  };
 
   useEffect(() => {
     fetchOrders();
-    fetchSummary
-    fetch('/api/orders/summary').then(r => r.ok ? r.json() : null).then(d => { if (d && d.shippedToday) setSummary(d); });
+    fetchSummary();
+
     const fetchDropdowns = async () => {
       try {
         const [sR, pR, iR] = await Promise.all([
@@ -120,6 +123,12 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
       } catch (err) { console.error("Dropdown fetch error", err); }
     };
     fetchDropdowns();
+
+    const summaryInterval = setInterval(() => {
+      fetchSummary();
+    }, 10000);
+
+    return () => clearInterval(summaryInterval);
   }, []);
 
   const handleSave = async (newOrderData: any) => {
@@ -135,7 +144,9 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
           dateTime: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         });
         setToastTitle("Order Submitted!"); setToastMessage("Your new order has been successfully added.");
-        setIsError(false); setShowToast(true); setShowAddModal(false); fetchOrders(); fetchSummary();
+        setIsError(false); setShowToast(true); setShowAddModal(false);
+        fetchOrders();
+        fetchSummary();
       } else {
         const errData = await response.json();
         setToastTitle("Oops!"); setToastMessage(errData.error || "Failed to save order.");
@@ -145,29 +156,19 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
   };
 
   const handleUpdateSave = async (updatedOrder: any) => {
-  const prevStatus = selectedOrderForEdit?.status?.toUpperCase();
-  const newStatus  = updatedOrder.status?.toUpperCase();
-
-  if (prevStatus !== 'CANCELLED' && newStatus === 'CANCELLED') {
-    setSummary(prev => prev ? {
-      ...prev,
-      cancelled: { current: prev.cancelled.current + 1 }
-    } : prev);
-  } else if (prevStatus === 'CANCELLED' && newStatus !== 'CANCELLED') {
-    setSummary(prev => prev ? {
-      ...prev,
-      cancelled: { current: Math.max(0, prev.cancelled.current - 1) }
-    } : prev);
-  }
-  // ──────────────────────────────────────────────────
     try {
       const response = await fetch(`/api/orders/update/${updatedOrder.id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedOrder),
       });
       if (response.ok) {
         setToastTitle("Updated!"); setToastMessage("The order record has been successfully updated.");
-        setIsError(false); setSubmittedData(null); setShowToast(true); setShowEditModal(false); fetchOrders(); fetchSummary
-      } else { setToastTitle("Update Failed"); setToastMessage("Failed to update order."); setIsError(true); setShowToast(true); }
+        setIsError(false); setSubmittedData(null); setShowToast(true); setShowEditModal(false);
+        fetchOrders();
+        fetchSummary();
+      } else {
+        setToastTitle("Update Failed"); setToastMessage("Failed to update order.");
+        setIsError(true); setShowToast(true);
+      }
     } catch (err) { console.error(err); }
   };
 
@@ -180,7 +181,9 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
         setSubmittedData(null);
         setToastTitle(apiData.is_archived ? "Archived!" : "Restored!");
         setToastMessage(apiData.is_archived ? "Order moved to Archive" : "Order restored from Archive");
-        setIsError(false); setShowToast(true); setOpenMenuId(null); fetchOrders(); fetchSummary();
+        setIsError(false); setShowToast(true); setOpenMenuId(null);
+        fetchOrders();
+        fetchSummary();
       } else {
         const errorData = await response.json();
         setSubmittedData(null); setToastTitle("Failed"); setToastMessage(`Failed: ${errorData.error}`); setIsError(true); setShowToast(true);
@@ -348,7 +351,6 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
     const arr = [...filtered];
     const getSafeId = (id: any) => Number(String(id).replace(/\D/g, '')) || 0;
     
-    // Default fallback
     if (!sortConfig.key || !sortConfig.direction) {
       return arr.sort((a, b) => (STATUS_PRIORITY[a.status?.toUpperCase()] || 99) - (STATUS_PRIORITY[b.status?.toUpperCase()] || 99) || getSafeId(a.id) - getSafeId(b.id));
     }
@@ -358,40 +360,33 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
       const A = a[key as keyof Order];
       const B = b[key as keyof Order];
       
-      // Handle Dates
       if (key === 'date') {
         return direction === 'asc' 
           ? new Date(A as string).getTime() - new Date(B as string).getTime() 
           : new Date(B as string).getTime() - new Date(A as string).getTime();
       }
 
-      // Handle ID safely
       if (key === 'id') {
         const numA = getSafeId(A);
         const numB = getSafeId(B);
         return direction === 'asc' ? numA - numB : numB - numA;
       }
 
-      // Handle Quantities and Amounts
       if (key === 'totalQty' || key === 'totalAmount') {
         const numA = Number(A) || 0;
         const numB = Number(B) || 0;
         return direction === 'asc' ? numA - numB : numB - numA;
       }
 
-      // FIX: Standardized Status Priority Sorting
       if (key === 'status') {
         const valA = STATUS_PRIORITY[String(A ?? '').toUpperCase()] || 999;
         const valB = STATUS_PRIORITY[String(B ?? '').toUpperCase()] || 999;
-        
         if (valA !== valB) {
           return direction === 'asc' ? valA - valB : valB - valA;
         }
-        // If statuses are identical, tie-break by ID
         return direction === 'asc' ? getSafeId(a.id) - getSafeId(b.id) : getSafeId(b.id) - getSafeId(a.id);
       }
       
-      // Handle Strings (Names, Addresses, Payment Methods)
       const sA = String(A ?? '').toLowerCase();
       const sB = String(B ?? '').toLowerCase();
       if (sA < sB) return direction === 'asc' ? -1 : 1;
@@ -489,38 +484,40 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
             </p>
           </div>
           <div>
+            {/* ── UPDATED: ExportButton with dropdown ── */}
             {['Admin', 'Manager'].includes(role) && (
-              <div onClick={() => setShowExportModal(true)}>
-                <ExportButton />
-              </div>
+              <ExportButton onSelect={(type) => {
+                setExportType(type);
+                setShowExportModal(true);
+              }} />
             )}
           </div>
         </div>
 
-<div className={s.topGrid}>
+        <div className={s.topGrid}>
 
           {/* ── Shipped Today ── */}
-            <section className={s.statCard}>
-              <p className={s.cardTitle}>Shipped Today</p>
-              <h2 className={s.bigNumberGreen}>
-                <svg width="36" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
-                  <rect x="1" y="3" width="15" height="13" rx="1"/>
-                  <path d="M16 8h4l3 5v4h-7V8z"/>
-                  <circle cx="5.5" cy="18.5" r="2.5"/>
-                  <circle cx="18.5" cy="18.5" r="2.5"/>
-                </svg>
-                <span style={{ color: "#16a34a" }}>{summary ? summary.shippedToday.current : '—'}</span>
-                {summary && <span style={{ color: "#164163" }}>/{summary.shippedToday.total}</span>}
-              </h2>
-            </section>
+          <section className={s.statCard}>
+            <p className={s.cardTitle}>Shipped Today</p>
+            <h2 className={s.bigNumberGreen}>
+              <svg width="36" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
+                <rect x="1" y="3" width="15" height="13" rx="1"/>
+                <path d="M16 8h4l3 5v4h-7V8z"/>
+                <circle cx="5.5" cy="18.5" r="2.5"/>
+                <circle cx="18.5" cy="18.5" r="2.5"/>
+              </svg>
+              <span style={{ color: "#16a34a" }}>{summary ? summary.shippedToday.current : '—'}</span>
+              {summary && <span style={{ color: "#164163" }}>/{summary.shippedToday.total}</span>}
+            </h2>
+          </section>
 
-            {/* ── Orders Cancelled ── */}
-            <section className={s.statCard}>
-              <p className={s.cardTitle}>Orders Cancelled</p>
-              <h2 className={s.bigNumberRed}>
-                {summary ? summary.cancelled.current : '—'}
-              </h2>
-            </section>
+          {/* ── Orders Cancelled ── */}
+          <section className={s.statCard}>
+            <p className={s.cardTitle}>Orders Cancelled</p>
+            <h2 className={s.bigNumberRed}>
+              {summary ? summary.cancelled.current : '—'}
+            </h2>
+          </section>
 
           {/* ── Total Orders ── */}
           <section className={s.statCardSpaced}>
@@ -630,25 +627,24 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
         )}
       </div>
 
-      <ExportModal isOpen={showExportModal} onClose={() => setShowExportModal(false)} 
+      {/* ── UPDATED: ExportModal with exportType ── */}
+      <ExportModal isOpen={showExportModal} onClose={() => { setShowExportModal(false); setExportType(null); }} 
                     onSuccess={(msg, type) => { setToastTitle(type === 'error' ? 'Oops!' : 'Success!'); setToastMessage(msg); setIsError(type === 'error'); setShowToast(true); }} 
                     data={orders.filter(o => !o.is_archived)} 
-                    summary={summary ?? { shippedToday: { current: 0, total: 0 }, cancelled: { current: 0 }, totalOrders: { count: 0 } 
-                    }} />
+                    summary={summary ?? { shippedToday: { current: 0, total: 0 }, cancelled: { current: 0 }, totalOrders: { count: 0 } }}
+                    exportType={exportType} />
 
       <AddOrderModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} 
                       onSave={handleSave} statuses={orderStatuses} 
                       paymentMethods={paymentMethods} 
-                      inventoryItems={inventoryItems} 
-                      />
+                      inventoryItems={inventoryItems} />
 
       <OrderEditModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} 
                       orderData={selectedOrderForEdit} 
                       onSave={handleUpdateSave} 
                       statuses={orderStatuses} 
                       paymentMethods={paymentMethods} 
-                      inventoryItems={inventoryItems} 
-                      />
+                      inventoryItems={inventoryItems} />
 
       {showViewModal && selectedOrderForView && (
         <div className={s.viewBackdrop} onClick={closeViewModal}>
@@ -670,7 +666,7 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
                 <p className={s.viewSectionTitle}>Customer Details</p>
                 <div className={s.viewCustomerGrid}>
                   {[
-                    {label: 'Customer Name', value: selectedOrderForView.customer},
+                    { label: 'Customer Name', value: selectedOrderForView.customer },
                     { label: 'Contact Number', value: selectedOrderForView.contact || '—' },
                     { label: 'Address', value: selectedOrderForView.address },
                     { label: 'Payment Method', value: selectedOrderForView.paymentMethod },
@@ -728,8 +724,7 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
             </div>
 
             <div className={s.viewModalFooter}>
-              <button className={s.viewBtnPrint} 
-                      onClick={handlePrint}><LuPrinter size={14} /> Print Receipt</button>
+              <button className={s.viewBtnPrint} onClick={handlePrint}><LuPrinter size={14} /> Print Receipt</button>
             </div>
           </div>
         </div>
