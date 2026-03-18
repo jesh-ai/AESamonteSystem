@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import styles from "@/css/inventory.module.css";
+import s from "@/css/inventory.module.css";
 import TopHeader from '@/components/layout/TopHeader';
 import ExportButton from '@/components/features/ExportButton';
 import ExportRequestModal from '@/components/features/ExportRequestModal';
@@ -12,15 +12,8 @@ import ExportModal from './exportModal';
 import ArchiveTable from './archiveInvModal';
 import AddSupplierModal from '@/app/suppliers/addSupplierModal';
 import {
-  LuSearch, 
-  LuEllipsisVertical, 
-  LuChevronUp, 
-  LuChevronDown,
-  LuArchive, 
-  LuChevronLeft, 
-  LuChevronRight, 
-  LuPencil,
-  LuX,
+  LuSearch, LuEllipsisVertical, LuChevronUp, LuChevronDown,
+  LuArchive, LuChevronLeft, LuChevronRight, LuPencil, LuX,
 } from "react-icons/lu";
 
 /* ================= TYPES ================= */
@@ -32,6 +25,7 @@ interface InventoryProps {
   onLogout: () => void;
   initialSearch?: string;
 }
+
 interface Supplier {
   id: number;
   supplierName: string;
@@ -57,7 +51,7 @@ export interface Product {
   price: number;
   status: string;
   is_archived?: boolean;
-  supplier_name?: string; 
+  supplier_name?: string;
 }
 
 interface InventorySummary {
@@ -73,38 +67,24 @@ interface InventorySummary {
 
 const ROWS_PER_PAGE = 10;
 
-const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0, onLogout, initialSearch }) => {
-  const s = styles as Record<string, string>;
+const Inventory: React.FC<InventoryProps> = ({ role, employeeId, onLogout, initialSearch }) => {
 
-  const isInventoryHead = role === 'Head' && department === 'Inventory';
-  const isSalesHead     = role === 'Head' && department === 'Sales';
-  const canModify       = ['Admin', 'Manager', 'Staff'].includes(role) || isInventoryHead;
-  const canExport       = ['Admin', 'Manager'].includes(role) || isInventoryHead;
-  const mustRequestExport = isSalesHead;
+  // ── Permission Logic ──
+  const isInventoryHead   = role === 'Inventory Head';
+  const isSalesHead       = role === 'Sales Head';
+  const canModify         = ['Admin', 'Manager', 'Staff'].includes(role) || isInventoryHead;
+  const canExport         = ['Admin', 'Manager', 'Inventory Head'].includes(role);
+  const mustRequestExport = role === 'Staff' || isSalesHead;
 
+  // ── State ──
   const [products, setProducts] = useState<Product[]>([]);
   const [data, setData] = useState<InventorySummary>({
-    totalProducts: 0,
-    totalProductsChange: 0,
-    weeklyInventory: 0,
-    monthlyInventory: 0,
-    yearlyInventory: 0,
-    outOfStockCount: 0,
-    outOfStockItems: [], 
-    lowStockItems: [],
+    totalProducts: 0, totalProductsChange: 0,
+    weeklyInventory: 0, monthlyInventory: 0, yearlyInventory: 0,
+    outOfStockCount: 0, outOfStockItems: [], lowStockItems: [],
   });
-  
   const [searchTerm, setSearchTerm] = useState(initialSearch ?? '');
-
-  useEffect(() => {
-    if (initialSearch) setSearchTerm(initialSearch);
-  }, [initialSearch]);
-
-  const [sortConfig, setSortConfig] = useState<{
-    key: keyof Product | '';
-    direction: 'asc' | 'desc' | null;
-  }>({ key: '', direction: null });
-
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Product | ''; direction: 'asc' | 'desc' | null }>({ key: '', direction: null });
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [isArchiveView, setIsArchiveView] = useState(false);
@@ -113,60 +93,54 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
   const [showModal, setShowModal] = useState(false);
   const [defaultSupplierName, setDefaultSupplierName] = useState<string>('');
   const [showSupplierModal, setShowSupplierModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false); 
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null); 
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showExportRequestModal, setShowExportRequestModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewProduct, setViewProduct] = useState<Product | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
-  const [isError, setIsError] = useState(false); 
+  const [isError, setIsError] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
+  useEffect(() => {
+    if (initialSearch) setSearchTerm(initialSearch);
+  }, [initialSearch]);
+
+  // ── Helpers ──
   const handleExportSuccess = (msg: string, type: 'success' | 'error' = 'success') => {
     setToastMessage(msg);
     setIsError(type === 'error');
     setShowToast(true);
   };
 
- const fetchInventory = async () => {
-  setIsLoading(true);
-  try {
-    const res = await fetch(`/api/inventory?t=${new Date().getTime()}`, {
-      method: "GET",
-      headers: { "Cache-Control": "no-cache" },
-    });
-    if (!res.ok) throw new Error("Failed to fetch");
-    
-    const productData: Product[] = await res.json();
-    setProducts(productData);
-
-    const activeProducts = productData.filter(p => !p.is_archived);
-
-    // FIX 1: Ensure we catch items with 0 qty regardless of the 'status' text
-    const outOfStock = activeProducts.filter(p => 
-      p.qty === 0 || p.status?.toLowerCase().includes("out of stock")
-    );
-    const lowStock = activeProducts.filter(p => 
-      (p.status?.toLowerCase().includes("low stock")) && p.qty > 0
-    );
-
-    setData(prev => ({
-      ...prev,
-      totalProducts: activeProducts.length, 
-      outOfStockCount: outOfStock.length,   
-      outOfStockItems: outOfStock,
-      lowStockItems: lowStock,              
-      totalAlerts: outOfStock.length + lowStock.length 
-    }));
-  } catch (err) {
-    console.error("Failed to fetch Inventory", err);
-  } finally {
-    setIsLoading(false);
-  }
-};
+  const fetchInventory = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/inventory?t=${new Date().getTime()}`, {
+        method: "GET", headers: { "Cache-Control": "no-cache" },
+      });
+      if (!res.ok) throw new Error("Failed to fetch");
+      const productData: Product[] = await res.json();
+      setProducts(productData);
+      const activeProducts = productData.filter(p => !p.is_archived);
+      const outOfStock = activeProducts.filter(p => p.qty === 0 || p.status?.toLowerCase().includes("out of stock"));
+      const lowStock = activeProducts.filter(p => p.status?.toLowerCase().includes("low stock") && p.qty > 0);
+      setData(prev => ({
+        ...prev,
+        totalProducts: activeProducts.length,
+        outOfStockCount: outOfStock.length,
+        outOfStockItems: outOfStock,
+        lowStockItems: lowStock,
+      }));
+    } catch (err) {
+      console.error("Failed to fetch Inventory", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const fetchInventorySummary = async () => {
     try {
@@ -184,11 +158,8 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
     }
   };
 
-  useEffect(() => {
-    fetchInventory();
-    fetchInventorySummary();
-  }, []);
-  
+  useEffect(() => { fetchInventory(); fetchInventorySummary(); }, []);
+
   useEffect(() => {
     const fetchSuppliers = async () => {
       try {
@@ -211,9 +182,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setActiveMenuId(null);
-      }
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) setActiveMenuId(null);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -226,14 +195,13 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
         const apiData = await response.json();
         setProducts(prev => prev.map(p => p.id === id ? { ...p, is_archived: apiData.is_archived, status: apiData.new_status } : p));
         fetchInventorySummary();
-        const actionMsg = apiData.is_archived ? "Moved to Archive" : "Restored from Archive";
-        handleExportSuccess(actionMsg, 'success');
+        handleExportSuccess(apiData.is_archived ? "Moved to Archive" : "Restored from Archive", 'success');
         setActiveMenuId(null);
       } else {
         const errorData = await response.json();
         handleExportSuccess(`Failed: ${errorData.error}`, "error");
       }
-    } catch (error) {
+    } catch {
       handleExportSuccess("Network error. Is Flask running?", "error");
     }
   };
@@ -259,21 +227,13 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
         setSelectedProduct(fullData);
       } else {
         setSelectedProduct({
-          id: product.id,
-          sku: product.sku || '',
-          itemName: product.item_name || '',
-          brand: product.brand || '',
-          itemDescription: product.item_description || '',
-          qty: product.qty ?? 0,
-          uom: product.uom || 'Select',
-          reorderPoint: (product as any).reorderPoint ?? '',
-          unitPrice: product.unitPrice ?? '',
-          sellingPrice: product.price ?? '',
-          suppliers: (product as any).suppliers || [],
-          supplierName: (product as any).supplierName || '',
-          contactPerson: (product as any).contactPerson || '',
-          contactNumber: (product as any).contactNumber || '',
-          leadTime: (product as any).leadTime ?? '',
+          id: product.id, sku: product.sku || '', itemName: product.item_name || '',
+          brand: product.brand || '', itemDescription: product.item_description || '',
+          qty: product.qty ?? 0, uom: product.uom || 'Select',
+          reorderPoint: (product as any).reorderPoint ?? '', unitPrice: product.unitPrice ?? '',
+          sellingPrice: product.price ?? '', suppliers: (product as any).suppliers || [],
+          supplierName: (product as any).supplierName || '', contactPerson: (product as any).contactPerson || '',
+          contactNumber: (product as any).contactNumber || '', leadTime: (product as any).leadTime ?? '',
           minOrder: (product as any).minOrder ?? '',
         } as any);
       }
@@ -281,22 +241,11 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
     } catch (err) {
       console.error("Error fetching item details:", err);
       setSelectedProduct({
-        id: product.id,
-        sku: product.sku || '',
-        itemName: product.item_name || '',
-        brand: product.brand || '',
-        itemDescription: product.item_description || '',
-        qty: product.qty ?? 0,
-        uom: product.uom || 'Select',
-        reorderPoint: (product as any).reorderPoint ?? '',
-        unitPrice: product.unitPrice ?? '',
-        sellingPrice: product.price ?? '',
-        suppliers: [],
-        supplierName: '',
-        contactPerson: '',
-        contactNumber: '',
-        leadTime: '',
-        minOrder: '',
+        id: product.id, sku: product.sku || '', itemName: product.item_name || '',
+        brand: product.brand || '', itemDescription: product.item_description || '',
+        qty: product.qty ?? 0, uom: product.uom || 'Select',
+        reorderPoint: '', unitPrice: '', sellingPrice: '',
+        suppliers: [], supplierName: '', contactPerson: '', contactNumber: '', leadTime: '', minOrder: '',
       } as any);
       setShowEditModal(true);
     }
@@ -305,81 +254,60 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
   const handleUpdate = async (updatedItem: any) => {
     try {
       const res = await fetch(`/api/inventory/update/${updatedItem.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedItem),
       });
       if (res.ok) {
         setShowEditModal(false);
         handleExportSuccess("Item updated successfully!");
-        await fetchInventory();
-        await fetchInventorySummary(); 
+        await fetchInventory(); await fetchInventorySummary();
       } else {
         const err = await res.json();
         handleExportSuccess(`Error updating: ${err.error}`, 'error');
       }
-    } catch (err) {
-      console.error("Update error:", err);
-    }
+    } catch (err) { console.error("Update error:", err); }
   };
 
   const handleSave = async (items: any[]) => {
     try {
       const formattedItems = items.map(item => ({
-        itemName: item.itemName,
-        brand: item.brand,
-        internalSku: item.internalSku,
-        itemDescription: item.itemDescription,
-        qty: Number(item.qty),
-        uom: item.uom,
-        unitPrice: Number(item.unitPrice),
-        sellingPrice: Number(item.sellingPrice),
-        reorderPoint: Number(item.reorderPoint) || 0,
-        supplierName: item.supplierName || '',
-        leadTime: Number(item.leadTime) || 0,
-        minOrder: Number(item.minOrder) || 0,
+        itemName: item.itemName, brand: item.brand, internalSku: item.internalSku,
+        itemDescription: item.itemDescription, qty: Number(item.qty), uom: item.uom,
+        unitPrice: Number(item.unitPrice), sellingPrice: Number(item.sellingPrice),
+        reorderPoint: Number(item.reorderPoint) || 0, supplierName: item.supplierName || '',
+        leadTime: Number(item.leadTime) || 0, minOrder: Number(item.minOrder) || 0,
       }));
       const res = await fetch("/api/inventory/add", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formattedItems), 
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formattedItems),
       });
       if (res.ok) {
         const result = await res.json();
-        handleExportSuccess(result.message); 
+        handleExportSuccess(result.message);
         setShowModal(false);
-        await fetchInventory();
-        await fetchInventorySummary(); 
+        await fetchInventory(); await fetchInventorySummary();
       } else {
         const err = await res.json();
         handleExportSuccess(`Error: ${err.error}`, 'error');
       }
-    } catch (err) {
-      console.error("Submission error:", err);
-    }
+    } catch (err) { console.error("Submission error:", err); }
   };
 
+  // ── Derived Data ──
   const filteredProducts = products.filter(p => {
     const matchesArchiveView = isArchiveView ? Boolean(p.is_archived) : !p.is_archived;
     const searchStr = `${p.id} ${p.item_name} ${p.brand} ${p.sku}`.toLowerCase();
-    const matchesSearch = searchStr.includes(searchTerm.toLowerCase());
-    return matchesArchiveView && matchesSearch;
+    return matchesArchiveView && searchStr.includes(searchTerm.toLowerCase());
   });
 
   const sortedProducts = useMemo(() => {
     const arr = [...filteredProducts];
-    if (!sortConfig.key || !sortConfig.direction) {
-      return arr.sort((a, b) => Number(a.id) - Number(b.id));
-    }
+    if (!sortConfig.key || !sortConfig.direction) return arr.sort((a, b) => Number(a.id) - Number(b.id));
     const key = sortConfig.key as keyof Product;
     return arr.sort((a, b) => {
-      const A = a[key];
-      const B = b[key];
-      if (typeof A === 'number' && typeof B === 'number') {
-        return sortConfig.direction === 'asc' ? A - B : B - A;
-      }
-      const strA = String(A).toLowerCase();
-      const strB = String(B).toLowerCase();
+      const A = a[key]; const B = b[key];
+      if (typeof A === 'number' && typeof B === 'number') return sortConfig.direction === 'asc' ? A - B : B - A;
+      const strA = String(A).toLowerCase(); const strB = String(B).toLowerCase();
       if (strA < strB) return sortConfig.direction === 'asc' ? -1 : 1;
       if (strA > strB) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
@@ -391,25 +319,17 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
 
   useEffect(() => { setCurrentPage(1); }, [searchTerm]);
 
-  const changePage = (page: number) => {
-    if (page >= 1 && page <= totalPages) setCurrentPage(page);
-  };
+  const changePage = (page: number) => { if (page >= 1 && page <= totalPages) setCurrentPage(page); };
 
   const renderPageNumbers = () => {
     const maxVisiblePages = 5;
     let startPage = Math.max(1, currentPage - 2);
     let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-    if (endPage - startPage + 1 < maxVisiblePages) {
-      startPage = Math.max(1, endPage - maxVisiblePages + 1);
-    }
+    if (endPage - startPage + 1 < maxVisiblePages) startPage = Math.max(1, endPage - maxVisiblePages + 1);
     const pages = [];
     for (let i = startPage; i <= endPage; i++) {
       pages.push(
-        <div
-          key={i}
-          className={`${s.pageCircle} ${currentPage === i ? s.pageCircleActive : ''}`}
-          onClick={() => changePage(i)}
-        >
+        <div key={i} className={`${s.pageCircle} ${currentPage === i ? s.pageCircleActive : ''}`} onClick={() => changePage(i)}>
           {i}
         </div>
       );
@@ -423,7 +343,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
     return s.viewStatusOutOfStock;
   };
 
-  if (isLoading) return <div className={s.loadingContainer}>Loading Inventory...</div>; 
+  if (isLoading) return <div className={s.loadingContainer}>Loading Inventory...</div>;
 
   return (
     <div className={s.container}>
@@ -440,9 +360,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
             <div className={s.alertBody}>
               <h2 className={s.alertTitle}>{isError ? 'Oops!' : 'Success!'}</h2>
               <p className={s.alertMessage}>{toastMessage}</p>
-              <button className={`${s.okButton} ${isError ? s.okButtonError : ''}`} onClick={() => setShowToast(false)}>
-                OK
-              </button>
+              <button className={`${s.okButton} ${isError ? s.okButtonError : ''}`} onClick={() => setShowToast(false)}>OK</button>
             </div>
           </div>
         </div>
@@ -450,7 +368,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
 
       <div className={s.mainContent}>
 
-        {/* ── HEADER ROW: Title + Export ── */}
+        {/* ── Header ── */}
         <div className={s.headerActions} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#164163', margin: 0 }}>INVENTORY</h1>
@@ -470,8 +388,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
                 style={{
                   display: 'flex', alignItems: 'center', gap: '8px',
                   backgroundColor: '#475569', color: 'white', padding: '8px 18px',
-                  borderRadius: '6px', border: 'none', cursor: 'pointer',
-                  fontWeight: 500, fontSize: '0.9rem',
+                  borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 500, fontSize: '0.9rem',
                 }}
               >
                 Request Export
@@ -480,6 +397,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
           </div>
         </div>
 
+        {/* ── Stat Cards ── */}
         <div className={s.topGrid}>
           <section className={s.statCard}>
             <p className={s.cardTitle}>Total Products</p>
@@ -493,84 +411,44 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
           <section className={s.statCard}>
             <p className={s.cardTitle}>Inventory Report</p>
             <div className={s.list}>
-              <div className={`${s.listRow} ${s.altRow}`}>
-                <span>Weekly</span><span className={s.green}>{data.weeklyInventory.toLocaleString()}</span>
-              </div>
-              <div className={s.listRow}>
-                <span>Monthly</span><span className={s.red}>{data.monthlyInventory.toLocaleString()}</span>
-              </div>
-              <div className={`${s.listRow} ${s.altRow}`}>
-                <span>Yearly</span><span className={s.blue}>{data.yearlyInventory.toLocaleString()}</span>
-              </div>
+              <div className={`${s.listRow} ${s.altRow}`}><span>Weekly</span><span className={s.green}>{data.weeklyInventory.toLocaleString()}</span></div>
+              <div className={s.listRow}><span>Monthly</span><span className={s.red}>{data.monthlyInventory.toLocaleString()}</span></div>
+              <div className={`${s.listRow} ${s.altRow}`}><span>Yearly</span><span className={s.blue}>{data.yearlyInventory.toLocaleString()}</span></div>
             </div>
           </section>
 
-         <section className={s.statCard}>
-  <div style={{ 
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center',
-    marginBottom: '15px' 
-  }}>
-    <p className={s.cardTitle} style={{ margin: 0 }}>Stock Alerts</p>
-    
-    {/* Dynamic Total Count (41) */}
-    <span style={{ 
-      fontSize: '0.9rem', 
-      fontWeight: 700, 
-      color: '#64748b',
-      backgroundColor: '#f1f5f9',
-      padding: '2px 8px',
-      borderRadius: '6px'
-    }}>
-      { (data.outOfStockItems?.length || 0) + (data.lowStockItems?.length || 0) } Total
-    </span>
-  </div>
-  
-  {/* Increased height to 220px to fit more of the 41 items */}
-  <div className={s.scrollContainer} style={{ height: '100px', overflowY: 'auto' }}>
-    
-    {/* OUT OF STOCK SECTION */}
-    {data.outOfStockItems?.map((item) => (
-      <div key={`out-${item.id}`} className={s.pillRed} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-        {/* Brand distinction added here */}
-        <span>{item.item_name} {item.brand ? `(${item.brand})` : ''}</span>
-        <span style={{ fontWeight: 800 }}>
-          {item.qty} {(item.uom || 'PCS').toUpperCase()}
-        </span>
-      </div>
-    ))}
-
-    {/* LOW STOCK SECTION */}
-    {data.lowStockItems?.map((item) => (
-      <div key={`low-${item.id}`} className={s.pillYellow} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-        {/* Brand distinction added here */}
-        <span>{item.item_name} {item.brand ? `(${item.brand})` : ''}</span>
-        <span style={{ fontWeight: 800 }}>
-          {item.qty} {(item.uom || 'PCS').toUpperCase()}
-        </span>
-      </div>
-    ))}
-  </div>
-</section>
+          <section className={s.statCard}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+              <p className={s.cardTitle} style={{ margin: 0 }}>Stock Alerts</p>
+              <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#64748b', backgroundColor: '#f1f5f9', padding: '2px 8px', borderRadius: '6px' }}>
+                {(data.outOfStockItems?.length || 0) + (data.lowStockItems?.length || 0)} Total
+              </span>
+            </div>
+            <div className={s.scrollContainer} style={{ height: '100px', overflowY: 'auto' }}>
+              {data.outOfStockItems?.map(item => (
+                <div key={`out-${item.id}`} className={s.pillRed} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span>{item.item_name} {item.brand ? `(${item.brand})` : ''}</span>
+                  <span style={{ fontWeight: 800 }}>{item.qty} {(item.uom || 'PCS').toUpperCase()}</span>
+                </div>
+              ))}
+              {data.lowStockItems?.map(item => (
+                <div key={`low-${item.id}`} className={s.pillYellow} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span>{item.item_name} {item.brand ? `(${item.brand})` : ''}</span>
+                  <span style={{ fontWeight: 800 }}>{item.qty} {(item.uom || 'PCS').toUpperCase()}</span>
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
 
         {isArchiveView ? (
-          <ArchiveTable 
-            products={products} 
-            onRestore={handleToggleArchive} 
-            onBack={() => setIsArchiveView(false)} 
-          />
+          <ArchiveTable products={products} onRestore={handleToggleArchive} onBack={() => setIsArchiveView(false)} />
         ) : (
           <div className={s.tableContainer}>
             <div className={s.header}>
               <h1 className={s.title}>Product List</h1>
               <div className={s.controls}>
-                <button 
-                  className={s.archiveIconBtn} 
-                  onClick={() => setIsArchiveView(true)} 
-                  title="View Archives"
-                >
+                <button className={s.archiveIconBtn} onClick={() => setIsArchiveView(true)} title="View Archives">
                   <LuArchive size={20} />
                 </button>
                 <div className={s.searchWrapper}>
@@ -588,16 +466,11 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
                 <thead>
                   <tr>
                     {[
-                      { label: 'ID', key: 'id' },
-                      { label: 'ITEM', key: 'item_name' },
-                      { label: 'DESCRIPTION', key: 'item_description' },
-                      { label: 'SKU', key: 'sku' },
-                      { label: 'BRAND', key: 'brand' },
-                      { label: 'QTY', key: 'qty' },
-                      { label: 'UOM', key: 'uom' },
-                      { label: 'UNIT PRICE', key: 'unitPrice' },
-                      { label: 'PRICE', key: 'price' },
-                      { label: 'STATUS', key: 'status' },
+                      { label: 'ID', key: 'id' }, { label: 'ITEM', key: 'item_name' },
+                      { label: 'DESCRIPTION', key: 'item_description' }, { label: 'SKU', key: 'sku' },
+                      { label: 'BRAND', key: 'brand' }, { label: 'QTY', key: 'qty' },
+                      { label: 'UOM', key: 'uom' }, { label: 'UNIT PRICE', key: 'unitPrice' },
+                      { label: 'PRICE', key: 'price' }, { label: 'STATUS', key: 'status' },
                     ].map(col => (
                       <th key={col.key} onClick={() => requestSort(col.key as keyof Product)}>
                         <div className={s.sortableHeader}>
@@ -628,28 +501,22 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
                         <span className={
                           p.status.includes("Available") ? s.pillGreen
                           : p.status.includes("Low Stock") ? s.pillYellow
-                          : p.status.includes("Out of Stock") ? s.pillRed
-                          : ""
+                          : p.status.includes("Out of Stock") ? s.pillRed : ""
                         }>
                           {p.status}
                         </span>
                       </td>
                       <td className={s.actionCell} onClick={e => e.stopPropagation()}>
-                        <LuEllipsisVertical
-                          className={s.moreIcon}
-                          onClick={() => setActiveMenuId(activeMenuId === p.id ? null : p.id)}
-                        />
+                        <LuEllipsisVertical className={s.moreIcon} onClick={() => setActiveMenuId(activeMenuId === p.id ? null : p.id)} />
                         {activeMenuId === p.id && (
                           <div className={s.popoverMenu} ref={menuRef}>
                             {canModify ? (
                               <>
-                                <button className={s.popEditBtn} onClick={(e) => { e.stopPropagation(); handleEditClick(p); }}><LuPencil size={12}/> Edit</button>
-                                <button className={s.popArchiveBtn} onClick={(e) => { e.stopPropagation(); handleToggleArchive(p.id); }}><LuArchive size={12}/> Archive</button>
+                                <button className={s.popEditBtn} onClick={e => { e.stopPropagation(); handleEditClick(p); }}><LuPencil size={12}/> Edit</button>
+                                <button className={s.popArchiveBtn} onClick={e => { e.stopPropagation(); handleToggleArchive(p.id); }}><LuArchive size={12}/> Archive</button>
                               </>
                             ) : (
-                              <span style={{ padding: '8px 12px', color: '#94a3b8', fontSize: '0.85rem' }}>
-                                View only
-                              </span>
+                              <span style={{ padding: '8px 12px', color: '#94a3b8', fontSize: '0.85rem' }}>View only</span>
                             )}
                           </div>
                         )}
@@ -676,49 +543,37 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
             </div>
           </div>
         )}
-
-      </div> {/* closes mainContent */}
+      </div>
 
       <ExportModal isOpen={showExportModal} onClose={() => setShowExportModal(false)} onSuccess={handleExportSuccess} data={products.filter(p => !p.is_archived)} summary={data} />
 
+      {/* ✅ FIX: pass type through so errors show red toast */}
       <ExportRequestModal
         isOpen={showExportRequestModal}
         onClose={() => setShowExportRequestModal(false)}
         targetModule="Inventory"
         requesterId={employeeId}
-        onSuccess={(msg) => handleExportSuccess(msg, 'success')}
+        onSuccess={(msg, type) => handleExportSuccess(msg, type)}
       />
 
-      <AddInventoryModal 
+      <AddInventoryModal
         isOpen={showModal}
         onClose={() => { setShowModal(false); setDefaultSupplierName(''); }}
         onSave={handleSave}
         onOpenSupplierModal={() => setShowSupplierModal(true)}
-        suppliers={suppliers}
-        uoms={uoms}
-        existingProducts={products}
-        defaultSupplierName={defaultSupplierName}
+        suppliers={suppliers} uoms={uoms} existingProducts={products} defaultSupplierName={defaultSupplierName}
       />
 
-      <EditInventoryModal 
-        isOpen={showEditModal}
-        onClose={() => setShowEditModal(false)}
-        itemData={selectedProduct}
-        onSave={handleUpdate}
-        suppliers={suppliers} 
-        uoms={uoms}
-        existingProducts={products}
+      <EditInventoryModal
+        isOpen={showEditModal} onClose={() => setShowEditModal(false)}
+        itemData={selectedProduct} onSave={handleUpdate}
+        suppliers={suppliers} uoms={uoms} existingProducts={products}
       />
 
       <AddSupplierModal
         isOpen={showSupplierModal}
         onClose={() => setShowSupplierModal(false)}
-        onSuccess={(msg) => {
-          setToastMessage(msg);
-          setIsError(false);
-          setShowToast(true);
-          setShowSupplierModal(false);
-        }}
+        onSuccess={msg => { setToastMessage(msg); setIsError(false); setShowToast(true); setShowSupplierModal(false); }}
         existingSuppliers={suppliers}
       />
 
@@ -728,36 +583,20 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
             <div className={s.viewModalHeader}>
               <div className={s.viewModalHeaderLeft}>
                 <h2 className={s.viewItemName}>{viewProduct.item_name}</h2>
-                <p className={s.viewItemSubtitle}>
-                  {viewProduct.id}&nbsp;•&nbsp;SKU: {viewProduct.sku || '—'}
-                </p>
+                <p className={s.viewItemSubtitle}>{viewProduct.id}&nbsp;•&nbsp;SKU: {viewProduct.sku || '—'}</p>
               </div>
               <div className={s.viewModalHeaderRight}>
-                <span className={getStatusClass(viewProduct.status)}>
-                  {viewProduct.status}
-                </span>
-                <button className={s.viewCloseBtn} onClick={() => setShowViewModal(false)}>
-                  <LuX size={20} />
-                </button>
+                <span className={getStatusClass(viewProduct.status)}>{viewProduct.status}</span>
+                <button className={s.viewCloseBtn} onClick={() => setShowViewModal(false)}><LuX size={20} /></button>
               </div>
             </div>
-
             <div className={s.viewBody}>
               <div className={s.viewSection}>
                 <p className={s.viewSectionTitle}>PRODUCT DETAILS</p>
                 <div className={s.viewSectionGrid}>
-                  <div>
-                    <p className={s.viewFieldLabel}>Brand</p>
-                    <p className={s.viewFieldValue}>{viewProduct.brand || '—'}</p>
-                  </div>
-                  <div>
-                    <p className={s.viewFieldLabel}>SKU</p>
-                    <p className={s.viewFieldValueMono}>{viewProduct.sku || '—'}</p>
-                  </div>
-                  <div>
-                    <p className={s.viewFieldLabel}>Unit (UOM)</p>
-                    <p className={s.viewFieldValue}>{viewProduct.uom || '—'}</p>
-                  </div>
+                  <div><p className={s.viewFieldLabel}>Brand</p><p className={s.viewFieldValue}>{viewProduct.brand || '—'}</p></div>
+                  <div><p className={s.viewFieldLabel}>SKU</p><p className={s.viewFieldValueMono}>{viewProduct.sku || '—'}</p></div>
+                  <div><p className={s.viewFieldLabel}>Unit (UOM)</p><p className={s.viewFieldValue}>{viewProduct.uom || '—'}</p></div>
                 </div>
                 {viewProduct.item_description && (
                   <div className={s.viewDescriptionRow}>
@@ -766,16 +605,8 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
                   </div>
                 )}
               </div>
-
               <table className={s.viewItemsTable}>
-                <thead>
-                  <tr>
-                    <th>ITEM</th>
-                    <th>QTY</th>
-                    <th>UNIT COST</th>
-                    <th>SELLING PRICE</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>ITEM</th><th>QTY</th><th>UNIT COST</th><th>SELLING PRICE</th></tr></thead>
                 <tbody>
                   <tr>
                     <td>

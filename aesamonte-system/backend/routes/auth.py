@@ -17,14 +17,15 @@ auth_bp = Blueprint('auth', __name__)
 
 SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "aesamonte_rbac_secret_2025")
 
-SEMAPHORE_API_KEY    = os.environ.get("SEMAPHORE_API_KEY", "")
-SEMAPHORE_SENDER     = os.environ.get("SEMAPHORE_SENDER_NAME", "AESAMONTE")
+SEMAPHORE_API_KEY = os.environ.get("SEMAPHORE_API_KEY", "")
+SEMAPHORE_SENDER  = os.environ.get("SEMAPHORE_SENDER_NAME", "AESAMONTE")
 
 GMAIL_USER     = os.environ.get("GMAIL_USER", "")
 GMAIL_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "")
 
 # In-memory OTP store: { employee_id: { "otp": "123456", "expires_at": <timestamp> } }
 _otp_store: dict = {}
+
 
 def _build_trust_token(employee_id: int) -> str:
     """7-day device trust token — lets user skip 2FA OTP on this browser."""
@@ -58,7 +59,7 @@ def _build_token_response(user: dict) -> dict:
     payload = {
         "employee_id":   user['employee_id'],
         "role_id":       user['role_id'],
-        "role_name":     user['role_name'],
+        "role_name":     user['role_name'],  
         "employee_name": user.get('employee_name', ''),
         "permissions":   permissions,
         "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=8),
@@ -67,7 +68,7 @@ def _build_token_response(user: dict) -> dict:
     return {
         "status":        "success",
         "token":         token,
-        "role":          user['role_name'],
+        "role":          user['role_name'],  
         "employee_name": user.get('employee_name', ''),
         "employee_id":   user['employee_id'],
         "permissions":   permissions,
@@ -124,7 +125,6 @@ def login():
 
         # ── 2FA path ──
         if user.get('two_fa_enabled'):
-            # Check if this browser has a valid 7-day trust token
             device_trust_token = (data.get('device_trust_token') or '').strip()
             if device_trust_token and _verify_trust_token(device_trust_token, employee_id):
                 return jsonify(_build_token_response(user)), 200
@@ -209,42 +209,29 @@ def send_otp():
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         if method == 'sms':
-            cur.execute(
-                "SELECT employee_id, employee_contact FROM employee WHERE employee_id = %s",
-                (employee_id,)
-            )
+            cur.execute("SELECT employee_id, employee_contact FROM employee WHERE employee_id = %s", (employee_id,))
             employee = cur.fetchone()
             if not employee:
                 return jsonify({"status": "error", "message": "Employee ID not found."}), 404
 
-            # Normalize both numbers: strip spaces, dashes, and leading country code for comparison
             def normalize(num):
                 return ''.join(filter(str.isdigit, num or ''))[-10:]
 
             if normalize(employee['employee_contact']) != normalize(contact):
                 return jsonify({"status": "error", "message": "Contact number does not match our records."}), 400
 
-            # Generate 6-digit OTP
             otp_code = str(random.randint(100000, 999999))
-            _otp_store[str(employee_id)] = {
-                "otp": otp_code,
-                "expires_at": time.time() + 120,  # 2 minutes
-            }
+            _otp_store[str(employee_id)] = {"otp": otp_code, "expires_at": time.time() + 120}
 
-            # Normalize to +63 format for Semaphore
             digits = ''.join(filter(str.isdigit, contact))
-            if digits.startswith('0'):
-                digits = '63' + digits[1:]
-            if not digits.startswith('63'):
-                digits = '63' + digits
-            formatted_number = digits  # Semaphore accepts without leading +
+            if digits.startswith('0'): digits = '63' + digits[1:]
+            if not digits.startswith('63'): digits = '63' + digits
 
             try:
                 resp = http_requests.post(
                     "https://api.semaphore.co/api/v4/messages",
                     data={
-                        "apikey": SEMAPHORE_API_KEY,
-                        "number": formatted_number,
+                        "apikey": SEMAPHORE_API_KEY, "number": digits,
                         "message": f"Your AE Samonte verification code is: {otp_code}. It expires in 2 minutes.",
                         "sendername": SEMAPHORE_SENDER,
                     },
@@ -259,10 +246,7 @@ def send_otp():
             return jsonify({"status": "success", "message": "OTP sent via SMS."}), 200
 
         if method == 'email':
-            cur.execute(
-                "SELECT employee_id, employee_email FROM employee WHERE employee_id = %s",
-                (employee_id,)
-            )
+            cur.execute("SELECT employee_id, employee_email FROM employee WHERE employee_id = %s", (employee_id,))
             employee = cur.fetchone()
             if not employee:
                 return jsonify({"status": "error", "message": "Employee ID not found."}), 404
@@ -271,17 +255,13 @@ def send_otp():
                 return jsonify({"status": "error", "message": "Email address does not match our records."}), 400
 
             otp_code = str(random.randint(100000, 999999))
-            _otp_store[str(employee_id)] = {
-                "otp": otp_code,
-                "expires_at": time.time() + 120,
-            }
+            _otp_store[str(employee_id)] = {"otp": otp_code, "expires_at": time.time() + 120}
 
             try:
                 msg = MIMEMultipart("alternative")
                 msg["Subject"] = "AE Samonte – Your Verification Code"
                 msg["From"] = GMAIL_USER
                 msg["To"] = contact
-
                 html_body = f"""
                 <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e0e0e0;border-radius:8px;">
                   <h2 style="color:#b91c1c;">AE Samonte System</h2>
@@ -291,7 +271,6 @@ def send_otp():
                 </div>
                 """
                 msg.attach(MIMEText(html_body, "html"))
-
                 with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
                     server.login(GMAIL_USER, GMAIL_PASSWORD)
                     server.sendmail(GMAIL_USER, contact, msg.as_string())
@@ -310,9 +289,9 @@ def send_otp():
 @auth_bp.route('/verify-otp', methods=['POST'])
 def verify_otp():
     data = request.json
-    otp_input = data.get('otp', '').strip()
+    otp_input   = data.get('otp', '').strip()
     employee_id = str(data.get('employeeId', ''))
-    method = data.get('method')
+    method      = data.get('method')
 
     if method in ('sms', 'email'):
         record = _otp_store.get(employee_id)
@@ -323,7 +302,6 @@ def verify_otp():
             return jsonify({"status": "error", "message": "OTP has expired. Please request a new one."}), 400
         if otp_input != record['otp']:
             return jsonify({"status": "error", "message": "Invalid OTP. Please try again."}), 400
-
         _otp_store.pop(employee_id, None)
         return jsonify({"status": "success", "message": "OTP verified."}), 200
 
@@ -360,7 +338,6 @@ def reset_password():
             msg["Subject"] = "AE Samonte – Your Temporary Password"
             msg["From"] = GMAIL_USER
             msg["To"] = email
-
             html_body = f"""
             <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e0e0e0;border-radius:8px;">
               <h2 style="color:#b91c1c;">AE Samonte System</h2>
@@ -371,7 +348,6 @@ def reset_password():
             </div>
             """
             msg.attach(MIMEText(html_body, "html"))
-
             with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
                 server.login(GMAIL_USER, GMAIL_PASSWORD)
                 server.sendmail(GMAIL_USER, email, msg.as_string())
@@ -431,20 +407,14 @@ def update_profile():
 
     data = request.json or {}
     contact        = data.get('contact', '').strip()
-    two_fa_enabled = data.get('two_fa_enabled')   # boolean or None (omitted = don't change)
+    two_fa_enabled = data.get('two_fa_enabled')
 
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute(
-            "UPDATE employee SET employee_contact = %s WHERE employee_id = %s",
-            (contact, employee_id)
-        )
+        cur.execute("UPDATE employee SET employee_contact = %s WHERE employee_id = %s", (contact, employee_id))
         if two_fa_enabled is not None:
-            cur.execute(
-                "UPDATE employee SET two_fa_enabled = %s WHERE employee_id = %s",
-                (bool(two_fa_enabled), employee_id)
-            )
+            cur.execute("UPDATE employee SET two_fa_enabled = %s WHERE employee_id = %s", (bool(two_fa_enabled), employee_id))
         conn.commit()
         return jsonify({"status": "success"}), 200
     except Exception as e:
@@ -458,13 +428,12 @@ def update_profile():
 @auth_bp.route('/change-password', methods=['POST'])
 def change_password():
     data = request.json
-    employee_id = data.get('employeeId')
+    employee_id      = data.get('employeeId')
     current_password = data.get('currentPassword', '')
-    new_password = data.get('newPassword', '')
+    new_password     = data.get('newPassword', '')
 
     if not employee_id or not current_password or not new_password:
         return jsonify({"status": "error", "message": "All fields are required."}), 400
-
     if len(new_password) < 6:
         return jsonify({"status": "error", "message": "New password must be at least 6 characters."}), 400
 
@@ -475,15 +444,12 @@ def change_password():
         row = cur.fetchone()
         if not row:
             return jsonify({"status": "error", "message": "Employee not found."}), 404
-
         if not bcrypt.checkpw(current_password.encode("utf-8"), row['employee_password'].encode("utf-8")):
             return jsonify({"status": "error", "message": "Current password is incorrect."}), 400
-
         hashed = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
         cur.execute("UPDATE employee SET employee_password = %s WHERE employee_id = %s", (hashed, employee_id))
         conn.commit()
         return jsonify({"status": "success", "message": "Password changed successfully."}), 200
-
     except Exception as e:
         conn.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
