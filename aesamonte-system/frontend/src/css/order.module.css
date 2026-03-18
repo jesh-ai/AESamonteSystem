@@ -24,6 +24,7 @@
   gap: 1.25rem;
 }
 
+/* Card centers content but footer always spans full width */
 .statCard {
   background: #ffffff;
   border-radius: 12px;
@@ -31,6 +32,22 @@
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
+  align-items: center;
+  text-align: center;
+  justify-content: center; 
+  gap: 0.5rem;
+}
+
+.statCardSpaced {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.5rem;
   justify-content: space-between;
 }
 
@@ -38,6 +55,8 @@
   font-size: 0.95rem;
   font-weight: 600;
   color: #0f172a;
+  width: 100%;
+  text-align: center;
 }
 
 .bigNumber {
@@ -45,6 +64,114 @@
   font-weight: 700;
   color: #164163;
   line-height: 1.1;
+}
+
+/* ── Per-card number colors ── */
+.bigNumberGreen {
+  font-size: 2.75rem;
+  font-weight: 700;
+  color: #164163;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.bigNumberRed {
+  font-size: 2.75rem;
+  font-weight: 700;
+  color: #dc2626;
+  line-height: 1.1;
+}
+
+.bigNumberGold {
+  font-size: 2.75rem;
+  font-weight: 700;
+  color: #f3ca29;
+  line-height: 1.1;
+}
+
+/* ── Card footer — always full width regardless of card centering ── */
+.cardFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+  padding-top: 8px;
+  width: 100%;           /* key: overrides align-items: center from parent */
+  align-self: stretch;   /* key: stretches to full card width */
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.cardSubtext {
+  font-size: 0.78rem;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+/* ── Growth badge ── */
+.growthBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: #dcfce7;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.growthBadgeNegative {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1024px) {
+  .topGrid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+  .bigNumber,
+  .bigNumberGreen,
+  .bigNumberRed,
+  .bigNumberGold {
+    font-size: 2.25rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .topGrid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  .statCard {
+    padding: 1.25rem;
+  }
+  .bigNumber,
+  .bigNumberGreen,
+  .bigNumberRed,
+  .bigNumberGold {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .bigNumber,
+  .bigNumberGreen,
+  .bigNumberRed,
+  .bigNumberGold {
+    font-size: 1.75rem;
+  }
+  .cardTitle {
+    font-size: 0.85rem;
+  }
 }
 
 /* ===== TABLE CONTAINER ===== */
@@ -531,7 +658,7 @@ th.actionHeader .sortHeaderInner {
   color: white;
   border: none;
   padding: 5px 14px;
-  border-radius: 8px;
+  border-radius: 20px;
   cursor: pointer;
   font-weight: 600;
   font-size: 0.75rem;
@@ -921,49 +1048,24 @@ th.actionHeader .sortHeaderInner {
 }
 
 .viewStatusPreparing {
-  padding: 3px 14px; 
-  border-radius: 20px; 
-  font-size: 11px; 
-  font-weight: 600;
-  border: 1.5px solid #3b82f6; 
-  color: #1d4ed8; 
-  background: #eff6ff;
+  padding: 3px 14px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  border: 1.5px solid #3b82f6; color: #1d4ed8; background: #eff6ff;
 }
 .viewStatusToShip {
-  padding: 3px 14px; 
-  border-radius: 20px; 
-  font-size: 11px; 
-  font-weight: 600;
-  border: 1.5px solid #f59e0b; 
-  color: #b45309; 
-  background: #fffbeb;
+  padding: 3px 14px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  border: 1.5px solid #f59e0b; color: #b45309; background: #fffbeb;
 }
 .viewStatusReceived {
-  padding: 3px 14px; 
-  border-radius: 20px; 
-  font-size: 11px; 
-  font-weight: 600;
-  border: 1.5px solid #22c55e; 
-  color: #15803d; 
-  background: #f0fdf4;
+  padding: 3px 14px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  border: 1.5px solid #22c55e; color: #15803d; background: #f0fdf4;
 }
 .viewStatusCancelled {
-  padding: 3px 14px; 
-  border-radius: 20px; 
-  font-size: 11px; 
-  font-weight: 600;
-  border: 1.5px solid #ef4444; 
-  color: #b91c1c; 
-  background: #fef2f2;
+  padding: 3px 14px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  border: 1.5px solid #ef4444; color: #b91c1c; background: #fef2f2;
 }
 .viewStatusDefault {
-  padding: 3px 14px; 
-  border-radius: 20px; 
-  font-size: 11px; 
-  font-weight: 600;
-  border: 1.5px solid #94a3b8; 
-  color: #475569; 
-  background: #f8fafc;
+  padding: 3px 14px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  border: 1.5px solid #94a3b8; color: #475569; background: #f8fafc;
 }
 
 .viewPrintBody { padding: 0 24px; }
@@ -990,86 +1092,41 @@ th.actionHeader .sortHeaderInner {
   gap: 12px;
 }
 
-.viewInfoLabel { 
-  font-size: 11px; 
-  color: #94a3b8; 
-  margin: 0 0 2px; 
-}
-.viewInfoValue { 
-  font-size: 13px; 
-  font-weight: 600; 
-  color: #1e293b; 
-  margin: 0; 
-}
+.viewInfoLabel { font-size: 11px; color: #94a3b8; margin: 0 0 2px; }
+.viewInfoValue { font-size: 13px; font-weight: 600; color: #1e293b; margin: 0; }
 
-.viewItemsTable { 
-  width: 100%; 
-  border-collapse: collapse; 
-  margin: 4px 0 12px; 
-}
+.viewItemsTable { width: 100%; border-collapse: collapse; margin: 4px 0 12px; }
 
 .viewItemsTable thead th {
-  font-size: 11px; 
-  color: #64748b; 
-  padding: 8px;
-  border-bottom: 1px solid #e2e8f0; 
-  text-transform: uppercase;
-  letter-spacing: 0.04em; 
-  font-weight: 600; 
-  text-align: right;
+  font-size: 11px; color: #64748b; padding: 8px;
+  border-bottom: 1px solid #e2e8f0; text-transform: uppercase;
+  letter-spacing: 0.04em; font-weight: 600; text-align: right;
 }
-.viewItemsTable thead th:first-child { 
-  text-align: left; 
-}
+.viewItemsTable thead th:first-child { text-align: left; }
 
 .viewItemsTable tbody td {
-  padding: 10px 8px; 
-  border-bottom: 1px solid #f1f5f9;
-  font-size: 13px; 
-  color: #334155; 
-  text-align: right;
+  padding: 10px 8px; border-bottom: 1px solid #f1f5f9;
+  font-size: 13px; color: #334155; text-align: right;
 }
 .viewItemsTable tbody td:first-child { text-align: left; }
 
 .viewItemName { margin: 0; }
-.viewItemStatus { 
-  font-size: 11px; 
-  color: #94a3b8; 
-  margin-top: 2px; 
-}
-.viewEmptyRow td { 
-  padding: 20px 8px; 
-  text-align: center; 
-  color: #94a3b8; 
-  font-size: 13px; 
-}
+.viewItemStatus { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+.viewEmptyRow td { padding: 20px 8px; text-align: center; color: #94a3b8; font-size: 13px; }
 
-.viewTotalsWrapper { 
-  display: flex; 
-  justify-content: flex-end; 
-  margin-bottom: 8px; 
-}
-.viewTotalsBox { 
-  width: 220px; 
-}
+.viewTotalsWrapper { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.viewTotalsBox { width: 220px; }
 
 .viewTotalLine {
-  display: flex; 
-  justify-content: space-between;
-  padding: 4px 0; 
-  font-size: 13px; 
-  color: #64748b;
+  display: flex; justify-content: space-between;
+  padding: 4px 0; font-size: 13px; color: #64748b;
 }
 
 .viewTotalFinal {
-  display: flex; 
-  justify-content: space-between;
-  padding: 10px 0 0; 
-  margin-top: 6px;
+  display: flex; justify-content: space-between;
+  padding: 10px 0 0; margin-top: 6px;
   border-top: 1.5px solid #1e293b;
-  font-size: 16px; 
-  font-weight: 700; 
-  color: #0f172a;
+  font-size: 16px; font-weight: 700; color: #0f172a;
 }
 
 .viewModalFooter {
@@ -1698,10 +1755,11 @@ th.actionHeader .sortHeaderInner {
   width: 52px;
   height: 52px;
   border-radius: 50%;
+  background-color: #fef3c7;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2.5rem;
+  font-size: 1.5rem;
 }
 
 .confirmTextWrap {

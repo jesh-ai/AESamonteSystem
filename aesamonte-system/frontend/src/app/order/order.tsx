@@ -31,8 +31,8 @@ export type Order = {
 };
 
 type Summary = {
-  shippedToday: { current: number; total: number; yesterday: number };
-  cancelled: { current: number; yesterday: number };
+  shippedToday: { current: number; total: number};
+  cancelled: { current: number};
   totalOrders: { count: number; growth: number };
 };
 
@@ -472,12 +472,49 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
           </div>
         </div>
 
-        <div className={s.topGrid}>
-          <section className={s.statCard}><p className={s.cardTitle}>Shipped Today</p><h2 className={s.bigNumber}>{summary ? `${summary.shippedToday.current}/${summary.shippedToday.total}` : '—'}</h2></section>
-          <section className={s.statCard}><p className={s.cardTitle}>Orders Cancelled</p><h2 className={s.bigNumber}>{summary ? summary.cancelled.current : '—'}</h2></section>
-          <section className={s.statCard}><p className={s.cardTitle}>Total Orders</p><h2 className={s.bigNumber}>{summary ? summary.totalOrders.count.toLocaleString() : '—'}</h2></section>
-        </div>
+<div className={s.topGrid}>
 
+          {/* ── Shipped Today ── */}
+            <section className={s.statCard}>
+              <p className={s.cardTitle}>Shipped Today</p>
+              <h2 className={s.bigNumberGreen}>
+                <svg width="36" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
+                  <rect x="1" y="3" width="15" height="13" rx="1"/>
+                  <path d="M16 8h4l3 5v4h-7V8z"/>
+                  <circle cx="5.5" cy="18.5" r="2.5"/>
+                  <circle cx="18.5" cy="18.5" r="2.5"/>
+                </svg>
+                <span style={{ color: "#16a34a" }}>{summary ? summary.shippedToday.current : '—'}</span>
+                {summary && <span style={{ color: "#164163" }}>/{summary.shippedToday.total}</span>}
+              </h2>
+            </section>
+
+            {/* ── Orders Cancelled ── */}
+            <section className={s.statCard}>
+              <p className={s.cardTitle}>Orders Cancelled</p>
+              <h2 className={s.bigNumberRed}>
+                {summary ? summary.cancelled.current : '—'}
+              </h2>
+            </section>
+
+          {/* ── Total Orders ── */}
+          <section className={s.statCardSpaced}>
+            <p className={s.cardTitle}>Total Orders</p>
+            <h2 className={s.bigNumberGold}>
+              {summary ? summary.totalOrders.count.toLocaleString() : '—'}
+            </h2>
+            <div className={s.cardFooter}>
+              <span className={s.cardSubtext}>vs last month</span>
+              {summary && summary.totalOrders.growth != null && (
+                <span className={summary.totalOrders.growth >= 0 ? s.growthBadge : s.growthBadgeNegative}>
+                  {summary.totalOrders.growth >= 0 ? '↗' : '↘'} {Math.abs(summary.totalOrders.growth)}%
+                </span>
+              )}
+            </div>
+          </section>
+
+        </div>
+        
         {isArchiveView ? (
           <ArchiveTable orders={orders} onRestore={handleToggleArchive} onBack={() => setIsArchiveView(false)} />
         ) : (

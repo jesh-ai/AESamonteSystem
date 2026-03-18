@@ -31,10 +31,8 @@ def orders_summary():
             return cur.fetchone()[0]
 
         shipped_today = count_orders("RECEIVED", today)
-        shipped_yesterday = count_orders("RECEIVED", yesterday)
         total_shipped = count_orders("RECEIVED")
         cancelled_today = count_orders("CANCELLED", today)
-        cancelled_yesterday = count_orders("CANCELLED", yesterday)
 
         cur.execute("SELECT COUNT(*) FROM order_transaction")
         total_orders = cur.fetchone()[0]
@@ -43,11 +41,9 @@ def orders_summary():
             "shippedToday": {
                 "current": shipped_today,
                 "total": total_shipped,
-                "yesterday": shipped_yesterday
             },
             "cancelled": {
                 "current": cancelled_today,
-                "yesterday": cancelled_yesterday
             },
             "totalOrders": {
                 "count": total_orders,
