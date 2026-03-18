@@ -37,18 +37,18 @@ interface TransactionItem {
 }
 
 interface SalesProps {
-  role?: string; department?: string | null; employeeId?: number
+  role?: string; employeeId?: number
   onLogout: () => void; initialSearch?: string
 }
 
-export default function SalesPage({ role = 'Admin', department, employeeId = 0, onLogout, initialSearch }: SalesProps) {
+export default function SalesPage({ role = 'Admin', employeeId = 0, onLogout, initialSearch }: SalesProps) {
   const s = styles as Record<string, string>
 
   // ── Permission Logic ──
-  const isSalesHead       = role === 'Sales Head';
-  const isInventoryHead   = role === 'Inventory Head';
-  const canExport         = ['Admin', 'Manager'].includes(role);
-  const mustRequestExport = role === 'Staff' || isInventoryHead;
+ const isSalesHead       = role === 'Sales Head';
+const isInventoryHead   = role === 'Inventory Head';
+const canExport         = ['Admin', 'Manager'].includes(role) || isSalesHead;
+const mustRequestExport = isInventoryHead || role === 'Staff';
 
   // ── State ──
   const [showExportRequestModal, setShowExportRequestModal] = useState(false)

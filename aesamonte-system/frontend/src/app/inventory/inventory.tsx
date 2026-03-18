@@ -30,7 +30,6 @@ import {
 
 interface InventoryProps {
   role: string;
-  department?: string | null;
   employeeId?: number;
   onLogout: () => void;
   initialSearch?: string;
@@ -101,14 +100,14 @@ const ROWS_PER_PAGE = 10;
 
 const displayBrandName = (name: string) => name === 'No Brand' ? '—' : name;
 
-const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0, onLogout, initialSearch }) => {
+const Inventory: React.FC<InventoryProps> = ({ role, employeeId = 0, onLogout, initialSearch }) => {
   const s = styles as Record<string, string>;
 
-  const isInventoryHead = role === 'Head' && department === 'Inventory';
-  const isSalesHead     = role === 'Head' && department === 'Sales';
-  const canModify       = ['Admin', 'Manager', 'Staff'].includes(role) || isInventoryHead;
-  const canExport       = ['Admin', 'Manager'].includes(role) || isInventoryHead;
-  const mustRequestExport = isSalesHead;
+const isInventoryHead   = role === 'Inventory Head';
+const isSalesHead       = role === 'Sales Head';
+const canModify         = ['Admin', 'Manager', 'Staff'].includes(role) || isInventoryHead;
+const canExport         = ['Admin', 'Manager'].includes(role) || isInventoryHead;
+const mustRequestExport = isSalesHead || role === 'Staff';
 
   const [products, setProducts] = useState<Product[]>([]);
   const [data, setData] = useState<InventorySummary>({
