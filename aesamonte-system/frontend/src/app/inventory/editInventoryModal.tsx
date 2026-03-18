@@ -18,7 +18,8 @@ interface BrandVariant {
   brandName: string;
   sku: string;
   description: string;
-  qty: string;
+  qty: string;       // current stock (read-only display)
+  addStock: string;  // amount to add (editable)
   uom: string;
   reorderPoint: string;
   unitCost: string;
@@ -63,7 +64,8 @@ const INITIAL_NEW_BRAND: BrandVariant = {
   brandName: '',
   sku: '',
   description: '',
-  qty: '',
+  qty: '0',
+  addStock: '',
   uom: 'Select',
   reorderPoint: '20',
   unitCost: '',
@@ -161,7 +163,8 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
         brandName: b.brand_name || '',
         sku: b.sku || '',
         description: b.description || itemData.itemDescription || '',
-        qty: String(b.qty ?? ''),
+        qty: String(b.qty ?? '0'),
+        addStock: '',
         uom: itemData.uom || 'Select',
         reorderPoint: String(itemData.reorderPoint ?? '20'),
         unitCost: String(b.unit_price ?? ''),
@@ -272,7 +275,7 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
         brand_name: bv.brandName || 'No Brand',
         sku: bv.sku || null,
         uom: bv.uom,
-        qty: Number(bv.qty) || 0,
+        qty: (Number(bv.qty) || 0) + (Number(bv.addStock) || 0),
         unit_price: Number(bv.unitCost) || 0,
         selling_price: Number(bv.sellingPrice) || 0,
         itemDescription: bv.description,
@@ -475,18 +478,38 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
                       />
                     </div>
 
-                    {/* Row: QUANTITY | UNIT (UOM) | REORDER POINT */}
+                    {/* Row: CURRENT STOCK | ADD STOCK | NEW TOTAL */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '10px' }}>
                       <div>
-                        <label style={{ ...LABEL_STYLE }}>Quantity</label>
+                        <label style={{ ...LABEL_STYLE }}>Current Stock</label>
+                        <div style={{ ...READ_ONLY_STYLE }}>{brand.qty || '0'}</div>
+                      </div>
+                      <div>
+                        <label style={{ ...LABEL_STYLE }}>Add Stock</label>
                         <input
                           type="number" min="0"
                           style={{ ...FIELD_STYLE }}
-                          value={brand.qty}
-                          onChange={e => handleBrandChange(brandIdx, 'qty', e.target.value)}
+                          value={brand.addStock}
+                          onChange={e => {
+                            const v = e.target.value;
+                            if (v === '' || Number(v) >= 0) handleBrandChange(brandIdx, 'addStock', v);
+                          }}
                           placeholder="0"
                         />
                       </div>
+                      <div>
+                        <label style={{ ...LABEL_STYLE }}>New Total</label>
+                        <div style={{
+                          ...READ_ONLY_STYLE,
+                          ...(Number(brand.addStock) > 0 ? { color: '#16a34a', fontWeight: 700, borderColor: '#bbf7d0', backgroundColor: '#f0fdf4' } : {}),
+                        }}>
+                          {(Number(brand.qty) || 0) + (Number(brand.addStock) || 0)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Row: UNIT (UOM) | REORDER POINT */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '10px' }}>
                       <div>
                         <label style={{ ...LABEL_STYLE }}>Unit (UOM)</label>
                         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>

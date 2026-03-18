@@ -62,11 +62,15 @@ interface BrandVariant {
   unit_price: number;
   selling_price: number;
   qty: number;
+  description?: string;
+  item_description?: string;
 }
 
 interface SupplierInfo {
   supplier_id: number;
   supplier_name: string;
+  contact_person?: string;
+  contact_number?: string;
 }
 
 export interface Product {
@@ -77,6 +81,7 @@ export interface Product {
   uom: string;
   status: string;
   is_archived?: boolean;
+  item_location?: string;
   brands: BrandVariant[];
   suppliers: SupplierInfo[];
 }
@@ -252,10 +257,17 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
     setSortConfig({ key, direction });
   };
 
-  const handleViewClick = (product: Product) => {
+  const handleViewClick = async (product: Product) => {
     setViewProduct(product);
     setShowViewModal(true);
     setActiveMenuId(null);
+    try {
+      const res = await fetch(`/api/inventory/${product.id}`);
+      if (res.ok) {
+        const full = await res.json();
+        setViewProduct((prev: any) => prev?.id === product.id ? { ...prev, brands: full.brands, suppliers: full.suppliers } : prev);
+      }
+    } catch { /* keep list data as fallback */ }
   };
 
   const handleEditClick = async (product: Product) => {
@@ -478,7 +490,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
                     {[
                       { label: 'ID', key: 'id' },
                       { label: 'ITEM', key: 'item_name' },
-                      { label: 'DESCRIPTION', key: 'item_description' },
+                      { label: 'BRANDS', key: 'brands' },
                       { label: 'TOTAL QTY', key: 'qty' },
                       { label: 'UOM', key: 'uom' },
                       { label: 'STATUS', key: 'status' },
@@ -493,20 +505,26 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
                         </div>
                       </th>
                     ))}
-                    <th>SKU</th>
-                    <th>UNIT PRICE</th>
-                    <th>PRICE</th>
                     <th className={s.actionHeader}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedProducts.map(p => {
-                    const firstBrand = (p.brands || [])[0];
-                    return (
+                  {paginatedProducts.map(p => (
                     <tr key={p.id} onClick={() => handleViewClick(p)} style={{ cursor: 'pointer' }}>
                       <td>{p.id}</td>
                       <td>{p.item_name}</td>
-                      <td>{p.item_description}</td>
+                      <td style={{ fontSize: '0.83rem', color: '#374151' }}>
+                        {(p.brands || []).length === 0 ? (
+                          <span style={{ color: '#9ca3af' }}>—</span>
+                        ) : (
+                          (p.brands || []).map((b, i) => (
+                            <span key={i}>
+                              {i > 0 && <span style={{ color: '#d1d5db', margin: '0 4px' }}>•</span>}
+                              {displayBrandName(b.brand_name)}
+                            </span>
+                          ))
+                        )}
+                      </td>
                       <td>{p.qty}</td>
                       <td>{p.uom || '—'}</td>
                       <td>
@@ -518,15 +536,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
                         }>
                           {p.status}
                         </span>
-                      </td>
-                      <td style={{ fontSize: '0.82rem', fontFamily: 'monospace', color: '#64748b' }}>
-                        {firstBrand?.sku && firstBrand.sku !== '—' ? firstBrand.sku : '—'}
-                      </td>
-                      <td style={{ fontSize: '0.85rem', color: '#374151' }}>
-                        {firstBrand ? `₱${Number(firstBrand.unit_price).toLocaleString('en-PH', { minimumFractionDigits: 2 })}` : '—'}
-                      </td>
-                      <td style={{ fontSize: '0.85rem', color: '#374151' }}>
-                        {firstBrand ? `₱${Number(firstBrand.selling_price).toLocaleString('en-PH', { minimumFractionDigits: 2 })}` : '—'}
                       </td>
                       <td className={s.actionCell} onClick={e => e.stopPropagation()}>
                         <LuEllipsisVertical className={s.moreIcon} onClick={() => setActiveMenuId(activeMenuId === p.id ? null : p.id)} />
@@ -544,8 +553,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
                         )}
                       </td>
                     </tr>
-                  );
-                  })}
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -633,21 +641,29 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
             </div>
 
             <div className={s.viewBody}>
-              {/* Description */}
-              {viewProduct.item_description && (
-                <div className={s.viewSection} style={{ marginBottom: '16px' }}>
-                  <p className={s.viewFieldLabel}>Description</p>
-                  <p className={s.viewFieldValue}>{viewProduct.item_description}</p>
-                </div>
-              )}
 
               {/* Suppliers */}
               {(viewProduct.suppliers || []).length > 0 && (
                 <div className={s.viewSection} style={{ marginBottom: '16px' }}>
                   <p className={s.viewSectionTitle}>SUPPLIERS</p>
-                  <p className={s.viewFieldValue}>
-                    {viewProduct.suppliers.map(s => s.supplier_name).join(' • ')}
-                  </p>
+                  <table className={s.viewItemsTable}>
+                    <thead>
+                      <tr>
+                        <th>SUPPLIER NAME</th>
+                        <th>CONTACT PERSON</th>
+                        <th>CONTACT NUMBER</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {viewProduct.suppliers.map((sup: any, i: number) => (
+                        <tr key={i}>
+                          <td style={{ fontWeight: 600 }}>{sup.supplier_name}</td>
+                          <td>{sup.contact_person || '—'}</td>
+                          <td>{sup.contact_number || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
 
@@ -668,13 +684,14 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
                       <tr>
                         <th>BRAND</th>
                         <th>SKU</th>
+                        <th>DESCRIPTION</th>
                         <th>QTY</th>
                         <th>COST PRICE</th>
                         <th>SELLING PRICE</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {viewProduct.brands.map((bv, i) => (
+                      {viewProduct.brands.map((bv: any, i: number) => (
                         <tr key={i}>
                           <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -683,6 +700,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
                             </div>
                           </td>
                           <td><span style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: '#64748b' }}>{bv.sku || '—'}</span></td>
+                          <td style={{ color: '#6b7280', fontSize: '0.85rem' }}>{bv.description || '—'}</td>
                           <td>{bv.qty}</td>
                           <td>₱ {bv.unit_price?.toLocaleString('en-PH', { minimumFractionDigits: 2 }) || '0.00'}</td>
                           <td>₱ {bv.selling_price?.toLocaleString('en-PH', { minimumFractionDigits: 2 }) || '0.00'}</td>
@@ -692,6 +710,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, department, employeeId = 0,
                   </table>
                 )}
               </div>
+
             </div>
           </div>
         </div>

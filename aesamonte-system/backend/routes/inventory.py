@@ -55,7 +55,8 @@ def get_inventory():
 
         cur.execute("""
             SELECT ib.inventory_id, b.brand_id, b.brand_name,
-                   ib.item_sku, ib.item_unit_price, ib.item_selling_price, ib.item_qty
+                   ib.item_sku, ib.item_unit_price, ib.item_selling_price,
+                   ib.item_qty, ib.item_description
             FROM inventory_brands ib
             JOIN brand b ON ib.brand_id = b.brand_id
             ORDER BY ib.inventory_id, b.brand_name
@@ -63,7 +64,8 @@ def get_inventory():
         brand_rows = cur.fetchall()
 
         cur.execute("""
-            SELECT ins.inventory_id, s.supplier_id, s.supplier_name
+            SELECT ins.inventory_id, s.supplier_id, s.supplier_name,
+                   s.contact_person, s.supplier_contact
             FROM inventory_supplier ins
             JOIN supplier s ON ins.supplier_id = s.supplier_id
             ORDER BY ins.inventory_id
@@ -87,6 +89,7 @@ def get_inventory():
             "unit_price": float(br[4] or 0),
             "selling_price": float(br[5] or 0),
             "qty": int(br[6] or 0),
+            "description": br[7] or "",
         })
 
     suppliers_map = {}
@@ -95,6 +98,8 @@ def get_inventory():
         suppliers_map.setdefault(inv_id, []).append({
             "supplier_id": sr[1],
             "supplier_name": sr[2],
+            "contact_person": sr[3] or "",
+            "contact_number": sr[4] or "",
         })
 
     result = []
@@ -328,7 +333,8 @@ def get_inventory_item(id):
             return jsonify({"error": "Item not found"}), 404
 
         cur.execute("""
-            SELECT b.brand_id, b.brand_name, ib.item_sku, ib.item_unit_price, ib.item_selling_price, ib.item_qty
+            SELECT b.brand_id, b.brand_name, ib.item_sku, ib.item_unit_price,
+                   ib.item_selling_price, ib.item_qty, ib.item_description
             FROM inventory_brands ib
             JOIN brand b ON ib.brand_id = b.brand_id
             WHERE ib.inventory_id = %s
@@ -342,6 +348,7 @@ def get_inventory_item(id):
                 "unit_price": float(row[3] or 0),
                 "selling_price": float(row[4] or 0),
                 "qty": int(row[5] or 0),
+                "description": row[6] or "",
             }
             for row in cur.fetchall()
         ]
@@ -355,9 +362,9 @@ def get_inventory_item(id):
         suppliers_list = [
             {
                 "supplier_id": row[0],
-                "supplierName": row[1] or "",
-                "contactPerson": row[2] or "",
-                "contactNumber": row[3] or "",
+                "supplier_name": row[1] or "",
+                "contact_person": row[2] or "",
+                "contact_number": row[3] or "",
                 "isPrimary": idx == 0,
             }
             for idx, row in enumerate(cur.fetchall())

@@ -332,13 +332,10 @@ th.actionHeader .sortHeaderInner {
 
 .actionCell {
   position: relative;
-  overflow: visible !important;
+  overflow: visible !important; 
+  /* Forces the icon to strictly anchor to the middle of the cell */
   text-align: center !important;
   vertical-align: middle !important;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 5px;
 }
 
 .moreIcon {
