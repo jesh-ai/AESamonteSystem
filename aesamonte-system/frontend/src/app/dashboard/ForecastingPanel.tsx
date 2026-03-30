@@ -30,8 +30,7 @@ export default function ForecastingPanel({ charts, insights, loading }: Forecast
 
   const maxPeriod = Math.max(...forecastPeriods.map((p) => p.total), 1);
   const sorted = [...forecastPeriods].sort((a, b) => b.total - a.total);
-  const fireTotals = new Set(sorted.slice(1, 3).filter((p) => p.total > 0).map((p) => p.total));
-
+ 
   return (
     <>
       <div className={`${styles.panel} ${styles.panelCream}`}>
@@ -63,13 +62,10 @@ export default function ForecastingPanel({ charts, insights, loading }: Forecast
                 <div className={styles.skeletonBlock} />
               ) : (
                 <div
-                  className={`${styles.forecastCards} ${
-                    forecastView === "Monthly" ? styles.forecastCardsScroll : ""
-                  }`}
+                className={`${styles.forecastCards} ${styles.forecastCardsScroll}`}
                 >
                   {forecastPeriods.map((p, i) => {
                     const isTop = p.total === maxPeriod && p.total > 0;
-                    const hasFire = fireTotals.has(p.total);
                     const subLabel =
                       forecastView === "Monthly"
                         ? (p as PeriodSalesMonth).year ?? ""
@@ -79,11 +75,12 @@ export default function ForecastingPanel({ charts, insights, loading }: Forecast
                         key={i}
                         className={`${styles.forecastCard} ${isTop ? styles.forecastCardActive : ""}`}
                       >
+                         <div className={styles.forecastCardTop}> 
                         <p className={styles.forecastCardLabel}>{p.label}</p>
                         {subLabel && <p className={styles.forecastCardRange}>{subLabel}</p>}
+                        </div>
                         <div className={styles.forecastCardBottom}>
                           <p className={styles.forecastCardTotal}>{fmt(p.total)}</p>
-                          {hasFire && <span className={styles.fireIcon}>🔥</span>}
                         </div>
                       </div>
                     );

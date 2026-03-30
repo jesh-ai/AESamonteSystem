@@ -158,7 +158,7 @@ export default function StatsGrid({ metrics, loading, onNavigate, insights, lowS
                     {item.title === "Low Stock" ? (
                       <>
                         <span style={{ color: "#dc2626" }}>{metrics?.lowStock}</span>
-                        <span style={{ fontSize: "2rem", fontWeight: 500, color: "#dc2626", marginLeft: "4px" }}>SKUs</span>
+                        <span style={{ fontSize: "2rem", fontWeight: 500, color: "#dc2626", marginLeft: "4px" }}>Items</span>
                       </>
                     ) : (
                       item.value

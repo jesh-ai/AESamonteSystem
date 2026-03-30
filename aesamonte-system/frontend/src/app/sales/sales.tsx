@@ -66,7 +66,7 @@ export default function SalesPage({ role = 'Admin', employeeId = 0, onLogout, in
   const [showViewModal, setShowViewModal] = useState(false)
   const [selectedTx, setSelectedTx]       = useState<Transaction | null>(null)
   const [activeTab, setActiveTab]         = useState<'invoice' | 'delivery'>('invoice')
-  const [statusFilter, setStatusFilter]   = useState<'all' | 'pending' | 'paid'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'cash' | 'e-wallet' | 'card'>('all')
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false)
   const [fromDate, setFromDate] = useState<string>('')
   const [toDate, setToDate] = useState<string>('')
@@ -89,13 +89,20 @@ export default function SalesPage({ role = 'Admin', employeeId = 0, onLogout, in
   }
 
   const parseDate = (dateStr: string): Date | null => {
-    if (!dateStr) return null
+  if (!dateStr) return null
+  // Handle YYYY-MM-DD (from date input)
+  if (dateStr.includes('-')) {
     const parts = dateStr.split('-')
-    if (parts.length === 3) {
-      return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
-    }
-    return null
+    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
   }
+  // Handle MM/DD/YY (from transactions)
+  if (dateStr.includes('/')) {
+    const parts = dateStr.split('/')
+    const year = parseInt(parts[2]) + 2000
+    return new Date(year, parseInt(parts[0]) - 1, parseInt(parts[1]))
+  }
+  return null
+}
 
   const isDateInRange = (txDate: string): boolean => {
     if (!fromDate && !toDate) return true
@@ -112,23 +119,25 @@ export default function SalesPage({ role = 'Admin', employeeId = 0, onLogout, in
     return true
   }
 
-  const getStatusBadgeColor = (status: 'all' | 'pending' | 'paid') => {
-    switch(status) {
-      case 'paid': return '#10b981'
-      case 'pending': return '#f59e0b'
-      case 'all': return '#9ca3af'
-      default: return '#9ca3af'
-    }
+  const getStatusBadgeColor = (status: 'all' | 'cash' | 'e-wallet' | 'card') => {
+  switch(status) {
+    case 'cash': return '#10b981'
+    case 'e-wallet': return '#3b82f6'
+    case 'card': return '#8b5cf6'
+    case 'all': return '#9ca3af'
+    default: return '#9ca3af'
   }
+}
 
-  const getStatusLabel = (status: 'all' | 'pending' | 'paid') => {
-    switch(status) {
-      case 'paid': return 'Paid'
-      case 'pending': return 'Pending'
-      case 'all': return 'All Status'
-      default: return 'All Status'
-    }
+  const getStatusLabel = (status: 'all' | 'cash' | 'e-wallet' | 'card') => {
+  switch(status) {
+    case 'cash': return 'Cash'
+    case 'e-wallet': return 'E-Wallet'
+    case 'card': return 'Card'
+    case 'all': return 'All Methods'
+    default: return 'All Methods'
   }
+}
 
   const handleExportSuccess = (msg: string, type: 'success' | 'error' = 'success') => {
     setToastMessage(msg); setIsError(type === 'error'); setShowToast(true)
@@ -204,9 +213,11 @@ export default function SalesPage({ role = 'Admin', employeeId = 0, onLogout, in
   const closeViewModal = () => { setShowViewModal(false); setSelectedTx(null) }
 
   const filteredTx = transactions.filter(tx => {
+    console.log('tx.date:', tx.date);
     const matchesArchiveView = isArchiveView ? tx.is_archived === true : !tx.is_archived
     const searchStr = `${tx.no} ${tx.name} ${tx.address} ${tx.paymentMethod || ''}`.toLowerCase()
-    const matchesStatus = statusFilter === 'all' || tx.status === statusFilter.toUpperCase()
+    const matchesStatus = statusFilter === 'all' || 
+    tx.paymentMethod?.toLowerCase().includes(statusFilter.toLowerCase())
     const matchesDateRange = isDateInRange(tx.date)
     return matchesArchiveView && searchStr.includes(searchTerm.toLowerCase()) && matchesStatus && matchesDateRange
   })
@@ -435,8 +446,7 @@ export default function SalesPage({ role = 'Admin', employeeId = 0, onLogout, in
                   </button>
                   {isStatusDropdownOpen && (
                     <div className={s.statusFilterMenu}>
-                      {(['all', 'pending', 'paid'] as const).map(option => (
-                        <button
+                     {(['all', 'cash', 'e-wallet', 'card'] as const).map(option => (   <button
                           key={option}
                           className={`${s.statusFilterMenuItem} ${statusFilter === option ? s.statusFilterMenuItemActive : ''}`}
                           onClick={() => {
