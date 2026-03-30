@@ -226,23 +226,7 @@ const UomModal: React.FC<UomModalProps> = ({ isOpen, onClose, onUomAdded }) => {
 
                 {/* Toggle + threshold value / edit input */}
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
-                  <button
-                    onClick={() => handleToggle(uom)}
-                    title={uom.low_stock_threshold !== null ? `Threshold: ${uom.low_stock_threshold} — click to disable` : 'Click to enable low stock limit'}
-                    style={{
-                      flexShrink: 0, width: '44px', height: '24px', borderRadius: '12px',
-                      backgroundColor: uom.low_stock_threshold !== null ? '#3b82f6' : '#e2e8f0',
-                      border: 'none', cursor: 'pointer', position: 'relative',
-                      transition: 'background-color 0.2s',
-                    }}>
-                    <span style={{
-                      position: 'absolute', top: '3px',
-                      left: uom.low_stock_threshold !== null ? '23px' : '3px',
-                      width: '18px', height: '18px', borderRadius: '50%',
-                      backgroundColor: '#fff', transition: 'left 0.2s',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                    }} />
-                  </button>
+                  
                   {editingId === uom.id ? (
                     <input
                       type="number" min="0"
