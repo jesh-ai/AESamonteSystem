@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from "@/css/order.module.css";
 import { LuPlus, LuTrash2, LuX, LuMapPin, LuSearch } from "react-icons/lu";
 
@@ -19,6 +19,12 @@ const INITIAL_CUSTOMER = {
   deliveryAddress: ''
 };
 
+const LABEL_STYLE: React.CSSProperties = {
+  display: 'block', fontSize: '0.72rem', fontWeight: 700,
+  textTransform: 'uppercase', letterSpacing: '0.5px',
+  color: '#6b7280', marginBottom: '4px',
+};
+
 const AddOrderModal: React.FC<AddOrderModalProps> = ({
   isOpen,
   onClose,
@@ -31,7 +37,6 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
 
   const activeInventory = (inventoryItems || []).filter((inv: any) => !inv.is_archived);
 
-  // Flatten to one entry per brand variant so each brand is selectable separately
   const searchableItems = activeInventory.flatMap((inv: any) =>
     (inv.brands || [])
       .filter((b: any) => Number(b.qty) > 0)
@@ -63,45 +68,9 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
   const [items, setItems] = useState<any[]>([]);
   const [activeSearchIndex, setActiveSearchIndex] = useState<number | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
-  // ── DRAG RESIZER STATE ──
-  const [customerHeight, setCustomerHeight] = useState<number | 'auto'>('auto');
-  const isDragging = useRef(false);
-  const dragStartY = useRef(0);
-  const dragStartHeight = useRef(0);
-  const customerSectionRef = useRef<HTMLDivElement>(null);
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isDragging.current = true;
-    dragStartY.current = e.clientY;
-    dragStartHeight.current = customerSectionRef.current?.offsetHeight ?? 300;
-    setCustomerHeight(dragStartHeight.current);
-    document.body.style.cursor = 'row-resize';
-    document.body.style.userSelect = 'none';
-  }, []);
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging.current) return;
-      const delta = e.clientY - dragStartY.current;
-      const newHeight = Math.min(Math.max(dragStartHeight.current + delta, 120), 480);
-      setCustomerHeight(newHeight);
-    };
-    const handleMouseUp = () => {
-      if (isDragging.current) {
-        isDragging.current = false;
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-      }
-    };
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -118,7 +87,8 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
         paymentMethod: getDefaultPayment()
       }]);
       setShowCancelConfirm(false);
-      setCustomerHeight('auto');
+      setSubmitAttempted(false);
+      setSubmitError('');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
@@ -134,7 +104,6 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statuses, paymentMethods]);
 
-  // ── Check if form has any user-entered data ──
   const isFormDirty = (): boolean => {
     const hasCustomerData =
       customerData.customerName.trim() ||
@@ -149,11 +118,8 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
   };
 
   const handleCancelClick = () => {
-    if (isFormDirty()) {
-      setShowCancelConfirm(true);
-    } else {
-      onClose();
-    }
+    if (isFormDirty()) setShowCancelConfirm(true);
+    else onClose();
   };
 
   const handleConfirmCancel = () => {
@@ -240,6 +206,25 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitAttempted(true);
+    setSubmitError('');
+
+    // Required field checks
+    if (!customerData.customerName.trim()) {
+      setSubmitError('Customer name is required.');
+      return;
+    }
+    if (!customerData.deliveryAddress.trim()) {
+      setSubmitError('Delivery address is required.');
+      return;
+    }
+    // Check at least one item has a valid inventory item selected
+    const hasValidItem = items.some(item => item.inventory_id && item.item?.trim());
+    if (!hasValidItem) {
+      setSubmitError('Please select at least one valid item before saving.');
+      return;
+    }
+
     const finalItems = items.map(item => ({
       ...item,
       orderStatus: item.orderStatus || getDefaultStatus(),
@@ -252,6 +237,11 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
 
   const totalQty = items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
   const totalAmt = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+
+  // ── ERROR HELPERS ──
+  const customerNameHasError = () => submitAttempted && !customerData.customerName.trim();
+  const addressHasError = () => submitAttempted && !customerData.deliveryAddress.trim();
+  const itemHasError = (index: number) => submitAttempted && !items[index].inventory_id && items[index].item?.trim();
 
   return (
     <div className={s.modalOverlay} style={{ zIndex: 1000 }}>
@@ -269,14 +259,7 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
         <form onSubmit={handleSubmit} className={s.orderForm}>
 
           {/* --- CUSTOMER SECTION (resizable) --- */}
-          <div
-            ref={customerSectionRef}
-            className={s.customerSection}
-            style={{
-              height: customerHeight === 'auto' ? 'auto' : `${customerHeight}px`,
-              overflow: customerHeight === 'auto' ? 'visible' : 'hidden',
-            }}
-          >
+          <div className={s.customerSection}>
             <div className={s.orderSummaryBar}>
               <div>
                 <span className={s.summaryLabel}>Order ID</span>
@@ -298,27 +281,43 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
 
             <div className={s.customerFormGrid}>
               <div className={s.formGroup}>
-                <label className={s.miniLabel}>Customer Name</label>
-                <input className={s.cleanInput} value={customerData.customerName} onChange={(e) => setCustomerData({ ...customerData, customerName: e.target.value })} placeholder="Full Name" required />
+                <label style={{ ...LABEL_STYLE, color: customerNameHasError() ? '#dc2626' : '#6b7280' }}>
+                  Customer Name <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  className={s.cleanInput}
+                  style={customerNameHasError() ? { border: '1px solid #f87171', backgroundColor: '#fff5f5' } : {}}
+                  value={customerData.customerName}
+                  onChange={(e) => { setSubmitError(''); setCustomerData({ ...customerData, customerName: e.target.value }); }}
+                  placeholder="Full Name"
+                />
+                {customerNameHasError() && (
+                  <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Customer name is required.</p>
+                )}
               </div>
               <div className={s.formGroup}>
-                <label className={s.miniLabel}>Contact Number</label>
+                <label style={{ ...LABEL_STYLE }}>Contact Number</label>
                 <input className={s.cleanInput} value={customerData.contactNumber} onChange={(e) => setCustomerData({ ...customerData, contactNumber: e.target.value })} placeholder="09XXXXXXXXX" />
               </div>
             </div>
 
             <div className={s.formGroupFull}>
-              <label className={s.miniLabel}>Delivery Address</label>
-              <input className={s.cleanInput} value={customerData.deliveryAddress} onChange={(e) => setCustomerData({ ...customerData, deliveryAddress: e.target.value })} placeholder="Street, Barangay, City" required />
+              <label style={{ ...LABEL_STYLE, color: addressHasError() ? '#dc2626' : '#6b7280' }}>
+                Delivery Address <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <input
+                className={s.cleanInput}
+                style={addressHasError() ? { border: '1px solid #f87171', backgroundColor: '#fff5f5' } : {}}
+                value={customerData.deliveryAddress}
+                onChange={(e) => { setSubmitError(''); setCustomerData({ ...customerData, deliveryAddress: e.target.value }); }}
+                placeholder="Street, Barangay, City"
+              />
+              {addressHasError() && (
+                <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Delivery address is required.</p>
+              )}
             </div>
           </div>
 
-          {/* ── DRAG HANDLE ── */}
-          <div className={s.dragHandle} onMouseDown={handleMouseDown} title="Drag to resize">
-            <div className={s.dragDots}>
-              {[0, 1, 2].map(i => <div key={i} className={s.dragDot} />)}
-            </div>
-          </div>
 
           {/* --- ITEM LIST --- */}
           <div className={s.itemList}>
@@ -341,8 +340,8 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
 
                   {/* Search field */}
                   <div className={s.searchFieldWrapper}>
-                    <label className={`${s.miniLabel} ${s.searchLabelRow}`}>
-                      <span>Item Name</span>
+                    <label style={{ ...LABEL_STYLE, color: itemHasError(index) ? '#dc2626' : '#6b7280', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>Item Name <span style={{ color: '#ef4444' }}>*</span></span>
                       <LuSearch size={12} color="#94a3b8" />
                     </label>
                     <input
@@ -354,8 +353,11 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
                       placeholder="Search items..."
                       autoComplete="off"
                       className={(!item.inventory_id && item.item.length > 0) ? s.searchInputInvalid : s.searchInputValid}
-                      required
+                      style={itemHasError(index) ? { border: '1px solid #f87171', backgroundColor: '#fff5f5' } : {}}
                     />
+                    {itemHasError(index) && (
+                      <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Please select a valid item from the list.</p>
+                    )}
 
                     {activeSearchIndex === index && (
                       <div className={s.searchDropdown}>
@@ -394,13 +396,13 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
 
                   {/* Brand */}
                   <div className={s.formGroup} style={{ minWidth: 0 }}>
-                    <label className={s.miniLabel}>Brand</label>
+                    <label style={{ ...LABEL_STYLE }}>Brand</label>
                     <div className={s.descFieldValid}>{item.brand_name || '—'}</div>
                   </div>
 
                   {/* Description */}
                   <div className={s.formGroup} style={{ minWidth: 0 }}>
-                    <label className={s.miniLabel}>Description</label>
+                    <label style={{ ...LABEL_STYLE }}>Description</label>
                     <div className={(!item.inventory_id && item.item.length > 0) ? s.descFieldInvalid : s.descFieldValid}>
                       {item.itemDescription}
                     </div>
@@ -409,16 +411,16 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
 
                 <div className={s.itemBottomGrid}>
                   <div className={s.formGroup}>
-                    <label className={s.miniLabel}>Quantity</label>
-                    <input type="number" className={s.cleanInput} value={item.quantity || ''} onChange={(e) => handleQtyChange(index, e.target.value)} style={{ height: '38px' }} required />
+                    <label style={{ ...LABEL_STYLE }}>Quantity <span style={{ color: '#ef4444' }}>*</span></label>
+                    <input type="number" className={s.cleanInput} value={item.quantity || ''} onChange={(e) => handleQtyChange(index, e.target.value)} style={{ height: '38px' }} />
                   </div>
                   <div className={s.formGroup}>
-                    <label className={s.miniLabel}>Amount (₱)</label>
+                    <label style={{ ...LABEL_STYLE }}>Amount (₱)</label>
                     <div className={s.amountField}>{Number(item.amount).toLocaleString()}</div>
                   </div>
                   <div className={s.formGroup}>
-                    <label className={s.miniLabel}>Status</label>
-                    <select className={s.cleanInput} value={item.orderStatus || getDefaultStatus()} onChange={(e) => handleItemChange(index, 'orderStatus', e.target.value)} style={{ height: '38px' }} required>
+                    <label style={{ ...LABEL_STYLE }}>Status <span style={{ color: '#ef4444' }}>*</span></label>
+                    <select className={s.cleanInput} value={item.orderStatus || getDefaultStatus()} onChange={(e) => handleItemChange(index, 'orderStatus', e.target.value)} style={{ height: '38px' }}>
                       {statuses.length === 0 && <option value="Preparing">Preparing</option>}
                       {statuses.map((st: any) => (
                         <option key={st.status_id} value={st.status_name.trim()}>{st.status_name.trim()}</option>
@@ -426,8 +428,8 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
                     </select>
                   </div>
                   <div className={s.formGroup}>
-                    <label className={s.miniLabel}>Payment Method</label>
-                    <select className={s.cleanInput} value={item.paymentMethod || getDefaultPayment()} onChange={(e) => handleItemChange(index, 'paymentMethod', e.target.value)} style={{ height: '38px' }} required>
+                    <label style={{ ...LABEL_STYLE }}>Payment Method <span style={{ color: '#ef4444' }}>*</span></label>
+                    <select className={s.cleanInput} value={item.paymentMethod || getDefaultPayment()} onChange={(e) => handleItemChange(index, 'paymentMethod', e.target.value)} style={{ height: '38px' }}>
                       {paymentMethods.length === 0 && <option value="Cash">Cash</option>}
                       {paymentMethods.map((pm: any) => (
                         <option key={pm.status_id} value={pm.status_name.trim()}>{pm.status_name.trim()}</option>
@@ -445,9 +447,16 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
           </div>
 
           {/* --- FOOTER --- */}
-          <div className={s.modalFooter} style={{ padding: '20px 24px', borderTop: '1px solid #eaeaea', backgroundColor: '#fff', flexShrink: 0 }}>
-            <button type="button" onClick={handleCancelClick} className={s.cancelBtn}>Cancel</button>
-            <button type="submit" className={s.saveBtn}>Save Order</button>
+          <div className={s.modalFooter} style={{ padding: '20px 24px', borderTop: '1px solid #eaeaea', backgroundColor: '#fff', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {submitError && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#fee2e2', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: '8px', padding: '10px 14px', fontSize: '0.85rem', fontWeight: 500 }}>
+                <span>⚠</span> {submitError}
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button type="button" onClick={handleCancelClick} className={s.cancelBtn}>Cancel</button>
+              <button type="submit" className={s.saveBtn}>Save Order</button>
+            </div>
           </div>
         </form>
       </div>
@@ -461,17 +470,11 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
             </div>
             <div className={s.confirmTextWrap}>
               <p className={s.confirmTitle}>Discard Changes?</p>
-              <p className={s.confirmSubtext}>
-                 All entered information will be lost.
-              </p>
+              <p className={s.confirmSubtext}>All entered information will be lost.</p>
             </div>
             <div className={s.confirmButtons}>
-              <button className={s.keepEditingBtn} onClick={() => setShowCancelConfirm(false)}>
-                Keep Editing
-              </button>
-              <button className={s.discardBtn} onClick={handleConfirmCancel}>
-                Yes, Discard
-              </button>
+              <button className={s.keepEditingBtn} onClick={() => setShowCancelConfirm(false)}>Keep Editing</button>
+              <button className={s.discardBtn} onClick={handleConfirmCancel}>Yes, Discard</button>
             </div>
           </div>
         </div>

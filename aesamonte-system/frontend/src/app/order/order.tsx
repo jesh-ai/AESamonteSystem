@@ -72,13 +72,66 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [inventoryItems, setInventoryItems] = useState<any[]>([]);
   const [showExportModal, setShowExportModal] = useState(false);
-  const [exportType, setExportType] = useState<'pdf' | 'xlsx' | 'csv' | null>(null); // ── ADDED ──
+  const [exportType, setExportType] = useState<'pdf' | 'xlsx' | 'csv' | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastTitle, setToastTitle] = useState('');
   const [toastMessage, setToastMessage] = useState('');
   const [isError, setIsError] = useState(false);
   const [submittedData, setSubmittedData] = useState<any>(null);
+
+  // ── DATE RANGE FILTER ──
+  const [fromDate, setFromDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>('');
+  const [isDateFilterOpen, setIsDateFilterOpen] = useState(false);
+
+  // ── STATUS FILTER ──
+  const [statusFilter, setStatusFilter] = useState<string>('All Status');
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+
   const s = styles;
+
+  const ORDER_STATUS_OPTIONS = ['All Status', 'PREPARING', 'TO SHIP', 'RECEIVED', 'CANCELLED'];
+
+  const getStatusBadgeColor = (status: string) => {
+    if (status === 'PREPARING') return '#3b82f6';
+    if (status === 'TO SHIP')   return '#f59e0b';
+    if (status === 'RECEIVED')  return '#10b981';
+    if (status === 'CANCELLED') return '#ef4444';
+    return '#9ca3af';
+  };
+
+  const getDateRangeLabel = () => {
+    if (!fromDate && !toDate) return 'Date Range';
+    if (fromDate && toDate) return `${fromDate} to ${toDate}`;
+    if (fromDate) return `From ${fromDate}`;
+    if (toDate) return `Until ${toDate}`;
+    return 'Date Range';
+  };
+
+  const handleClearDateFilter = () => { setFromDate(''); setToDate(''); setCurrentPage(1); };
+
+  const parseDate = (dateStr: string): Date | null => {
+    if (!dateStr) return null;
+    if (dateStr.includes('-')) {
+      const parts = dateStr.split('-');
+      return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    }
+    if (dateStr.includes('/')) {
+      const parts = dateStr.split('/');
+      const year = parseInt(parts[2]) + (parseInt(parts[2]) < 100 ? 2000 : 0);
+      return new Date(year, parseInt(parts[0]) - 1, parseInt(parts[1]));
+    }
+    return null;
+  };
+
+  const isDateInRange = (txDate: string): boolean => {
+    if (!fromDate && !toDate) return true;
+    const tx = parseDate(txDate);
+    if (!tx) return true;
+    if (fromDate) { const from = parseDate(fromDate); if (from && tx < from) return false; }
+    if (toDate)   { const to   = parseDate(toDate);   if (to   && tx > to)   return false; }
+    return true;
+  };
 
   const fetchOrders = async () => {
     try {
@@ -99,17 +152,13 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
   const fetchSummary = async () => {
     try {
       const r = await fetch('/api/orders/summary');
-      if (r.ok) {
-        const d = await r.json();
-        if (d && d.shippedToday) setSummary(d);
-      }
+      if (r.ok) { const d = await r.json(); if (d && d.shippedToday) setSummary(d); }
     } catch (err) { console.error('Error fetching summary:', err); }
   };
 
   useEffect(() => {
     fetchOrders();
     fetchSummary();
-
     const fetchDropdowns = async () => {
       try {
         const [sR, pR, iR] = await Promise.all([
@@ -123,12 +172,19 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
       } catch (err) { console.error("Dropdown fetch error", err); }
     };
     fetchDropdowns();
-
-    const summaryInterval = setInterval(() => {
-      fetchSummary();
-    }, 10000);
-
+    const summaryInterval = setInterval(() => { fetchSummary(); }, 10000);
     return () => clearInterval(summaryInterval);
+  }, []);
+
+  // ── CLOSE DROPDOWNS ON OUTSIDE CLICK ──
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-filter="date"]'))   setIsDateFilterOpen(false);
+      if (!target.closest('[data-filter="status"]')) setIsStatusDropdownOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const handleSave = async (newOrderData: any) => {
@@ -145,8 +201,7 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
         });
         setToastTitle("Order Submitted!"); setToastMessage("Your new order has been successfully added.");
         setIsError(false); setShowToast(true); setShowAddModal(false);
-        fetchOrders();
-        fetchSummary();
+        fetchOrders(); fetchSummary();
       } else {
         const errData = await response.json();
         setToastTitle("Oops!"); setToastMessage(errData.error || "Failed to save order.");
@@ -163,8 +218,7 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
       if (response.ok) {
         setToastTitle("Updated!"); setToastMessage("The order record has been successfully updated.");
         setIsError(false); setSubmittedData(null); setShowToast(true); setShowEditModal(false);
-        fetchOrders();
-        fetchSummary();
+        fetchOrders(); fetchSummary();
       } else {
         setToastTitle("Update Failed"); setToastMessage("Failed to update order.");
         setIsError(true); setShowToast(true);
@@ -182,8 +236,7 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
         setToastTitle(apiData.is_archived ? "Archived!" : "Restored!");
         setToastMessage(apiData.is_archived ? "Order moved to Archive" : "Order restored from Archive");
         setIsError(false); setShowToast(true); setOpenMenuId(null);
-        fetchOrders();
-        fetchSummary();
+        fetchOrders(); fetchSummary();
       } else {
         const errorData = await response.json();
         setSubmittedData(null); setToastTitle("Failed"); setToastMessage(`Failed: ${errorData.error}`); setIsError(true); setShowToast(true);
@@ -202,28 +255,18 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
   const handlePrint = () => {
     if (!selectedOrderForView) return;
     const pw = window.open('', '_blank');
-    if (!pw) {
-      alert('Pop-up blocked. Please allow pop-ups for this site in your browser settings, then try again.');
-      return;
-    }
-
+    if (!pw) { alert('Pop-up blocked. Please allow pop-ups for this site in your browser settings, then try again.'); return; }
     const items = selectedOrderForView.items || [];
     const totalRows = Math.max(25, items.length);
     const rows = Array.from({ length: totalRows }, (_, i) => {
       const item = items[i];
       return item
-        ? `<tr>
-            <td>${i + 1}</td>
-            <td>${item.order_quantity}</td>
-            <td>PCS</td>
-            <td class="part">${item.item_name || `Item #${item.inventory_id}`}</td>
-           </tr>`
+        ? `<tr><td>${i + 1}</td><td>${item.order_quantity}</td><td>PCS</td><td class="part">${item.item_name || `Item #${item.inventory_id}`}</td></tr>`
         : `<tr><td>${i + 1}</td><td></td><td></td><td></td></tr>`;
     }).join('');
 
     pw.document.write(`<!DOCTYPE html>
-<html>
-<head>
+<html><head>
   <title>Delivery Receipt - No. ${String(selectedOrderForView.id).padStart(4, '0')}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -277,24 +320,11 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
     </div>
   </div>
   <div class="deliver-section">
-    <div class="deliver-row">
-      <span class="deliver-label">DELIVERED TO:</span>
-      <span class="deliver-line">${selectedOrderForView.customer}</span>
-    </div>
-    <div class="deliver-row">
-      <span class="deliver-label">Address:</span>
-      <span class="deliver-line">${selectedOrderForView.address}</span>
-    </div>
+    <div class="deliver-row"><span class="deliver-label">DELIVERED TO:</span><span class="deliver-line">${selectedOrderForView.customer}</span></div>
+    <div class="deliver-row"><span class="deliver-label">Address:</span><span class="deliver-line">${selectedOrderForView.address}</span></div>
   </div>
   <table>
-    <thead>
-      <tr>
-        <th style="width:6%">ITEM</th>
-        <th style="width:8%">QTY</th>
-        <th style="width:10%">UNIT</th>
-        <th class="art">ARTICLES / PARTICULARS</th>
-      </tr>
-    </thead>
+    <thead><tr><th style="width:6%">ITEM</th><th style="width:8%">QTY</th><th style="width:10%">UNIT</th><th class="art">ARTICLES / PARTICULARS</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>
   <div class="print-footer">
@@ -315,12 +345,8 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
       <div class="not-valid">"THIS DOCUMENT IS NOT VALID FOR CLAIM OF INPUT TAX"</div>
     </div>
   </div>
-</body>
-</html>`);
-
-    pw.document.close();
-    pw.focus();
-    pw.print();
+</body></html>`);
+    pw.document.close(); pw.focus(); pw.print();
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => { setSearchTerm(e.target.value); setCurrentPage(1); };
@@ -335,7 +361,9 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
     const term = searchTerm.trim().toLowerCase();
     return orders.filter(o => {
       const matchesArchiveView = isArchiveView ? Boolean(o.is_archived) : !o.is_archived;
-      return matchesArchiveView && (
+      const matchesStatus = statusFilter === 'All Status' || o.status?.toUpperCase() === statusFilter;
+      const matchesDate = isDateInRange(o.date);
+      return matchesArchiveView && matchesStatus && matchesDate && (
         o.id.toString().toLowerCase().includes(term) ||
         o.customer.toLowerCase().includes(term) ||
         (o.address ?? '').toLowerCase().includes(term) ||
@@ -345,50 +373,32 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
         o.status.toLowerCase().includes(term)
       );
     });
-  }, [orders, searchTerm, isArchiveView]);
+  }, [orders, searchTerm, isArchiveView, statusFilter, fromDate, toDate]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
     const getSafeId = (id: any) => Number(String(id).replace(/\D/g, '')) || 0;
-    
     if (!sortConfig.key || !sortConfig.direction) {
-      return arr.sort((a, b) => (STATUS_PRIORITY[a.status?.toUpperCase()] || 99) - (STATUS_PRIORITY[b.status?.toUpperCase()] || 99) || getSafeId(a.id) - getSafeId(b.id));
+      return arr.sort((a, b) => {
+        const dateA = parseDate(a.date)?.getTime() ?? 0;
+        const dateB = parseDate(b.date)?.getTime() ?? 0;
+        if (dateB !== dateA) return dateB - dateA; // newest first
+        return getSafeId(b.id) - getSafeId(a.id);  // then by ID descending
+      });
     }
-    
     const { key, direction } = sortConfig;
     return arr.sort((a, b) => {
-      const A = a[key as keyof Order];
-      const B = b[key as keyof Order];
-      
-      if (key === 'date') {
-        return direction === 'asc' 
-          ? new Date(A as string).getTime() - new Date(B as string).getTime() 
-          : new Date(B as string).getTime() - new Date(A as string).getTime();
-      }
-
-      if (key === 'id') {
-        const numA = getSafeId(A);
-        const numB = getSafeId(B);
-        return direction === 'asc' ? numA - numB : numB - numA;
-      }
-
-      if (key === 'totalQty' || key === 'totalAmount') {
-        const numA = Number(A) || 0;
-        const numB = Number(B) || 0;
-        return direction === 'asc' ? numA - numB : numB - numA;
-      }
-
+      const A = a[key as keyof Order]; const B = b[key as keyof Order];
+      if (key === 'date') return direction === 'asc' ? new Date(A as string).getTime() - new Date(B as string).getTime() : new Date(B as string).getTime() - new Date(A as string).getTime();
+      if (key === 'id') { const numA = getSafeId(A); const numB = getSafeId(B); return direction === 'asc' ? numA - numB : numB - numA; }
+      if (key === 'totalQty' || key === 'totalAmount') { const numA = Number(A) || 0; const numB = Number(B) || 0; return direction === 'asc' ? numA - numB : numB - numA; }
       if (key === 'status') {
         const valA = STATUS_PRIORITY[String(A ?? '').toUpperCase()] || 999;
         const valB = STATUS_PRIORITY[String(B ?? '').toUpperCase()] || 999;
-        if (valA !== valB) {
-          return direction === 'asc' ? valA - valB : valB - valA;
-        }
+        if (valA !== valB) return direction === 'asc' ? valA - valB : valB - valA;
         return direction === 'asc' ? getSafeId(a.id) - getSafeId(b.id) : getSafeId(b.id) - getSafeId(a.id);
       }
-      
-      const sA = String(A ?? '').toLowerCase();
-      const sB = String(B ?? '').toLowerCase();
+      const sA = String(A ?? '').toLowerCase(); const sB = String(B ?? '').toLowerCase();
       if (sA < sB) return direction === 'asc' ? -1 : 1;
       if (sA > sB) return direction === 'asc' ? 1 : -1;
       return 0;
@@ -398,15 +408,19 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
   const totalPages = Math.ceil(sorted.length / ROWS_PER_PAGE) || 1;
   const paginated = sorted.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
 
-  const getStatusStyle = (status: string | undefined) => {
-    const base = s.statusBadge;
-    if (!status) return base;
-    switch (status.toUpperCase()) {
-      case 'PREPARING': return `${base} ${s.pillBlue}`;
-      case 'TO SHIP':   return `${base} ${s.pillYellow}`;
-      case 'RECEIVED':  return `${base} ${s.pillGreen}`;
-      case 'CANCELLED': return `${base} ${s.pillRed}`;
-      default: return base;
+  const getStatusStyle = (status: string | undefined): React.CSSProperties => {
+    const base: React.CSSProperties = {
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      width: 'fit-content', whiteSpace: 'nowrap',
+      padding: '2px 10px', borderRadius: '999px',
+      fontSize: '0.78rem', fontWeight: 600,
+    };
+    switch (status?.toUpperCase()) {
+      case 'PREPARING': return { ...base, color: '#2563eb', border: '1.5px solid #93c5fd', backgroundColor: '#eff6ff' };
+      case 'TO SHIP':   return { ...base, color: '#b45309', border: '1.5px solid #fcd34d', backgroundColor: '#fffbeb' };
+      case 'RECEIVED':  return { ...base, color: '#15803d', border: '1.5px solid #86efac', backgroundColor: '#f0fdf4' };
+      case 'CANCELLED': return { ...base, color: '#dc2626', border: '1.5px solid #fca5a5', backgroundColor: '#fef2f2' };
+      default:          return { ...base, color: '#6b7280', border: '1.5px solid #e5e7eb', backgroundColor: '#f9fafb' };
     }
   };
 
@@ -418,59 +432,24 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
     const maxVisiblePages = 5;
     let startPage = Math.max(1, currentPage - 2);
     let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-    if (endPage - startPage + 1 < maxVisiblePages) {
-      startPage = Math.max(1, endPage - maxVisiblePages + 1);
-    }
+    if (endPage - startPage + 1 < maxVisiblePages) startPage = Math.max(1, endPage - maxVisiblePages + 1);
     const pages = [];
     for (let i = startPage; i <= endPage; i++) {
-      pages.push(
-        <button
-          key={i}
-          className={currentPage === i ? s.pageCircleActive : s.pageCircle}
-          onClick={() => setCurrentPage(i)}
-        >
-          {i}
-        </button>
-      );
+      pages.push(<button key={i} className={currentPage === i ? s.pageCircleActive : s.pageCircle} onClick={() => setCurrentPage(i)}>{i}</button>);
     }
     return pages;
   };
 
   const renderGrowthPill = (value: number) => {
-    let icon = '—';
-    let textColor = '#ca8a04'; // Yellow-600
-    let bgColor = '#fef08a'; // Yellow-200
-
-    if (value > 0) {
-      icon = '↗';
-      textColor = '#15803d'; // Green-700
-      bgColor = '#dcfce7'; // Green-100
-    } else if (value < 0) {
-      icon = '↘';
-      textColor = '#b91c1c'; // Red-700
-      bgColor = '#fee2e2'; // Red-100
-    }
-
-    const displayValue = Math.abs(value);
-
+    let icon = '—'; let textColor = '#ca8a04'; let bgColor = '#fef08a';
+    if (value > 0) { icon = '↗'; textColor = '#15803d'; bgColor = '#dcfce7'; }
+    else if (value < 0) { icon = '↘'; textColor = '#b91c1c'; bgColor = '#fee2e2'; }
     return (
-      <span 
-        style={{ 
-          color: textColor, 
-          backgroundColor: bgColor,
-          fontWeight: 600,
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '4px',
-          padding: '2px 8px',
-          borderRadius: '999px',
-          fontSize: '0.85rem'
-        }}
-      >
-        {icon} {displayValue}%
+      <span style={{ color: textColor, backgroundColor: bgColor, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '999px', fontSize: '0.85rem' }}>
+        {icon} {Math.abs(value)}%
       </span>
     );
-  }
+  };
 
   return (
     <div className={s.container}>
@@ -511,64 +490,43 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
 
       <div className={s.mainContent}>
 
-        {/* ── HEADER ROW: Title + Export ── */}
+        {/* ── HEADER ROW ── */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', margin: 0 }}>
           <div>
             <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#164163', margin: 0 }}>ORDERS</h1>
-            <p style={{ fontSize: '0.82rem', color: '#9ca3af', margin: '2px 0 0' }}>
-              Track, manage, and process customer orders.
-            </p>
+            <p style={{ fontSize: '0.82rem', color: '#9ca3af', margin: '2px 0 0' }}>Track, manage, and process customer orders.</p>
           </div>
           <div>
-            {/* ── UPDATED: ExportButton with dropdown ── */}
             {['Admin', 'Manager'].includes(role) && (
-              <ExportButton onSelect={(type) => {
-                setExportType(type);
-                setShowExportModal(true);
-              }} />
+              <ExportButton onSelect={(type) => { setExportType(type); setShowExportModal(true); }} />
             )}
           </div>
         </div>
 
         <div className={s.topGrid}>
-
-          {/* ── Shipped Today ── */}
           <section className={s.statCard}>
             <p className={s.cardTitle}>Shipped Today</p>
             <h2 className={s.bigNumberGreen}>
               <svg width="36" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
-                <rect x="1" y="3" width="15" height="13" rx="1"/>
-                <path d="M16 8h4l3 5v4h-7V8z"/>
-                <circle cx="5.5" cy="18.5" r="2.5"/>
-                <circle cx="18.5" cy="18.5" r="2.5"/>
+                <rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v4h-7V8z"/>
+                <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
               </svg>
               <span style={{ color: "#16a34a" }}>{summary ? summary.shippedToday.current : '—'}</span>
               {summary && <span style={{ color: "#164163" }}>/{summary.shippedToday.total}</span>}
             </h2>
           </section>
-
-          {/* ── Orders Cancelled ── */}
           <section className={s.statCard}>
             <p className={s.cardTitle}>Orders Cancelled</p>
-            <h2 className={s.bigNumberRed}>
-              {summary ? summary.cancelled.current : '—'}
-            </h2>
+            <h2 className={s.bigNumberRed}>{summary ? summary.cancelled.current : '—'}</h2>
           </section>
-
-          {/* ── Total Orders ── */}
           <section className={s.statCardSpaced}>
             <p className={s.cardTitle}>Total Orders</p>
-            <h2 className={s.bigNumberGold}>
-              {summary ? summary.totalOrders.count.toLocaleString() : '—'}
-            </h2>
+            <h2 className={s.bigNumberGold}>{summary ? summary.totalOrders.count.toLocaleString() : '—'}</h2>
             <div className={s.cardFooter}>
               <span className={s.cardSubtext}>vs last month</span>
-              {summary && summary.totalOrders.growth != null && (
-                renderGrowthPill(summary.totalOrders.growth)
-              )}
+              {summary && summary.totalOrders.growth != null && renderGrowthPill(summary.totalOrders.growth)}
             </div>
           </section>
-
         </div>
         
         {isArchiveView ? (
@@ -578,17 +536,69 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
             <div className={s.header}>
               <h2 className={s.title}>Orders</h2>
               <div className={s.controls}>
-                <button 
-                  className={s.archiveIconBtn} 
-                  onClick={() => setIsArchiveView(true)} 
-                  title="View Archives"
-                >
-                  <LuArchive size={20} />
-                </button>
-                <div className={s.searchWrapper}>
-                  <input className={s.searchInput} placeholder="Search..." value={searchTerm} onChange={handleSearchChange} />
-                  <LuSearch size={18} />
+
+                {/* ── DATE RANGE FILTER ── */}
+                <div className={s.dateFilterContainer} data-filter="date">
+                  <button
+                    className={`${s.dateFilterTrigger} ${isDateFilterOpen ? s.dateFilterTriggerOpen : ''} ${(fromDate || toDate) ? s.dateFilterTriggerActive : ''}`}
+                    onClick={() => setIsDateFilterOpen(prev => !prev)}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    <span className={s.dateFilterLabel}>{getDateRangeLabel()}</span>
+                    <svg className={`${s.dateFilterChevron} ${isDateFilterOpen ? s.dateFilterChevronOpen : ''}`} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  </button>
+                  {isDateFilterOpen && (
+                    <div className={s.dateFilterMenu}>
+                      <div className={s.dateFilterInputGroup}>
+                        <label htmlFor="orderFromDate" className={s.dateFilterLabel}>From</label>
+                        <input id="orderFromDate" type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); setCurrentPage(1); }} className={s.dateFilterInput} />
+                      </div>
+                      <div className={s.dateFilterInputGroup}>
+                        <label htmlFor="orderToDate" className={s.dateFilterLabel}>To</label>
+                        <input id="orderToDate" type="date" value={toDate} onChange={e => { setToDate(e.target.value); setCurrentPage(1); }} className={s.dateFilterInput} />
+                      </div>
+                      {(fromDate || toDate) && (
+                        <button className={s.dateFilterClear} onClick={handleClearDateFilter}>Clear Dates</button>
+                      )}
+                    </div>
+                  )}
                 </div>
+
+                {/* ── STATUS FILTER ── */}
+                <div className={s.statusFilterContainer} data-filter="status">
+                  <button
+                    className={`${s.statusFilterTrigger} ${isStatusDropdownOpen ? s.statusFilterTriggerOpen : ''}`}
+                    onClick={() => setIsStatusDropdownOpen(prev => !prev)}
+                  >
+                    <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: getStatusBadgeColor(statusFilter), flexShrink: 0 }}></span>
+                    <span className={s.statusFilterLabel}>{statusFilter}</span>
+                    <svg className={`${s.statusFilterChevron} ${isStatusDropdownOpen ? s.statusFilterChevronOpen : ''}`} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  </button>
+                  {isStatusDropdownOpen && (
+                    <div className={s.statusFilterMenu}>
+                      {ORDER_STATUS_OPTIONS.map(option => (
+                        <button
+                          key={option}
+                          className={`${s.statusFilterMenuItem} ${statusFilter === option ? s.statusFilterMenuItemActive : ''}`}
+                          onClick={() => { setStatusFilter(option); setIsStatusDropdownOpen(false); setCurrentPage(1); }}
+                        >
+                          <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: getStatusBadgeColor(option), flexShrink: 0 }}></span>
+                          <span>{option}</span>
+                          {statusFilter === option && <svg className={s.statusFilterCheckmark} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <button className={s.archiveIconBtn} onClick={() => setIsArchiveView(true)} title="View Archives"><LuArchive size={20} /></button>
+
+                {/* ── SEARCH (updated to match Sales style) ── */}
+                <div className={s.searchWrapper}>
+                  <LuSearch size={18} className={s.searchIcon} />
+                  <input className={s.searchInput} placeholder="Search No, Name, Address, Payment" value={searchTerm} onChange={handleSearchChange} />
+                </div>
+
                 <button className={s.addButton} onClick={() => setShowAddModal(true)}>ADD</button>
               </div>
             </div>
@@ -628,7 +638,7 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
                       <td style={{ fontWeight: 'bold' }}>₱{o.totalAmount?.toLocaleString()}</td>
                       <td>{o.paymentMethod}</td>
                       <td>{o.date}</td>
-                      <td><span className={getStatusStyle(o.status)}>{o.status}</span></td>
+                      <td><span style={getStatusStyle(o.status)}>{o.status}</span></td>
                       <td className={s.actionCell} onClick={e => e.stopPropagation()}>
                         <LuEllipsisVertical className={s.moreIcon} onClick={() => setOpenMenuId(openMenuId === o.id ? null : o.id)} />
                         {openMenuId === o.id && (
@@ -648,20 +658,15 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
             <div className={s.footer}>
               <div className={s.showDataText}>Showing <span className={s.countBadge}>{paginated.length}</span> of {sorted.length}</div>
               <div className={s.pagination}>
-                <button className={s.nextBtn} disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}>
-                  <LuChevronLeft />
-                </button>
+                <button className={s.nextBtn} disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}><LuChevronLeft /></button>
                 {renderPageNumbers()}
-                <button className={s.nextBtn} disabled={currentPage >= totalPages} onClick={() => setCurrentPage(prev => prev + 1)}>
-                  <LuChevronRight />
-                </button>
+                <button className={s.nextBtn} disabled={currentPage >= totalPages} onClick={() => setCurrentPage(prev => prev + 1)}><LuChevronRight /></button>
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* ── UPDATED: ExportModal with exportType ── */}
       <ExportModal isOpen={showExportModal} onClose={() => { setShowExportModal(false); setExportType(null); }} 
                     onSuccess={(msg, type) => { setToastTitle(type === 'error' ? 'Oops!' : 'Success!'); setToastMessage(msg); setIsError(type === 'error'); setShowToast(true); }} 
                     data={orders.filter(o => !o.is_archived)} 
@@ -670,15 +675,11 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
 
       <AddOrderModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} 
                       onSave={handleSave} statuses={orderStatuses} 
-                      paymentMethods={paymentMethods} 
-                      inventoryItems={inventoryItems} />
+                      paymentMethods={paymentMethods} inventoryItems={inventoryItems} />
 
       <OrderEditModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} 
-                      orderData={selectedOrderForEdit} 
-                      onSave={handleUpdateSave} 
-                      statuses={orderStatuses} 
-                      paymentMethods={paymentMethods} 
-                      inventoryItems={inventoryItems} />
+                      orderData={selectedOrderForEdit} onSave={handleUpdateSave} 
+                      statuses={orderStatuses} paymentMethods={paymentMethods} inventoryItems={inventoryItems} />
 
       {showViewModal && selectedOrderForView && (
         <div className={s.viewBackdrop} onClick={closeViewModal}>
@@ -705,23 +706,13 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
                     { label: 'Address', value: selectedOrderForView.address },
                     { label: 'Payment Method', value: selectedOrderForView.paymentMethod },
                   ].map(({ label, value }) => (
-                    <div key={label}>
-                      <p className={s.viewInfoLabel}>{label}</p>
-                      <p className={s.viewInfoValue}>{value}</p>
-                    </div>
+                    <div key={label}><p className={s.viewInfoLabel}>{label}</p><p className={s.viewInfoValue}>{value}</p></div>
                   ))}
                 </div>
               </div>
 
               <table className={s.viewItemsTable}>
-                <thead>
-                  <tr>
-                    <th>Item Description</th>
-                    <th>Qty</th>
-                    <th>Unit Cost</th>
-                    <th>Amount</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>Item Description</th><th>Qty</th><th>Unit Cost</th><th>Amount</th></tr></thead>
                 <tbody>
                   {selectedOrderForView.items && selectedOrderForView.items.length > 0 ? (
                     selectedOrderForView.items.map((item, idx) => {
@@ -729,10 +720,7 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
                       const unitCost = item.order_quantity > 0 ? itemAmount / item.order_quantity : 0;
                       return (
                         <tr key={idx}>
-                          <td>
-                            <p className={s.viewItemName}>{item.item_name || `Item #${item.inventory_id}`}</p>
-                            {item.uom && <p className={s.viewItemStatus}>{item.uom}</p>}
-                          </td>
+                          <td><p className={s.viewItemName}>{item.item_name || `Item #${item.inventory_id}`}</p>{item.uom && <p className={s.viewItemStatus}>{item.uom}</p>}</td>
                           <td>{item.order_quantity}</td>
                           <td>₱ {unitCost.toFixed(2)}</td>
                           <td>₱ {itemAmount.toFixed(2)}</td>
@@ -749,10 +737,7 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
                 <div className={s.viewTotalsBox}>
                   <div className={s.viewTotalLine}><span>VATable Sales</span><span>₱ {vatableBase.toFixed(2)}</span></div>
                   <div className={s.viewTotalLine}><span>VAT Amount (12%)</span><span>₱ {vatAmount.toFixed(2)}</span></div>
-                  <div className={s.viewTotalFinal}>
-                    <span>Total</span>
-                    <span>₱ {selectedOrderForView.totalAmount?.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
-                  </div>
+                  <div className={s.viewTotalFinal}><span>Total</span><span>₱ {selectedOrderForView.totalAmount?.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span></div>
                 </div>
               </div>
             </div>
