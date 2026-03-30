@@ -19,7 +19,8 @@ interface BrandVariant {
   sku: string;
   description: string;
   qty: string;
-  addStock: string;
+  stockAction: 'add' | 'remove';
+  stockDelta: string;
   uom: string;
   reorderPoint: string;
   unitCost: string;
@@ -71,13 +72,22 @@ const INITIAL_NEW_BRAND: BrandVariant = {
   sku: '',
   description: '',
   qty: '0',
-  addStock: '',
+  stockAction: 'add',
+  stockDelta: '',
   uom: 'Select',
   reorderPoint: '20',
   unitCost: '',
   sellingPrice: '',
   isNew: true,
 };
+
+const SectionHeading = ({ children }: { children: React.ReactNode }) => (
+  <p style={{ margin: '0 0 12px', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: '#9ca3af' }}>{children}</p>
+);
+
+const Divider = () => (
+  <hr style={{ border: 'none', borderTop: '1px solid #f3f4f6', margin: '20px 0' }} />
+);
 
 const LABEL_STYLE: React.CSSProperties = {
   display: 'block', fontSize: '0.72rem', fontWeight: 700,
@@ -136,7 +146,8 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
         sku: b.sku || '',
         description: b.description || itemData.itemDescription || '',
         qty: String(b.qty ?? '0'),
-        addStock: '',
+        stockAction: 'add' as const,
+        stockDelta: '',
         uom: itemData.uom || 'Select',
         reorderPoint: String(itemData.reorderPoint ?? '20'),
         unitCost: String(b.unit_price ?? ''),
@@ -257,7 +268,7 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
         brand_name: bv.brandName || 'No Brand',
         sku: bv.sku || null,
         uom: bv.uom,
-        qty: (Number(bv.qty) || 0) + (Number(bv.addStock) || 0),
+        qty: Math.max(0, (Number(bv.qty) || 0) + (bv.stockAction === 'add' ? 1 : -1) * (Number(bv.stockDelta) || 0)),
         unit_price: Number(bv.unitCost) || 0,
         selling_price: Number(bv.sellingPrice) || 0,
         itemDescription: bv.description,
@@ -279,229 +290,227 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
       }}>
 
         {/* HEADER */}
-        <div className={s.modalHeader} style={{ padding: '20px 24px', borderBottom: '1px solid #eaeaea', backgroundColor: '#fff', flexShrink: 0 }}>
-          <div className={s.modalTitleGroup}>
-            <h2 className={s.title} style={{ fontSize: '1.25rem', marginBottom: '4px' }}>Edit Inventory Item</h2>
-            <p className={s.subText}>Update product details, brands, and supplier links.</p>
+        <div className={s.modalHeader} style={{ padding: '20px 28px', borderBottom: '1px solid #f3f4f6', backgroundColor: '#fff', flexShrink: 0 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#111827' }}>Edit Inventory Item</h2>
+            <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#9ca3af' }}>Update product details, brands, and supplier links.</p>
           </div>
-          <LuX onClick={handleCancelClick} className={s.closeIcon} style={{ cursor: 'pointer', color: '#666' }} />
+          <LuX onClick={handleCancelClick} style={{ cursor: 'pointer', color: '#9ca3af', flexShrink: 0 }} size={20} />
         </div>
 
-        {/* Product ID Banner */}
-        <div style={{ backgroundColor: '#eff6ff', padding: '12px 24px', borderBottom: '1px solid #dbeafe', flexShrink: 0 }}>
-          <span style={{ fontSize: '0.78rem', textTransform: 'uppercase', color: '#1e40af', letterSpacing: '0.5px', fontWeight: 700 }}>Product ID: </span>
-          <span style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>{formData.id}</span>
-        </div>
+        {/* ── SCROLLABLE BODY ── */}
+        <div style={{ flex: 1, overflowY: 'auto', backgroundColor: '#f8fafc', minHeight: 0 }}>
+          <div style={{ padding: '24px 24px 0' }}>
 
-        {/* ── SINGLE SCROLLABLE BODY ── */}
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', backgroundColor: '#f9fafb', minHeight: 0 }}>
-
-          {/* ── ITEM DETAILS SECTION ── */}
-          <div style={{ padding: '20px 24px', flexShrink: 0 }}>
-            <div style={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', padding: '20px' }}>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', borderBottom: '1px solid #f3f4f6', paddingBottom: '12px' }}>
-                <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700 }}>1</div>
-                <span style={{ color: '#111827', fontWeight: 600, fontSize: '1rem' }}>Item Details</span>
+            {/* ── ITEM NAME card ── */}
+            <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '20px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                <SectionHeading>Basic Information</SectionHeading>
+                <span style={{ fontSize: '0.75rem', color: '#6b7280', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '2px 10px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                  ID: {formData.id}
+                </span>
               </div>
+              <label style={{ ...LABEL_STYLE, color: itemNameHasError() ? '#dc2626' : '#6b7280' }}>
+                Item Name <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <input
+                style={itemNameHasError() ? FIELD_ERROR_STYLE : FIELD_STYLE}
+                value={formData.itemName}
+                onChange={e => { setDupError(''); setFormData({ ...formData, itemName: e.target.value }); }}
+                placeholder="e.g. Bond Paper A4"
+              />
+              {itemNameHasError() && (
+                <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Item name is required.</p>
+              )}
+            </div>
 
-              {/* ITEM NAME */}
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ ...LABEL_STYLE, color: itemNameHasError() ? '#dc2626' : '#6b7280' }}>
-                  Item Name <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <input
-                  style={itemNameHasError() ? FIELD_ERROR_STYLE : { ...FIELD_STYLE, borderColor: dupError && dupError.includes(formData.itemName) ? '#fca5a5' : '#9ca3af' }}
-                  value={formData.itemName}
-                  onChange={e => { setDupError(''); setFormData({ ...formData, itemName: e.target.value }); }}
-                  placeholder="e.g. Bond Paper A4"
-                />
-                {itemNameHasError() && (
-                  <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Item name is required.</p>
+          </div>
+
+          {/* ── BRAND VARIANTS ── */}
+          {brandVariants.map((brand, brandIdx) => (
+            <div key={brandIdx} style={{ padding: '0 24px', marginBottom: '16px' }}>
+              {/* one card per brand — no nested boxes inside */}
+              <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '20px' }}>
+
+              {/* Brand header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <p style={{ margin: 0, fontSize: '0.78rem', fontWeight: 700, color: '#374151' }}>
+                  Brand Variant {brandIdx + 1}
+                  {!brand.isNew && (
+                    <span style={{ marginLeft: '8px', fontSize: '0.7rem', fontWeight: 500, color: '#9ca3af' }}>· existing</span>
+                  )}
+                </p>
+                {brandVariants.length > 1 && (
+                  <button type="button" onClick={() => handleRemoveBrandVariant(brandIdx)}
+                    style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', fontWeight: 600 }}>
+                    <LuTrash2 size={13} /> Remove
+                  </button>
                 )}
               </div>
 
-              {/* BRAND DETAIL sub-cards */}
-              {brandVariants.map((brand, brandIdx) => (
-                <div key={brandIdx} style={{ border: '2px dashed #e2e8f0', borderRadius: '10px', padding: '16px', marginBottom: '12px', backgroundColor: '#fafafa' }}>
-
-                  {/* Brand header */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#374151' }}>
-                      {brandIdx + 1} Brand Detail
-                      {!brand.isNew && (
-                        <span style={{ marginLeft: '8px', fontSize: '0.7rem', fontWeight: 500, color: '#6b7280', backgroundColor: '#f3f4f6', padding: '1px 6px', borderRadius: '999px', border: '1px solid #e5e7eb' }}>existing</span>
-                      )}
-                    </span>
-                    {brandVariants.length > 1 && (
-                      <button type="button" onClick={() => handleRemoveBrandVariant(brandIdx)}
-                        style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }}>
-                        <LuTrash2 size={13} />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Row: BRAND NAME | SKU */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '10px' }}>
-                    <div>
-                      <label style={{ ...LABEL_STYLE }}>Brand Name</label>
-                      {!brand.isNew ? (
-                        <div style={{ ...READ_ONLY_STYLE }}>{brand.brandName || '—'}</div>
-                      ) : (
-                        <select
-                          style={{ ...FIELD_STYLE }}
-                          value={brand.brand_id ?? ''}
-                          onChange={e => {
-                            const selected = brands.find((b: any) => String(b.id) === e.target.value);
-                            handleBrandChange(brandIdx, 'brand_id', selected ? selected.id : null);
-                            handleBrandChange(brandIdx, 'brandName', selected ? selected.name : '');
-                          }}
-                        >
-                          <option value="">Select Brand</option>
-                          {brands.map((b: any) => (
-                            <option key={b.id} value={b.id}>
-                              {b.name === 'No Brand' ? '— No Brand' : b.name}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                    <div>
-                      <label style={{ ...LABEL_STYLE }}>SKU</label>
-                      <input
-                        style={{ ...DISABLED_STYLE }}
-                        value={brand.sku || (brand.isNew ? '' : 'Auto-generated')}
-                        readOnly
-                        placeholder="Auto-generated"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Row: DESCRIPTION */}
-                  <div style={{ marginBottom: '10px' }}>
-                    <label style={{ ...LABEL_STYLE }}>Description</label>
-                    <input
-                      style={{ ...FIELD_STYLE }}
-                      value={brand.description}
-                      onChange={e => handleBrandChange(brandIdx, 'description', e.target.value)}
-                      placeholder="Specific brand details..."
-                    />
-                  </div>
-
-                  {/* Row: CURRENT STOCK | ADD STOCK | NEW TOTAL */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '10px' }}>
-                    <div>
-                      <label style={{ ...LABEL_STYLE }}>Current Stock</label>
-                      <div style={{ ...READ_ONLY_STYLE }}>{brand.qty || '0'}</div>
-                    </div>
-                    <div>
-                      <label style={{ ...LABEL_STYLE }}>Add Stock</label>
-                      <input
-                        type="number" min="0"
-                        style={{ ...FIELD_STYLE }}
-                        value={brand.addStock}
-                        onChange={e => {
-                          const v = e.target.value;
-                          if (v === '' || Number(v) >= 0) handleBrandChange(brandIdx, 'addStock', v);
-                        }}
-                        placeholder="0"
-                      />
-                    </div>
-                    <div>
-                      <label style={{ ...LABEL_STYLE }}>New Total</label>
-                      <div style={{
-                        ...READ_ONLY_STYLE,
-                        ...(Number(brand.addStock) > 0 ? { color: '#16a34a', fontWeight: 700, borderColor: '#bbf7d0', backgroundColor: '#f0fdf4' } : {}),
+              {/* Brand Name | SKU */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                <div>
+                  <label style={{ ...LABEL_STYLE }}>Brand Name</label>
+                  {!brand.isNew ? (
+                    <div style={{ ...READ_ONLY_STYLE }}>{brand.brandName || '—'}</div>
+                  ) : (
+                    <select style={{ ...FIELD_STYLE }} value={brand.brand_id ?? ''}
+                      onChange={e => {
+                        const selected = brands.find((b: any) => String(b.id) === e.target.value);
+                        handleBrandChange(brandIdx, 'brand_id', selected ? selected.id : null);
+                        handleBrandChange(brandIdx, 'brandName', selected ? selected.name : '');
                       }}>
-                        {(Number(brand.qty) || 0) + (Number(brand.addStock) || 0)}
-                      </div>
-                    </div>
-                  </div>
+                      <option value="">Select Brand</option>
+                      {brands.map((b: any) => (
+                        <option key={b.id} value={b.id}>{b.name === 'No Brand' ? '— No Brand' : b.name}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                <div>
+                  <label style={{ ...LABEL_STYLE }}>SKU</label>
+                  <input style={{ ...DISABLED_STYLE }} value={brand.sku || (brand.isNew ? '' : 'Auto-generated')} readOnly placeholder="Auto-generated" />
+                </div>
+              </div>
 
-                  {/* Row: UNIT (UOM) | REORDER POINT */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '10px' }}>
-                    <div>
-                      <label style={{ ...LABEL_STYLE, color: uomHasError(brandIdx) ? '#dc2626' : '#6b7280' }}>
-                        Unit (UOM) <span style={{ color: '#ef4444' }}>*</span>
-                      </label>
-                      <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
-                        <div style={{ flex: 1 }}>
-                          <select
-                            style={{ ...(uomHasError(brandIdx) ? FIELD_ERROR_STYLE : FIELD_STYLE), width: '100%' }}
-                            value={brand.uom}
-                            onChange={e => handleBrandChange(brandIdx, 'uom', e.target.value)}
-                          >
-                            <option value="Select">Select</option>
-                            {uoms.map((u: any) => <option key={u.id} value={u.code}>{u.name} ({u.code})</option>)}
-                          </select>
-                          {uomHasError(brandIdx) && (
-                            <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Please select a unit of measure.</p>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={onOpenUomModal}
-                          title="Manage Units of Measure"
-                          style={{ flexShrink: 0, width: '34px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #d1d5db', borderRadius: '6px', backgroundColor: '#f9fafb', cursor: 'pointer', color: '#6b7280' }}>
-                          <LuSlidersHorizontal size={15} />
-                        </button>
-                      </div>
-                    </div>
-                    <div>
-                      <label style={{ ...LABEL_STYLE }}>Reorder Point</label>
-                      <input
-                        type="number" min="0"
-                        style={{ ...FIELD_STYLE, border: '1px solid #fcd34d' }}
-                        value={brand.reorderPoint}
-                        onChange={e => handleBrandChange(brandIdx, 'reorderPoint', e.target.value)}
-                        placeholder="20"
-                      />
-                    </div>
-                  </div>
+              {/* Description */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ ...LABEL_STYLE }}>Description</label>
+                <input style={{ ...FIELD_STYLE }} value={brand.description}
+                  onChange={e => handleBrandChange(brandIdx, 'description', e.target.value)}
+                  placeholder="Specific brand details..." />
+              </div>
 
-                  {/* Row: UNIT COST | SELLING PRICE */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div>
-                      <label style={{ ...LABEL_STYLE }}>Unit Cost</label>
-                      <input
-                        type="number" min="0" step="0.01"
-                        style={{ ...FIELD_STYLE }}
-                        value={brand.unitCost}
-                        onChange={e => handleBrandChange(brandIdx, 'unitCost', e.target.value)}
-                        placeholder="0.00"
-                      />
+              {/* ── Inventory Settings ── */}
+              <Divider />
+              <SectionHeading>Inventory Settings</SectionHeading>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+                <div>
+                  <label style={{ ...LABEL_STYLE, color: uomHasError(brandIdx) ? '#dc2626' : '#6b7280' }}>
+                    Unit (UOM) <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <div style={{ flex: 1 }}>
+                      <select style={{ ...(uomHasError(brandIdx) ? FIELD_ERROR_STYLE : FIELD_STYLE), width: '100%' }}
+                        value={brand.uom} onChange={e => handleBrandChange(brandIdx, 'uom', e.target.value)}>
+                        <option value="Select">Select</option>
+                        {uoms.map((u: any) => <option key={u.id} value={u.code}>{u.name} ({u.code})</option>)}
+                      </select>
+                      {uomHasError(brandIdx) && (
+                        <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Please select a unit of measure.</p>
+                      )}
                     </div>
-                    <div>
-                      <label style={{ ...LABEL_STYLE }}>Selling Price</label>
-                      <input
-                        type="number" min="0" step="0.01"
-                        style={{ ...FIELD_STYLE }}
-                        value={brand.sellingPrice}
-                        onChange={e => handleBrandChange(brandIdx, 'sellingPrice', e.target.value)}
-                        placeholder="0.00"
-                      />
-                    </div>
+                    <button type="button" onClick={onOpenUomModal} title="Manage Units of Measure"
+                      style={{ flexShrink: 0, width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e5e7eb', borderRadius: '6px', background: '#fff', cursor: 'pointer', color: '#6b7280' }}>
+                      <LuSlidersHorizontal size={15} />
+                    </button>
                   </div>
                 </div>
-              ))}
+                <div>
+                  <label style={{ ...LABEL_STYLE }}>Reorder Point</label>
+                  <input type="number" min="0" style={{ ...FIELD_STYLE, borderColor: '#fcd34d' }}
+                    value={brand.reorderPoint}
+                    onChange={e => handleBrandChange(brandIdx, 'reorderPoint', e.target.value)}
+                    placeholder="20" />
+                </div>
+              </div>
 
-              {/* + Add Brand Variant */}
-              <button
-                type="button"
-                onClick={handleAddBrandVariant}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563eb', fontSize: '0.85rem', fontWeight: 600, padding: '4px 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <LuPlus size={14} /> Add Brand Variant
-              </button>
+              {/* ── Pricing ── */}
+              <Divider />
+              <SectionHeading>Pricing</SectionHeading>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+                <div>
+                  <label style={{ ...LABEL_STYLE }}>Unit Cost</label>
+                  <input type="number" min="0" step="0.01" style={{ ...FIELD_STYLE }} value={brand.unitCost}
+                    onChange={e => handleBrandChange(brandIdx, 'unitCost', e.target.value)} placeholder="0.00" />
+                </div>
+                <div>
+                  <label style={{ ...LABEL_STYLE }}>Selling Price</label>
+                  <input type="number" min="0" step="0.01" style={{ ...FIELD_STYLE }} value={brand.sellingPrice}
+                    onChange={e => handleBrandChange(brandIdx, 'sellingPrice', e.target.value)} placeholder="0.00" />
+                </div>
+              </div>
+
+              {/* ── Stock Adjustment ── */}
+              <Divider />
+              <SectionHeading>Stock Adjustment</SectionHeading>
+              {(() => {
+                const current = Number(brand.qty) || 0;
+                const delta = Number(brand.stockDelta) || 0;
+                const newTotal = Math.max(0, brand.stockAction === 'add' ? current + delta : current - delta);
+                const hasChange = delta > 0;
+                return (
+                  <div style={{ marginBottom: '8px' }}>
+                    {/* Current Stock | New Total */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                      <div style={{ background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px 16px' }}>
+                        <p style={{ margin: '0 0 6px', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: '#9ca3af' }}>Current Stock</p>
+                        <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: '#374151' }}>{current}</p>
+                      </div>
+                      <div style={{
+                        background: hasChange ? (brand.stockAction === 'add' ? '#f0fdf4' : '#fff5f5') : '#f8fafc',
+                        border: `1px solid ${hasChange ? (brand.stockAction === 'add' ? '#bbf7d0' : '#fecaca') : '#e5e7eb'}`,
+                        borderRadius: '8px', padding: '12px 16px',
+                      }}>
+                        <p style={{ margin: '0 0 6px', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: hasChange ? (brand.stockAction === 'add' ? '#16a34a' : '#dc2626') : '#9ca3af' }}>New Total</p>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                          <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: hasChange ? (brand.stockAction === 'add' ? '#16a34a' : '#dc2626') : '#9ca3af' }}>{newTotal}</p>
+                          {hasChange && (
+                            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: brand.stockAction === 'add' ? '#16a34a' : '#dc2626' }}>
+                              ({brand.stockAction === 'add' ? '+' : '−'}{delta})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {/* Controls */}
+                    <label style={{ ...LABEL_STYLE }}>Adjust By</label>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden', height: '38px', flexShrink: 0 }}>
+                        {(['add', 'remove'] as const).map(action => (
+                          <button key={action} type="button"
+                            onClick={() => handleBrandChange(brandIdx, 'stockAction', action)}
+                            style={{
+                              padding: '0 18px', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem',
+                              transition: 'background 0.15s, color 0.15s',
+                              backgroundColor: brand.stockAction === action ? (action === 'add' ? '#16a34a' : '#dc2626') : '#f9fafb',
+                              color: brand.stockAction === action ? '#fff' : '#6b7280',
+                            }}>
+                            {action === 'add' ? '+ Stock In' : '− Stock Out'}
+                          </button>
+                        ))}
+                      </div>
+                      <input type="text" inputMode="numeric"
+                        style={{ ...FIELD_STYLE, flex: 1, textAlign: 'center', fontWeight: 600 }}
+                        value={brand.stockDelta}
+                        onChange={e => handleBrandChange(brandIdx, 'stockDelta', e.target.value.replace(/[^0-9]/g, ''))}
+                        placeholder="Enter quantity" />
+                    </div>
+                  </div>
+                );
+              })()}
+
             </div>
           </div>
+          ))}
 
-          {/* ── SUPPLIER SECTION (bottom) ── */}
-          <div style={{ flexShrink: 0, padding: '20px 24px', backgroundColor: '#fff', borderTop: '1px solid #eaeaea' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-              <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: '#333' }}>Supplier Details</h4>
+          {/* + Add Brand Variant */}
+          <div style={{ padding: '0 24px 8px' }}>
+            <button type="button" onClick={handleAddBrandVariant}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563eb', fontSize: '0.85rem', fontWeight: 600, padding: '4px 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <LuPlus size={14} /> Add Brand Variant
+            </button>
+          </div>
+
+          {/* ── SUPPLIER SECTION ── */}
+          <div style={{ padding: '0 28px 28px' }}>
+            <Divider />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: '#111827' }}>Suppliers</p>
               <button type="button" onClick={handleAddSupplier}
-                style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '6px', border: '1px solid #dbeafe', backgroundColor: '#eff6ff', color: '#1e40af', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>
-                <LuPlus size={13} /> Add Supplier
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563eb', fontSize: '0.85rem', fontWeight: 600, padding: '4px 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <LuPlus size={14} /> Add Supplier
               </button>
             </div>
 
@@ -512,68 +521,79 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
             )}
 
             {supplierEntries.map((entry, idx) => (
-              <div key={idx} style={{ border: `1px solid ${idx === 0 ? '#bfdbfe' : '#e5e7eb'}`, borderRadius: '10px', padding: '14px', marginBottom: '10px', backgroundColor: idx === 0 ? '#f0f7ff' : '#fafafa' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  {idx === 0
-                    ? <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1e40af', backgroundColor: '#dbeafe', padding: '2px 8px', borderRadius: '999px' }}>PRIMARY</span>
-                    : <span style={{ fontSize: '0.72rem', color: '#6b7280', backgroundColor: '#f3f4f6', padding: '2px 8px', borderRadius: '999px', border: '1px solid #e5e7eb' }}>Alternate</span>
-                  }
+              <div key={idx} style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '16px', marginBottom: '12px' }}>
+
+                {/* Row: badge + remove */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                  <span style={{
+                    fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px',
+                    color: idx === 0 ? '#1e40af' : '#6b7280',
+                    background: idx === 0 ? '#eff6ff' : '#f3f4f6',
+                    padding: '3px 10px', borderRadius: '999px',
+                  }}>
+                    {idx === 0 ? 'Primary' : `Alternate ${idx}`}
+                  </span>
                   {supplierEntries.length > 1 && (
-                    <button type="button" onClick={() => handleRemoveSupplier(idx)} style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}>
+                    <button type="button" onClick={() => handleRemoveSupplier(idx)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
                       <LuTrash2 size={13} /> Remove
                     </button>
                   )}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '12px', marginBottom: '10px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 500, color: '#555', marginBottom: '4px' }}>Supplier Name</label>
-                    <select style={{ ...FIELD_STYLE }} value={entry.supplierName} onChange={e => handleSupplierChange(idx, 'supplierName', e.target.value)}>
-                      <option value="">Select Supplier</option>
-                      {suppliers.map((sup: any) => {
-                        const used = supplierEntries.some((e, ei) => ei !== idx && e.supplierName === sup.supplierName);
-                        return <option key={sup.id} value={sup.supplierName} disabled={used} style={{ color: used ? '#9ca3af' : '#374151' }}>{sup.supplierName}</option>;
-                      })}
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 500, color: '#555', marginBottom: '4px' }}>Lead Time (Days)</label>
-                    <input type="number" style={{ ...FIELD_STYLE }} value={entry.leadTime} placeholder="e.g. 7" onChange={e => handleSupplierChange(idx, 'leadTime', e.target.value)} />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 500, color: '#555', marginBottom: '4px' }}>Min Order (MOQ)</label>
-                    <input type="number" style={{ ...FIELD_STYLE }} value={entry.minOrder} placeholder="e.g. 50" onChange={e => handleSupplierChange(idx, 'minOrder', e.target.value)} />
-                  </div>
+
+                {/* Supplier select + auto-filled contact info below it */}
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ ...LABEL_STYLE }}>Supplier Name</label>
+                  <select style={{ ...FIELD_STYLE }} value={entry.supplierName} onChange={e => handleSupplierChange(idx, 'supplierName', e.target.value)}>
+                    <option value="">Select Supplier</option>
+                    {suppliers.map((sup: any) => {
+                      const used = supplierEntries.some((e, ei) => ei !== idx && e.supplierName === sup.supplierName);
+                      return <option key={sup.id} value={sup.supplierName} disabled={used} style={{ color: used ? '#9ca3af' : '#374151' }}>{sup.supplierName}</option>;
+                    })}
+                  </select>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+
+                {/* Contact info (read-only, auto-filled from supplier) + Lead Time + Min Order */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 500, color: '#555', marginBottom: '4px' }}>Contact Person</label>
+                    <label style={{ ...LABEL_STYLE }}>Contact Person <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: '#b0b8c1' }}>· auto-filled</span></label>
                     <div style={{ ...READ_ONLY_STYLE }}>{entry.contactPerson || '—'}</div>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 500, color: '#555', marginBottom: '4px' }}>Contact Number</label>
+                    <label style={{ ...LABEL_STYLE }}>Contact Number <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: '#b0b8c1' }}>· auto-filled</span></label>
                     <div style={{ ...READ_ONLY_STYLE }}>{entry.contactNumber || '—'}</div>
                   </div>
                 </div>
+
+                {/* Lead Time + Min Order */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ ...LABEL_STYLE }}>Lead Time (Days)</label>
+                    <input type="number" style={{ ...FIELD_STYLE }} value={entry.leadTime} placeholder="e.g. 7" onChange={e => handleSupplierChange(idx, 'leadTime', e.target.value)} />
+                  </div>
+                  <div>
+                    <label style={{ ...LABEL_STYLE }}>Min Order (MOQ)</label>
+                    <input type="number" style={{ ...FIELD_STYLE }} value={entry.minOrder} placeholder="e.g. 50" onChange={e => handleSupplierChange(idx, 'minOrder', e.target.value)} />
+                  </div>
+                </div>
+
               </div>
             ))}
           </div>
-
         </div>
-        {/* END SINGLE SCROLLABLE BODY */}
+        {/* END SCROLLABLE BODY */}
 
         {/* FOOTER */}
-        <div className={s.modalFooter} style={{ padding: '20px 24px', borderTop: '1px solid #eaeaea', backgroundColor: '#fff', display: 'flex', flexDirection: 'column', gap: '12px', flexShrink: 0 }}>
+        <div style={{ padding: '16px 28px', borderTop: '1px solid #f3f4f6', backgroundColor: '#fff', display: 'flex', flexDirection: 'column', gap: '12px', flexShrink: 0 }}>
           {dupError && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#fee2e2', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: '8px', padding: '10px 14px', fontSize: '0.85rem', fontWeight: 500 }}>
               <span>⚠</span> {dupError}
             </div>
           )}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
             <button className={s.cancelBtn} onClick={handleCancelClick}>Cancel</button>
-            <button
-              className={s.saveBtn}
-              onClick={handleSubmit}
-              style={{ backgroundColor: '#111827', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: '8px', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer' }}>
+            <button onClick={handleSubmit}
+              style={{ backgroundColor: '#111827', color: '#fff', border: 'none', padding: '8px 24px', borderRadius: '8px', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer' }}>
               Update Item
             </button>
           </div>
