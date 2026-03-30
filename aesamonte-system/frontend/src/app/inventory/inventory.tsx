@@ -142,6 +142,23 @@ const Inventory: React.FC<InventoryProps> = ({ role, employeeId = 0, onLogout, i
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [exportType, setExportType] = useState<'pdf' | 'xlsx' | 'csv' | null>(null);
 
+  // ── UOM FILTER ──
+  const [uomFilter, setUomFilter] = useState<string>('All UOM');
+  const [isUomDropdownOpen, setIsUomDropdownOpen] = useState(false);
+
+  // ── STATUS FILTER (ported from Sales) ──
+  const [statusFilter, setStatusFilter] = useState<string>('All Status');
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+
+  const STATUS_OPTIONS = ['All Status', 'Available', 'Low Stock', 'Out of Stock'];
+
+  const getStatusBadgeColor = (status: string) => {
+    if (status === 'Available') return '#10b981';
+    if (status === 'Low Stock') return '#f59e0b';
+    if (status === 'Out of Stock') return '#ef4444';
+    return '#9ca3af';
+  };
+
   const handleExportSuccess = (msg: string, type: 'success' | 'error' = 'success') => {
     setToastMessage(msg);
     setIsError(type === 'error');
@@ -186,7 +203,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, employeeId = 0, onLogout, i
         weeklyInventory: summary.weekly,
         monthlyInventory: summary.monthly,
         yearlyInventory: summary.yearly,
-        // CATCH THE PERCENTAGE
         totalProductsChange: summary.totalProductsChange || 0,
       }));
     } catch (err) {
@@ -229,6 +245,10 @@ const Inventory: React.FC<InventoryProps> = ({ role, employeeId = 0, onLogout, i
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) setActiveMenuId(null);
+      // Close date/status dropdowns when clicking outside
+      const target = event.target as HTMLElement;
+      if (!target.closest('[data-filter="uom"]')) setIsUomDropdownOpen(false);
+      if (!target.closest('[data-filter="status"]')) setIsStatusDropdownOpen(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -337,26 +357,42 @@ const Inventory: React.FC<InventoryProps> = ({ role, employeeId = 0, onLogout, i
     const supplierNames = (p.suppliers || []).map(s => s.supplier_name).join(' ');
     const searchStr = `${p.id} ${p.item_name} ${brandNames} ${supplierNames}`.toLowerCase();
     const matchesSearch = searchStr.includes(searchTerm.toLowerCase());
-    return matchesArchiveView && matchesSearch;
+    // ── STATUS FILTER ──
+    const matchesStatus = statusFilter === 'All Status' || p.status?.includes(statusFilter);
+    const matchesUom = uomFilter === 'All UOM' || p.uom === uomFilter;
+    return matchesArchiveView && matchesSearch && matchesStatus && matchesUom;
   });
+
+  // Priority: Out of Stock = 0, Low Stock = 1, everything else = 2
+  const getStatusPriority = (status: string) => {
+    if (status?.includes('Out of Stock')) return 0;
+    if (status?.includes('Low Stock')) return 1;
+    return 2;
+  };
 
   const sortedProducts = useMemo(() => {
     const arr = [...filteredProducts];
-    if (!sortConfig.key || !sortConfig.direction) return arr.sort((a, b) => Number(a.id) - Number(b.id));
-    const key = sortConfig.key as keyof Product;
+    const baseSort = !sortConfig.key || !sortConfig.direction
+      ? (a: Product, b: Product) => Number(a.id) - Number(b.id)
+      : (a: Product, b: Product) => {
+          const key = sortConfig.key as keyof Product;
+          const A = a[key]; const B = b[key];
+          if (typeof A === 'number' && typeof B === 'number') return sortConfig.direction === 'asc' ? A - B : B - A;
+          const strA = String(A).toLowerCase(); const strB = String(B).toLowerCase();
+          if (strA < strB) return sortConfig.direction === 'asc' ? -1 : 1;
+          if (strA > strB) return sortConfig.direction === 'asc' ? 1 : -1;
+          return 0;
+        };
     return arr.sort((a, b) => {
-      const A = a[key]; const B = b[key];
-      if (typeof A === 'number' && typeof B === 'number') return sortConfig.direction === 'asc' ? A - B : B - A;
-      const strA = String(A).toLowerCase(); const strB = String(B).toLowerCase();
-      if (strA < strB) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (strA > strB) return sortConfig.direction === 'asc' ? 1 : -1;
-      return 0;
+      const priorityDiff = getStatusPriority(a.status) - getStatusPriority(b.status);
+      if (priorityDiff !== 0) return priorityDiff; // pin alert rows first
+      return baseSort(a, b);                        // then apply normal sort within each group
     });
   }, [filteredProducts, sortConfig]);
 
   const totalPages = Math.ceil(sortedProducts.length / ROWS_PER_PAGE);
   const paginatedProducts = sortedProducts.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
-  useEffect(() => { setCurrentPage(1); }, [searchTerm]);
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, statusFilter, uomFilter]);
 
   const changePage = (page: number) => { if (page >= 1 && page <= totalPages) setCurrentPage(page); };
 
@@ -380,41 +416,19 @@ const Inventory: React.FC<InventoryProps> = ({ role, employeeId = 0, onLogout, i
     return s.viewStatusOutOfStock;
   };
 
-  // ADD THIS HELPER FUNCTION
   const renderGrowthPill = (value: number) => {
     let icon = '—';
-    let textColor = '#ca8a04'; // Yellow-600
-    let bgColor = '#fef08a'; // Yellow-200
-
-    if (value > 0) {
-      icon = '↗';
-      textColor = '#15803d'; // Green-700
-      bgColor = '#dcfce7'; // Green-100
-    } else if (value < 0) {
-      icon = '↘';
-      textColor = '#b91c1c'; // Red-700
-      bgColor = '#fee2e2'; // Red-100
-    }
-
+    let textColor = '#ca8a04';
+    let bgColor = '#fef08a';
+    if (value > 0) { icon = '↗'; textColor = '#15803d'; bgColor = '#dcfce7'; }
+    else if (value < 0) { icon = '↘'; textColor = '#b91c1c'; bgColor = '#fee2e2'; }
     const displayValue = Math.abs(value);
-
     return (
-      <span 
-        className={s.pill} 
-        style={{ 
-          color: textColor, 
-          backgroundColor: bgColor,
-          fontWeight: 600,
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '4px'
-        }}
-      >
+      <span className={s.pill} style={{ color: textColor, backgroundColor: bgColor, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
         {icon} {displayValue}%
       </span>
     );
-  }
-  //END OF HELPER FUNCTION
+  };
 
   if (isLoading) return <div className={s.loadingContainer}>Loading Inventory...</div>;
 
@@ -462,10 +476,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, employeeId = 0, onLogout, i
           <section className={s.statCard}>
             <p className={s.cardTitle}>Total Products</p>
             <h2 className={s.bigNumber}>{data.totalProducts.toLocaleString()}</h2>
-            <div className={s.cardFooter}>
-              <span className={s.subText}>vs last month</span>
-              {renderGrowthPill(data.totalProductsChange)}
-            </div>
           </section>
 
           <section className={s.statCard}>
@@ -509,10 +519,75 @@ const Inventory: React.FC<InventoryProps> = ({ role, employeeId = 0, onLogout, i
             <div className={s.header}>
               <h1 className={s.title}>Product List</h1>
               <div className={s.controls}>
+
+                {/* ── UOM FILTER ── */}
+                <div className={s.statusFilterContainer} data-filter="uom">
+                  <button
+                    className={`${s.statusFilterTrigger} ${isUomDropdownOpen ? s.statusFilterTriggerOpen : ''}`}
+                    onClick={() => setIsUomDropdownOpen(prev => !prev)}
+                  >
+                    <span className={s.statusFilterLabel}>{uomFilter}</span>
+                    <svg className={`${s.statusFilterChevron} ${isUomDropdownOpen ? s.statusFilterChevronOpen : ''}`} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  </button>
+                  {isUomDropdownOpen && (
+                    <div className={s.statusFilterMenu} style={{ maxHeight: '220px', overflowY: 'auto' }}>
+                      <button
+                        className={`${s.statusFilterMenuItem} ${uomFilter === 'All UOM' ? s.statusFilterMenuItemActive : ''}`}
+                        onClick={() => { setUomFilter('All UOM'); setIsUomDropdownOpen(false); setCurrentPage(1); }}
+                      >
+                        <span>All UOM</span>
+                        {uomFilter === 'All UOM' && <svg className={s.statusFilterCheckmark} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+                      </button>
+                      {/* Divider */}
+                      {uoms.length > 0 && <div style={{ borderTop: '1px solid #e5e7eb', margin: '4px 0' }} />}
+                      {uoms.map(u => (
+                        <button
+                          key={u.id}
+                          className={`${s.statusFilterMenuItem} ${uomFilter === u.code ? s.statusFilterMenuItemActive : ''}`}
+                          onClick={() => { setUomFilter(u.code); setIsUomDropdownOpen(false); setCurrentPage(1); }}
+                        >
+                          <span style={{ fontWeight: 500 }}>{u.name}</span>
+                          <span style={{ fontSize: '0.75rem', color: '#9ca3af', marginLeft: '4px' }}>({u.code})</span>
+                          {uomFilter === u.code && <svg className={s.statusFilterCheckmark} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* ── STATUS FILTER (same pattern as Sales) ── */}
+                <div className={s.statusFilterContainer} data-filter="status">
+                  <button
+                    className={`${s.statusFilterTrigger} ${isStatusDropdownOpen ? s.statusFilterTriggerOpen : ''}`}
+                    onClick={() => setIsStatusDropdownOpen(prev => !prev)}
+                  >
+                    <span className={s.statusBadge} style={{ backgroundColor: getStatusBadgeColor(statusFilter) }}></span>
+                    <span className={s.statusFilterLabel}>{statusFilter}</span>
+                    <svg className={`${s.statusFilterChevron} ${isStatusDropdownOpen ? s.statusFilterChevronOpen : ''}`} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  </button>
+                  {isStatusDropdownOpen && (
+                    <div className={s.statusFilterMenu}>
+                      {STATUS_OPTIONS.map(option => (
+                        <button
+                          key={option}
+                          className={`${s.statusFilterMenuItem} ${statusFilter === option ? s.statusFilterMenuItemActive : ''}`}
+                          onClick={() => { setStatusFilter(option); setIsStatusDropdownOpen(false); setCurrentPage(1); }}
+                        >
+                          <span className={s.statusMenuBadge} style={{ backgroundColor: getStatusBadgeColor(option) }}></span>
+                          <span>{option}</span>
+                          {statusFilter === option && (
+                            <svg className={s.statusFilterCheckmark} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <button className={s.archiveIconBtn} onClick={() => setIsArchiveView(true)} title="View Archives"><LuArchive size={20} /></button>
                 <div className={s.searchWrapper}>
-                  <input className={s.searchInput} placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-                  <LuSearch size={18} />
+                  <LuSearch size={18} className={s.searchIcon} />
+                  <input className={s.searchInput} placeholder="Search by ID, Item, or Brand" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
                 <button className={s.addButton} onClick={guard(permissions?.can_create, () => { setDefaultSupplierName(''); setShowModal(true); })}>ADD</button>
               </div>
@@ -530,40 +605,41 @@ const Inventory: React.FC<InventoryProps> = ({ role, employeeId = 0, onLogout, i
                       { label: 'UOM', key: 'uom' },
                       { label: 'STATUS', key: 'status' },
                     ].map(col => (
-                            <th
-                              key={col.label}
-                              onClick={() => col.key && requestSort(col.key as keyof Product)}
-                              style={{ cursor: col.key ? 'pointer' : 'default', whiteSpace: 'nowrap' }}
-                            >
-                              <div className={s.sortableHeader}>
-                                <span>{col.label}</span>
-                                {col.key && (
-                                  <div className={s.sortIconsStack}>
-                                    <LuChevronUp className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''} />
-                                    <LuChevronDown className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''} />
-                                  </div>
-                                )}
-                              </div>
-                            </th>
-                          ))}
+                      <th
+                        key={col.label}
+                        onClick={() => col.key && requestSort(col.key as keyof Product)}
+                        style={{ cursor: col.key ? 'pointer' : 'default', whiteSpace: 'nowrap' }}
+                      >
+                        <div className={s.sortableHeader}>
+                          <span>{col.label}</span>
+                          {col.key && (
+                            <div className={s.sortIconsStack}>
+                              <LuChevronUp className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''} />
+                              <LuChevronDown className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''} />
+                            </div>
+                          )}
+                        </div>
+                      </th>
+                    ))}
                     <th className={s.actionHeader}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedProducts.map(p => (
-                  <tr key={p.id} onClick={() => handleViewClick(p)} style={{ cursor: 'pointer', height: '42px' }}><td>{p.id}</td>
+                    <tr key={p.id} onClick={() => handleViewClick(p)} style={{ cursor: 'pointer', height: '42px' }}>
+                      <td>{p.id}</td>
                       <td>{p.item_name}</td>
-                     <td style={{ fontSize: '0.83rem', color: '#374151' }}>
-                          {(p.brands || []).length === 0 ? (
-                            <span style={{ color: '#9ca3af' }}>—</span>
-                          ) : (
+                      <td style={{ fontSize: '0.83rem', color: '#374151' }}>
+                        {(p.brands || []).length === 0 ? (
+                          <span style={{ color: '#9ca3af' }}>—</span>
+                        ) : (
                           [...new Set((p.brands || []).map(b => displayBrandName(b.brand_name)))]
-                            .map((name, i, arr) => (
+                            .map((name, i) => (
                               <span key={i}>
                                 {i > 0 && <span style={{ color: '#d1d5db', margin: '0 4px' }}>•</span>}
                                 {name}
                               </span>
-                          ))
+                            ))
                         )}
                       </td>
                       <td>{p.qty}</td>

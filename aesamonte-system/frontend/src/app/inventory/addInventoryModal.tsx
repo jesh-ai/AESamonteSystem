@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from "@/css/inventory.module.css";
 import { LuPlus, LuTrash2, LuSlidersHorizontal } from "react-icons/lu";
 
@@ -74,6 +74,12 @@ const FIELD_STYLE: React.CSSProperties = {
   backgroundColor: '#fff', color: '#374151', fontSize: '0.95rem', outline: 'none',
 };
 
+const FIELD_ERROR_STYLE: React.CSSProperties = {
+  ...FIELD_STYLE,
+  border: '1px solid #f87171',
+  backgroundColor: '#fff5f5',
+};
+
 const READ_ONLY_STYLE: React.CSSProperties = {
   padding: '8px 12px', height: '38px', backgroundColor: '#f3f4f6',
   borderRadius: '6px', border: '1px solid #e5e7eb',
@@ -84,6 +90,12 @@ const DISABLED_STYLE: React.CSSProperties = {
   ...FIELD_STYLE, backgroundColor: '#f3f4f6', color: '#9ca3af', cursor: 'not-allowed',
 };
 
+const LABEL_STYLE: React.CSSProperties = {
+  display: 'block', fontSize: '0.72rem', fontWeight: 700,
+  textTransform: 'uppercase', letterSpacing: '0.5px',
+  color: '#6b7280', marginBottom: '4px',
+};
+
 function computeSkuPreview(brandName: string, itemName: string): string {
   const words = ((brandName || itemName || '').trim().toUpperCase()).split(/\s+/).filter(w => w.length > 0);
   let prefix = '';
@@ -91,12 +103,6 @@ function computeSkuPreview(brandName: string, itemName: string): string {
   if (prefix.length < 3) prefix = prefix.padEnd(3, 'X');
   return `${prefix}-AUTO`;
 }
-
-const LABEL_STYLE: React.CSSProperties = {
-  display: 'block', fontSize: '0.72rem', fontWeight: 700,
-  textTransform: 'uppercase', letterSpacing: '0.5px',
-  color: '#6b7280', marginBottom: '4px',
-};
 
 const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
   isOpen, onClose, onSave, onOpenSupplierModal, onOpenUomModal,
@@ -110,44 +116,9 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
   const [dupError, setDupError] = useState('');
   const [supplierError, setSupplierError] = useState('');
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
-  const [supplierHeight, setSupplierHeight] = useState<number | 'auto'>('auto');
-  const isDragging = useRef(false);
-  const dragStartY = useRef(0);
-  const dragStartHeight = useRef(0);
-  const supplierSectionRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isDragging.current = true;
-    dragStartY.current = e.clientY;
-    dragStartHeight.current = supplierSectionRef.current?.offsetHeight ?? 400;
-    setSupplierHeight(dragStartHeight.current);
-    document.body.style.cursor = 'row-resize';
-    document.body.style.userSelect = 'none';
-  }, []);
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging.current) return;
-      const delta = e.clientY - dragStartY.current;
-      setSupplierHeight(Math.min(Math.max(dragStartHeight.current + delta, 120), 520));
-    };
-    const handleMouseUp = () => {
-      if (isDragging.current) {
-        isDragging.current = false;
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-      }
-    };
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -166,7 +137,7 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
       setDupError('');
       setSupplierError('');
       setShowCancelConfirm(false);
-      setSupplierHeight('auto');
+      setSubmitAttempted(false);
     }
   }, [isOpen, defaultSupplierName]);
 
@@ -267,6 +238,7 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
     e.preventDefault();
     setDupError('');
     setSupplierError('');
+    setSubmitAttempted(true);
 
     const normalize = (str: string) => (str || '').trim().toLowerCase().replace(/\s+/g, ' ');
     const validItems = itemGroups.filter(ig => ig.itemName?.trim());
@@ -326,6 +298,13 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
 
   if (!isOpen) return null;
 
+  // ── ERROR HELPERS ──
+  const itemNameHasError = (itemIdx: number) =>
+    submitAttempted && !itemGroups[itemIdx].itemName?.trim();
+
+  const uomHasError = (itemIdx: number, brandIdx: number) =>
+    submitAttempted && (!itemGroups[itemIdx].brands[brandIdx].uom || itemGroups[itemIdx].brands[brandIdx].uom === 'Select');
+
   return (
     <div className={s.modalOverlay} style={{ zIndex: 1000 }}>
       <div className={s.modalContent} style={{
@@ -342,276 +321,281 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
         </div>
 
         <form ref={formRef} onSubmit={handleSubmit} style={{
-          display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', backgroundColor: '#f9fafb', minHeight: 0
+          display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', minHeight: 0
         }}>
 
-          {/* ── SUPPLIER SECTION ── */}
-          <div ref={supplierSectionRef} style={{
-            height: supplierHeight === 'auto' ? 'auto' : `${supplierHeight}px`,
-            minHeight: '120px', flexShrink: 0, padding: '20px 24px',
-            backgroundColor: '#fff', borderBottom: '1px solid #eaeaea',
-            overflowY: supplierHeight !== 'auto' ? 'auto' : undefined,
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-              <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: '#333' }}>Supplier Details</h4>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <span onClick={onOpenSupplierModal} style={{ cursor: 'pointer', fontSize: '0.82rem', color: '#007bff', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <LuPlus size={13} /> New Supplier
-                </span>
-                <button type="button" onClick={handleAddSupplier}
-                  style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '6px', border: '1px solid #dbeafe', backgroundColor: '#eff6ff', color: '#1e40af', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>
-                  <LuPlus size={13} /> Add Supplier
-                </button>
-              </div>
-            </div>
+          {/* ── SINGLE SCROLLABLE BODY ── */}
+          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', backgroundColor: '#f9fafb', minHeight: 0 }}>
 
-            {supplierError && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#fee2e2', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: '8px', padding: '10px 14px', fontSize: '0.85rem', fontWeight: 500, marginBottom: '12px' }}>
-                <span>⚠</span> {supplierError}
-              </div>
-            )}
+            {/* ── ITEMS SECTION (top) ── */}
+            <div style={{ padding: '20px 24px' }}>
 
-            {supplierEntries.map((entry, idx) => (
-              <div key={idx} style={{ border: `1px solid ${idx === 0 ? '#bfdbfe' : '#e5e7eb'}`, borderRadius: '10px', padding: '14px', marginBottom: '10px', backgroundColor: idx === 0 ? '#f0f7ff' : '#fafafa' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  {idx === 0
-                    ? <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1e40af', backgroundColor: '#dbeafe', padding: '2px 8px', borderRadius: '999px' }}>PRIMARY</span>
-                    : <span style={{ fontSize: '0.72rem', color: '#6b7280', backgroundColor: '#f3f4f6', padding: '2px 8px', borderRadius: '999px', border: '1px solid #e5e7eb' }}>Alternate</span>
-                  }
-                  {supplierEntries.length > 1 && (
-                    <button type="button" onClick={() => handleRemoveSupplier(idx)} style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}>
-                      <LuTrash2 size={13} /> Remove
-                    </button>
-                  )}
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '12px', marginBottom: '10px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 500, color: '#555', marginBottom: '4px' }}>Supplier Name</label>
-                    <select style={{ ...FIELD_STYLE }} value={entry.supplierName} onChange={e => handleSupplierChange(idx, 'supplierName', e.target.value)}>
-                      <option value="">Select Supplier</option>
-                      {suppliers.map((sup, i) => {
-                        const usedElsewhere = supplierEntries.some((e, ei) => ei !== idx && e.supplierName === sup.supplierName);
-                        return (
-                          <option key={sup.id || i} value={sup.supplierName} disabled={usedElsewhere} style={{ color: usedElsewhere ? '#9ca3af' : '#374151' }}>
-                            {sup.supplierName}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 500, color: '#555', marginBottom: '4px' }}>Lead Time (Days)</label>
-                    <input type="number" style={{ ...FIELD_STYLE }} value={entry.leadTime} placeholder="e.g. 7" onChange={e => handleSupplierChange(idx, 'leadTime', e.target.value)} />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 500, color: '#555', marginBottom: '4px' }}>Min Order (MOQ)</label>
-                    <input type="number" style={{ ...FIELD_STYLE }} value={entry.minOrder} placeholder="e.g. 50" onChange={e => handleSupplierChange(idx, 'minOrder', e.target.value)} />
-                  </div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 500, color: '#555', marginBottom: '4px' }}>Contact Person</label>
-                    <div style={{ ...READ_ONLY_STYLE }}>{entry.contactPerson || '—'}</div>
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 500, color: '#555', marginBottom: '4px' }}>Contact Number</label>
-                    <div style={{ ...READ_ONLY_STYLE }}>{entry.contactNumber || '—'}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+              {itemGroups.map((item, itemIdx) => (
+                <div key={itemIdx} style={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', padding: '20px', marginBottom: '20px' }}>
 
-          {/* DRAG HANDLE */}
-          <div onMouseDown={handleMouseDown}
-            style={{ height: '10px', flexShrink: 0, backgroundColor: '#e2e8f0', cursor: 'row-resize', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#94a3b8')}
-            onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#e2e8f0')}
-            title="Drag to resize">
-            <div style={{ display: 'flex', gap: '4px' }}>
-              {[0, 1, 2].map(i => <div key={i} style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#94a3b8' }} />)}
-            </div>
-          </div>
-
-          {/* ── ITEMS SECTION ── */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
-
-            {itemGroups.map((item, itemIdx) => (
-              <div key={itemIdx} style={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', padding: '20px', marginBottom: '20px' }}>
-
-                {/* Item Group header */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #f3f4f6', paddingBottom: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#111827', fontWeight: 600, fontSize: '1rem' }}>
-                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700 }}>{itemIdx + 1}</div>
-                    Item Group
-                  </div>
-                  {itemGroups.length > 1 && (
-                    <button type="button" onClick={() => handleRemoveItemGroup(itemIdx)}
-                      style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <LuTrash2 size={14} /> Remove
-                    </button>
-                  )}
-                </div>
-
-                {/* ITEM NAME */}
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={{ ...LABEL_STYLE }}>Item Name <span style={{ color: '#ef4444' }}>*</span></label>
-                  <input
-                    style={{ ...FIELD_STYLE }}
-                    value={item.itemName}
-                    onChange={e => handleItemNameChange(itemIdx, e.target.value)}
-                    placeholder="e.g. Bond Paper A4"
-                  />
-                </div>
-
-                {/* BRAND DETAIL sub-cards */}
-                {item.brands.map((brand, brandIdx) => (
-                  <div key={brandIdx} style={{ border: '2px dashed #e2e8f0', borderRadius: '10px', padding: '16px', marginBottom: '12px', backgroundColor: '#fafafa' }}>
-
-                    {/* Brand header row */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#374151' }}>
-                        {brandIdx + 1} Brand Detail
-                      </span>
-                      {item.brands.length > 1 && (
-                        <button type="button" onClick={() => handleRemoveBrand(itemIdx, brandIdx)}
-                          style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }}>
-                          <LuTrash2 size={13} />
-                        </button>
-                      )}
+                  {/* Item Group header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #f3f4f6', paddingBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#111827', fontWeight: 600, fontSize: '1rem' }}>
+                      <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700 }}>{itemIdx + 1}</div>
+                      Item Group
                     </div>
+                    {itemGroups.length > 1 && (
+                      <button type="button" onClick={() => handleRemoveItemGroup(itemIdx)}
+                        style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <LuTrash2 size={14} /> Remove
+                      </button>
+                    )}
+                  </div>
 
-                    {/* Row: BRAND NAME | SKU (AUTO) */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '10px' }}>
-                      <div>
-                        <label style={{ ...LABEL_STYLE }}>Brand Name</label>
-                        <select
-                          style={{ ...FIELD_STYLE }}
-                          value={brand.brand_id ?? ''}
-                          onChange={e => {
-                            const selected = brands.find(b => String(b.id) === e.target.value);
-                            handleBrandChange(itemIdx, brandIdx, 'brand_id', selected ? selected.id : null);
-                            handleBrandChange(itemIdx, brandIdx, 'brandName', selected ? selected.name : '');
-                          }}
-                        >
-                          <option value="">Select Brand</option>
-                          {brands.map(b => (
-                            <option key={b.id} value={b.id}>
-                              {b.name === 'No Brand' ? '— No Brand' : b.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label style={{ ...LABEL_STYLE }}>SKU (Auto)</label>
-                        <input
-                          style={{ ...DISABLED_STYLE }}
-                          value={brand.brandName || item.itemName ? computeSkuPreview(brand.brandName, item.itemName) : ''}
-                          readOnly
-                          placeholder="Generated after save"
-                        />
-                      </div>
-                    </div>
+                  {/* ITEM NAME */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ ...LABEL_STYLE, color: itemNameHasError(itemIdx) ? '#dc2626' : '#6b7280' }}>
+                      Item Name <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <input
+                      style={itemNameHasError(itemIdx) ? FIELD_ERROR_STYLE : FIELD_STYLE}
+                      value={item.itemName}
+                      onChange={e => handleItemNameChange(itemIdx, e.target.value)}
+                      placeholder="e.g. Bond Paper A4"
+                    />
+                    {itemNameHasError(itemIdx) && (
+                      <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Item name is required.</p>
+                    )}
+                  </div>
 
-                    {/* Row: DESCRIPTION */}
-                    <div style={{ marginBottom: '10px' }}>
-                      <label style={{ ...LABEL_STYLE }}>Description</label>
-                      <input
-                        style={{ ...FIELD_STYLE }}
-                        value={brand.description}
-                        onChange={e => handleBrandChange(itemIdx, brandIdx, 'description', e.target.value)}
-                        placeholder="Specific brand details..."
-                      />
-                    </div>
+                  {/* BRAND DETAIL sub-cards */}
+                  {item.brands.map((brand, brandIdx) => (
+                    <div key={brandIdx} style={{ border: '2px dashed #e2e8f0', borderRadius: '10px', padding: '16px', marginBottom: '12px', backgroundColor: '#fafafa' }}>
 
-                    {/* Row: QUANTITY | UNIT (UOM) | REORDER POINT */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '10px' }}>
-                      <div>
-                        <label style={{ ...LABEL_STYLE }}>Quantity</label>
-                        <input
-                          type="number" min="0"
-                          style={{ ...FIELD_STYLE }}
-                          value={brand.qty}
-                          onChange={e => handleBrandChange(itemIdx, brandIdx, 'qty', e.target.value)}
-                          placeholder="0"
-                        />
-                      </div>
-                      <div>
-                        <label style={{ ...LABEL_STYLE }}>Unit (UOM)</label>
-                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                          <select
-                            style={{ ...FIELD_STYLE, flex: 1 }}
-                            value={brand.uom}
-                            onChange={e => handleBrandChange(itemIdx, brandIdx, 'uom', e.target.value)}
-                          >
-                            <option value="Select">Select</option>
-                            {uoms.map(u => <option key={u.id} value={u.code}>{u.name} ({u.code})</option>)}
-                          </select>
-                          <button
-                            type="button"
-                            onClick={onOpenUomModal}
-                            title="Manage Units of Measure"
-                            style={{ flexShrink: 0, width: '34px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #d1d5db', borderRadius: '6px', backgroundColor: '#f9fafb', cursor: 'pointer', color: '#6b7280' }}>
-                            <LuSlidersHorizontal size={15} />
+                      {/* Brand header row */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#374151' }}>
+                          {brandIdx + 1} Brand Detail
+                        </span>
+                        {item.brands.length > 1 && (
+                          <button type="button" onClick={() => handleRemoveBrand(itemIdx, brandIdx)}
+                            style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }}>
+                            <LuTrash2 size={13} />
                           </button>
+                        )}
+                      </div>
+
+                      {/* Row: BRAND NAME | SKU (AUTO) */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '10px' }}>
+                        <div>
+                          <label style={{ ...LABEL_STYLE }}>Brand Name</label>
+                          <select
+                            style={{ ...FIELD_STYLE }}
+                            value={brand.brand_id ?? ''}
+                            onChange={e => {
+                              const selected = brands.find(b => String(b.id) === e.target.value);
+                              handleBrandChange(itemIdx, brandIdx, 'brand_id', selected ? selected.id : null);
+                              handleBrandChange(itemIdx, brandIdx, 'brandName', selected ? selected.name : '');
+                            }}
+                          >
+                            <option value="">Select Brand</option>
+                            {brands.map(b => (
+                              <option key={b.id} value={b.id}>
+                                {b.name === 'No Brand' ? '— No Brand' : b.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ ...LABEL_STYLE }}>SKU (Auto)</label>
+                          <input
+                            style={{ ...DISABLED_STYLE }}
+                            value={brand.brandName || item.itemName ? computeSkuPreview(brand.brandName, item.itemName) : ''}
+                            readOnly
+                            placeholder="Generated after save"
+                          />
                         </div>
                       </div>
-                      <div>
-                        <label style={{ ...LABEL_STYLE }}>Reorder Point</label>
+
+                      {/* Row: DESCRIPTION */}
+                      <div style={{ marginBottom: '10px' }}>
+                        <label style={{ ...LABEL_STYLE }}>Description</label>
                         <input
-                          type="number" min="0"
-                          style={{ ...FIELD_STYLE, border: '1px solid #fcd34d' }}
-                          value={brand.reorderPoint}
-                          onChange={e => handleBrandChange(itemIdx, brandIdx, 'reorderPoint', e.target.value)}
-                          placeholder="20"
+                          style={{ ...FIELD_STYLE }}
+                          value={brand.description}
+                          onChange={e => handleBrandChange(itemIdx, brandIdx, 'description', e.target.value)}
+                          placeholder="Specific brand details..."
                         />
+                      </div>
+
+                      {/* Row: QUANTITY | UNIT (UOM) | REORDER POINT */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '10px' }}>
+                        <div>
+                          <label style={{ ...LABEL_STYLE }}>Quantity</label>
+                          <input
+                            type="number" min="0"
+                            style={{ ...FIELD_STYLE }}
+                            value={brand.qty}
+                            onChange={e => handleBrandChange(itemIdx, brandIdx, 'qty', e.target.value)}
+                            placeholder="0"
+                          />
+                        </div>
+                        <div>
+                          <label style={{ ...LABEL_STYLE, color: uomHasError(itemIdx, brandIdx) ? '#dc2626' : '#6b7280' }}>
+                            Unit (UOM) <span style={{ color: '#ef4444' }}>*</span>
+                          </label>
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+                            <div style={{ flex: 1 }}>
+                              <select
+                                style={{ ...(uomHasError(itemIdx, brandIdx) ? FIELD_ERROR_STYLE : FIELD_STYLE), width: '100%' }}
+                                value={brand.uom}
+                                onChange={e => handleBrandChange(itemIdx, brandIdx, 'uom', e.target.value)}
+                              >
+                                <option value="Select">Select</option>
+                                {uoms.map(u => <option key={u.id} value={u.code}>{u.name} ({u.code})</option>)}
+                              </select>
+                              {uomHasError(itemIdx, brandIdx) && (
+                                <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Please select a unit of measure.</p>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={onOpenUomModal}
+                              title="Manage Units of Measure"
+                              style={{ flexShrink: 0, width: '34px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #d1d5db', borderRadius: '6px', backgroundColor: '#f9fafb', cursor: 'pointer', color: '#6b7280' }}>
+                              <LuSlidersHorizontal size={15} />
+                            </button>
+                          </div>
+                        </div>
+                        <div>
+                          <label style={{ ...LABEL_STYLE }}>Reorder Point</label>
+                          <input
+                            type="number" min="0"
+                            style={{ ...FIELD_STYLE, border: '1px solid #fcd34d' }}
+                            value={brand.reorderPoint}
+                            onChange={e => handleBrandChange(itemIdx, brandIdx, 'reorderPoint', e.target.value)}
+                            placeholder="20"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Row: UNIT COST | SELLING PRICE */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div>
+                          <label style={{ ...LABEL_STYLE }}>Unit Cost</label>
+                          <input
+                            type="number" min="0" step="0.01"
+                            style={{ ...FIELD_STYLE }}
+                            value={brand.unitCost}
+                            onChange={e => handleBrandChange(itemIdx, brandIdx, 'unitCost', e.target.value)}
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div>
+                          <label style={{ ...LABEL_STYLE }}>Selling Price</label>
+                          <input
+                            type="number" min="0" step="0.01"
+                            style={{ ...FIELD_STYLE }}
+                            value={brand.sellingPrice}
+                            onChange={e => handleBrandChange(itemIdx, brandIdx, 'sellingPrice', e.target.value)}
+                            placeholder="0.00"
+                          />
+                        </div>
                       </div>
                     </div>
+                  ))}
 
-                    {/* Row: UNIT COST | SELLING PRICE */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <div>
-                        <label style={{ ...LABEL_STYLE }}>Unit Cost</label>
-                        <input
-                          type="number" min="0" step="0.01"
-                          style={{ ...FIELD_STYLE }}
-                          value={brand.unitCost}
-                          onChange={e => handleBrandChange(itemIdx, brandIdx, 'unitCost', e.target.value)}
-                          placeholder="0.00"
-                        />
-                      </div>
-                      <div>
-                        <label style={{ ...LABEL_STYLE }}>Selling Price</label>
-                        <input
-                          type="number" min="0" step="0.01"
-                          style={{ ...FIELD_STYLE }}
-                          value={brand.sellingPrice}
-                          onChange={e => handleBrandChange(itemIdx, brandIdx, 'sellingPrice', e.target.value)}
-                          placeholder="0.00"
-                        />
-                      </div>
+                  {/* + Add Another Brand */}
+                  <button
+                    type="button"
+                    onClick={() => handleAddBrand(itemIdx)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563eb', fontSize: '0.85rem', fontWeight: 600, padding: '4px 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <LuPlus size={14} /> Add Another Brand
+                  </button>
+                </div>
+              ))}
+
+              {/* + Add New Item Category */}
+              <button type="button" onClick={handleAddItemGroup}
+                style={{ width: '100%', padding: '12px', border: '2px dashed #e5e7eb', borderRadius: '8px', backgroundColor: '#fff', color: '#4b5563', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '4px' }}
+                onMouseOver={e => e.currentTarget.style.borderColor = '#3b82f6'}
+                onMouseOut={e => e.currentTarget.style.borderColor = '#e5e7eb'}>
+                <LuPlus /> Add New Item Category
+              </button>
+            </div>
+
+            {/* ── SUPPLIER SECTION (bottom) ── */}
+            <div style={{
+              flexShrink: 0, padding: '20px 24px',
+              backgroundColor: '#fff', borderTop: '1px solid #eaeaea',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: '#333' }}>Supplier Details</h4>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span onClick={onOpenSupplierModal} style={{ cursor: 'pointer', fontSize: '0.82rem', color: '#007bff', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <LuPlus size={13} /> New Supplier
+                  </span>
+                  <button type="button" onClick={handleAddSupplier}
+                    style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '6px', border: '1px solid #dbeafe', backgroundColor: '#eff6ff', color: '#1e40af', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>
+                    <LuPlus size={13} /> Add Supplier
+                  </button>
+                </div>
+              </div>
+
+              {supplierError && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#fee2e2', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: '8px', padding: '10px 14px', fontSize: '0.85rem', fontWeight: 500, marginBottom: '12px' }}>
+                  <span>⚠</span> {supplierError}
+                </div>
+              )}
+
+              {supplierEntries.map((entry, idx) => (
+                <div key={idx} style={{ border: `1px solid ${idx === 0 ? '#bfdbfe' : '#e5e7eb'}`, borderRadius: '10px', padding: '14px', marginBottom: '10px', backgroundColor: idx === 0 ? '#f0f7ff' : '#fafafa' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    {idx === 0
+                      ? <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1e40af', backgroundColor: '#dbeafe', padding: '2px 8px', borderRadius: '999px' }}>PRIMARY</span>
+                      : <span style={{ fontSize: '0.72rem', color: '#6b7280', backgroundColor: '#f3f4f6', padding: '2px 8px', borderRadius: '999px', border: '1px solid #e5e7eb' }}>Alternate</span>
+                    }
+                    {supplierEntries.length > 1 && (
+                      <button type="button" onClick={() => handleRemoveSupplier(idx)} style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}>
+                        <LuTrash2 size={13} /> Remove
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '12px', marginBottom: '10px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 500, color: '#555', marginBottom: '4px' }}>Supplier Name</label>
+                      <select style={{ ...FIELD_STYLE }} value={entry.supplierName} onChange={e => handleSupplierChange(idx, 'supplierName', e.target.value)}>
+                        <option value="">Select Supplier</option>
+                        {suppliers.map((sup, i) => {
+                          const usedElsewhere = supplierEntries.some((e, ei) => ei !== idx && e.supplierName === sup.supplierName);
+                          return (
+                            <option key={sup.id || i} value={sup.supplierName} disabled={usedElsewhere} style={{ color: usedElsewhere ? '#9ca3af' : '#374151' }}>
+                              {sup.supplierName}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 500, color: '#555', marginBottom: '4px' }}>Lead Time (Days)</label>
+                      <input type="number" style={{ ...FIELD_STYLE }} value={entry.leadTime} placeholder="e.g. 7" onChange={e => handleSupplierChange(idx, 'leadTime', e.target.value)} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 500, color: '#555', marginBottom: '4px' }}>Min Order (MOQ)</label>
+                      <input type="number" style={{ ...FIELD_STYLE }} value={entry.minOrder} placeholder="e.g. 50" onChange={e => handleSupplierChange(idx, 'minOrder', e.target.value)} />
                     </div>
                   </div>
-                ))}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 500, color: '#555', marginBottom: '4px' }}>Contact Person</label>
+                      <div style={{ ...READ_ONLY_STYLE }}>{entry.contactPerson || '—'}</div>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 500, color: '#555', marginBottom: '4px' }}>Contact Number</label>
+                      <div style={{ ...READ_ONLY_STYLE }}>{entry.contactNumber || '—'}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
 
-                {/* + Add Another Brand */}
-                <button
-                  type="button"
-                  onClick={() => handleAddBrand(itemIdx)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563eb', fontSize: '0.85rem', fontWeight: 600, padding: '4px 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <LuPlus size={14} /> Add Another Brand
-                </button>
-              </div>
-            ))}
-
-            {/* + Add New Item Category */}
-            <button type="button" onClick={handleAddItemGroup}
-              style={{ width: '100%', padding: '12px', border: '2px dashed #e5e7eb', borderRadius: '8px', backgroundColor: '#fff', color: '#4b5563', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '2rem' }}
-              onMouseOver={e => e.currentTarget.style.borderColor = '#3b82f6'}
-              onMouseOut={e => e.currentTarget.style.borderColor = '#e5e7eb'}>
-              <LuPlus /> Add New Item Category
-            </button>
           </div>
+          {/* END SINGLE SCROLLABLE BODY */}
 
           {/* FOOTER */}
           <div className={s.modalFooter} style={{ padding: '20px 24px', borderTop: '1px solid #eaeaea', backgroundColor: '#fff', display: 'flex', flexDirection: 'column', gap: '12px', flexShrink: 0 }}>
