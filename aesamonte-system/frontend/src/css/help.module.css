@@ -58,12 +58,20 @@
   border: 1px solid #ccc;
   border-radius: 8px;
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition: all 0.3s ease; /* This ensures the hover animates smoothly */
+  background-color: white;
+}
+
+.help-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  border-color: #bbb;
 }
 
 .item-open {
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
   border-color: #bbb;
+  transform: none; /* Stops it from lifting further if it's already open */
 }
 
 .help-header {
@@ -74,18 +82,53 @@
   cursor: pointer;
   font-weight: 700;
   background-color: white;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.3s ease;
+}
+
+.help-header:hover {
+  background-color: #faf7f0; /* A very light tan/cream color to indicate it's clickable */
 }
 
 /* DARKENED HEADER WHEN OPEN */
 .header-open {
-  background-color: #e5d9b6; /* Slightly darker tan than the body */
+  background-color: #e5d9b6;
   border-bottom: 1px solid #ccc;
 }
 
+.header-open:hover {
+  background-color: #e5d9b6; 
+}
+
+/* ARROW ANIMATION */
+.arrow {
+  font-size: 0.8rem;
+  color: #666;
+  transition: transform 0.3s ease; /* Rotates smoothly */
+}
+
+.arrow-open {
+  transform: rotate(180deg);
+}
+
+/* CSS GRID ANIMATION FOR ACCORDION HEIGHT */
+.help-body-wrapper {
+  display: grid;
+  grid-template-rows: 0fr; /* Collapsed state */
+  transition: grid-template-rows 0.3s ease-in-out;
+}
+
+.wrapper-open {
+  grid-template-rows: 1fr; /* Expanded state */
+}
+
+.help-body-content {
+  overflow: hidden; /* Crucial: hides content when 0fr */
+}
+
+/* INNER CONTENT & PADDING */
 .help-body {
   padding: 30px 60px 40px 60px;
-  background-color: #eee4c9; /* Standard interior cream color */
+  background-color: #eee4c9; 
 }
 
 .help-step-section {
@@ -103,7 +146,7 @@
 }
 
 .sub-bullet {
-  padding-left: 50px; /* Stronger tabbing for ◦ items */
+  padding-left: 50px; 
   color: #444; 
 }
 
@@ -111,9 +154,4 @@
   margin-bottom: 6px;
   line-height: 1.6;
   color: #333;
-}
-
-.arrow {
-  font-size: 0.8rem;
-  color: #666;
 }
