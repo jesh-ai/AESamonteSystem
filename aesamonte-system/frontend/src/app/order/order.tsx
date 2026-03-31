@@ -405,9 +405,9 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
     });
   }, [filtered, sortConfig]);
 
-  const totalPages = Math.ceil(sorted.length / ROWS_PER_PAGE) || 1;
+  const totalPages = Math.max(1, Math.ceil(sorted.length / ROWS_PER_PAGE));
   const paginated = sorted.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
-
+  
   const getStatusStyle = (status: string | undefined): React.CSSProperties => {
     const base: React.CSSProperties = {
       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',

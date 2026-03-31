@@ -390,10 +390,10 @@ const Inventory: React.FC<InventoryProps> = ({ role, employeeId = 0, onLogout, i
     });
   }, [filteredProducts, sortConfig]);
 
-  const totalPages = Math.ceil(sortedProducts.length / ROWS_PER_PAGE);
+const totalPages = Math.max(1, Math.ceil(sortedProducts.length / ROWS_PER_PAGE));
   const paginatedProducts = sortedProducts.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
-  useEffect(() => { setCurrentPage(1); }, [searchTerm, statusFilter, uomFilter]);
 
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, statusFilter, uomFilter]);
   const changePage = (page: number) => { if (page >= 1 && page <= totalPages) setCurrentPage(page); };
 
   const renderPageNumbers = () => {
@@ -673,7 +673,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, employeeId = 0, onLogout, i
               <div className={s.footerLeft}>
                 Showing <span className={s.countBadge}>{paginatedProducts.length}</span> of {sortedProducts.length}
               </div>
-              {totalPages > 1 && (
                 <div className={s.footerRight}>
                   <div className={s.pagination}>
                     <button className={s.nextBtn} onClick={() => changePage(currentPage - 1)} disabled={currentPage === 1}><LuChevronLeft /></button>
@@ -681,7 +680,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, employeeId = 0, onLogout, i
                     <button className={s.nextBtn} onClick={() => changePage(currentPage + 1)} disabled={currentPage === totalPages}><LuChevronRight /></button>
                   </div>
                 </div>
-              )}
             </div>
           </div>
         )}
