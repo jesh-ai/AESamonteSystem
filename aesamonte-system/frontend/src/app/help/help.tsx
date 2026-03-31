@@ -10,21 +10,35 @@ interface HelpProps {
 }
 
 const Help: React.FC<HelpProps> = ({ role, onLogout }) => {
-  // Changed to an array to allow multiple open sections
-  const [openIndices, setOpenIndices] = useState<number[]>([]);
+  // Changed to a single number (or null) to allow only one open section at a time
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
   const s = styles as Record<string, string>;
 
+  // Normalize the active role name to lowercase for strict matching
+  const currentRole = role?.toLowerCase() || '';
+
+  // 1. ROLES WITH FULL ACCESS
+  // Super Admin (1), Admin (2), and Manager (3) automatically bypass the filter.
+  // Add any future top-level roles here.
+  const allAccessRoles = ['super admin', 'admin', 'manager'];
+
   const toggleAccordion = (index: number) => {
-    setOpenIndices(prev => 
-      prev.includes(index) 
-        ? prev.filter(i => i !== index) 
-        : [...prev, index]
-    );
+    // Classic accordion logic: if the clicked index is already open, close it (set to null).
+    // Otherwise, set it as the new currently open index.
+    setOpenIndex(prev => (prev === index ? null : index));
   };
 
+  /*
+   * HOW TO UPDATE ONCE NEW ROLES ARE ADDED TO THE DB:
+   * When you split "Head" into "Inventory Head" and "Sales Head", simply
+   * add their lowercase names to the `allowedRoles` array inside the specific
+   * guides they should have access to. You can then safely remove the generic 'head'.
+   */
   const guides = [
     {
       title: "Getting Started",
+      // 'all' allows any logged-in user to see this general module
+      allowedRoles: ['all'], 
       steps: [
         {
           label: "Step 1: Launch the System",
@@ -60,6 +74,8 @@ const Help: React.FC<HelpProps> = ({ role, onLogout }) => {
     },
     {
       title: "Managing Inventory",
+      // FUTURE UPDATE: Replace 'head' with 'inventory head'
+      allowedRoles: ['head', 'inventory head', 'staff'], 
       steps: [
         {
           label: "Step 1: Open the Inventory Page",
@@ -81,6 +97,8 @@ const Help: React.FC<HelpProps> = ({ role, onLogout }) => {
     },
     {
       title: "Orders",
+      // FUTURE UPDATE: Replace 'head' with 'sales head'
+      allowedRoles: ['head', 'sales head', 'staff', 'cashier'],
       steps: [
         {
           label: "Step 1: Open the Orders Page",
@@ -101,6 +119,8 @@ const Help: React.FC<HelpProps> = ({ role, onLogout }) => {
     },
     {
       title: "Payments and Sales",
+      // FUTURE UPDATE: Replace 'head' with 'sales head'
+      allowedRoles: ['head', 'sales head', 'staff', 'cashier'],
       steps: [
         {
           label: "Step 1: View Sales Overview",
@@ -123,6 +143,8 @@ const Help: React.FC<HelpProps> = ({ role, onLogout }) => {
     },
     {
       title: "System Reports and Business Analytics",
+      // Left empty because Super Admin, Admin, and Manager already get access via `allAccessRoles`
+      allowedRoles: [], 
       steps: [
         {
           label: "Step 1: View Reports Summary",
@@ -140,6 +162,18 @@ const Help: React.FC<HelpProps> = ({ role, onLogout }) => {
     }
   ];
 
+  // 2. FILTERING LOGIC
+  const visibleGuides = guides.filter(guide => {
+    // Grant access if the user is a top-level role (Super Admin, Admin, Manager)
+    if (allAccessRoles.includes(currentRole)) return true;
+    
+    // Grant access if the module is marked for 'all'
+    if (guide.allowedRoles.includes('all')) return true;
+
+    // Grant access if the user's specific role is explicitly listed in allowedRoles
+    return guide.allowedRoles.includes(currentRole);
+  });
+
   return (
     <div className={s['help-container']}>
       <TopHeader role={role} onLogout={onLogout} />
@@ -155,8 +189,10 @@ const Help: React.FC<HelpProps> = ({ role, onLogout }) => {
           </div>
 
           <div className={s['help-list']}>
-            {guides.map((guide, index) => {
-              const isOpen = openIndices.includes(index);
+            {/* Map through the filtered list instead of the full array */}
+            {visibleGuides.map((guide, index) => {
+              // Now comparing against a single index instead of an array
+              const isOpen = openIndex === index; 
               return (
                 <div key={index} className={`${s['help-item']} ${isOpen ? s['item-open'] : ''}`}>
                   <div 
@@ -164,28 +200,32 @@ const Help: React.FC<HelpProps> = ({ role, onLogout }) => {
                     onClick={() => toggleAccordion(index)}
                   >
                     <span>{guide.title}</span>
-                    <span className={s['arrow']}>{isOpen ? '▲' : '▼'}</span>
+                    <span className={`${s['arrow']} ${isOpen ? s['arrow-open'] : ''}`}>▼</span>
                   </div>
                   
-                  {isOpen && (
-                    <div className={s['help-body']}>
-                      {guide.steps.map((step, sIdx) => (
-                        <div key={sIdx} className={s['help-step-section']}>
-                          <p className={s['step-label']}>{step.label}</p>
-                          <div className={s['step-details']}>
-                            {step.details.map((detail, dIdx) => (
-                              <p 
-                                key={dIdx} 
-                                className={`${s['detail-line']} ${detail.startsWith('◦') ? s['sub-bullet'] : ''}`}
-                              >
-                                {detail.startsWith('◦') ? '' : '• '} {detail}
-                              </p>
-                            ))}
-                          </div>
+                    <div className={`${s['help-body-wrapper']} ${isOpen ? s['wrapper-open'] : ''}`}>
+                      <div className={s['help-body-content']}>
+                        
+                        <div className={s['help-body']}>
+                          {guide.steps.map((step, sIdx) => (
+                            <div key={sIdx} className={s['help-step-section']}>
+                              <p className={s['step-label']}>{step.label}</p>
+                              <div className={s['step-details']}>
+                                {step.details.map((detail, dIdx) => (
+                                  <p 
+                                    key={dIdx} 
+                                    className={`${s['detail-line']} ${detail.startsWith('◦') ? s['sub-bullet'] : ''}`}
+                                  >
+                                    {detail.startsWith('◦') ? '' : '• '} {detail}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+
+                      </div>
                     </div>
-                  )}
                 </div>
               );
             })}
