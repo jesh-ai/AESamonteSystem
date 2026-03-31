@@ -7,30 +7,35 @@ import {
   LuChevronUp,
   LuChevronDown,
   LuArrowLeft,
-  LuArchiveRestore
+  LuArchiveRestore,
+  LuChevronLeft,
+  LuChevronRight
 } from 'react-icons/lu'
 
 export interface Transaction {
-  no: string  // <--- FIXED to string
+  no: string
   name: string
   address: string
   date: string
   qty: number
   amount: number
   status: 'PAID' | 'PENDING' | 'INACTIVE'
-  paymentMethod: string // <--- ADDED
+  paymentMethod: string
   is_archived?: boolean
 }
 
 interface ArchiveTableProps {
   transactions: Transaction[]
-  onRestore: (txNo: string) => void // <--- FIXED to string
+  onRestore: (txNo: string) => void
   onBack: () => void
 }
+
+const ROWS_PER_PAGE = 10;
 
 export default function ArchiveTable({ transactions, onRestore, onBack }: ArchiveTableProps) {
   const s = styles as Record<string, string>
   const [searchTerm, setSearchTerm] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
   const [sortConfig, setSortConfig] = useState<{
     key: keyof Transaction | ''
     direction: 'asc' | 'desc' | null
@@ -57,6 +62,34 @@ export default function ArchiveTable({ transactions, onRestore, onBack }: Archiv
     setSortConfig({ key, direction })
   }
 
+  // 3. Pagination Logic
+  const totalPages = Math.max(1, Math.ceil(sortedTx.length / ROWS_PER_PAGE));
+  const paginatedTx = sortedTx.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
+
+  const renderPageNumbers = () => {
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+    
+    const pages = [];
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(
+        <button 
+          key={i} 
+          className={currentPage === i ? s.pageCircleActive : s.pageCircle} 
+          onClick={() => setCurrentPage(i)}
+        >
+          {i}
+        </button>
+      );
+    }
+    return pages;
+  };
+
   return (
     <div className={s.tableContainer} style={{ border: '2px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
       <div className={s.header}>
@@ -77,14 +110,16 @@ export default function ArchiveTable({ transactions, onRestore, onBack }: Archiv
               className={s.searchInput}
               placeholder="Search archives..."
               value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
+              onChange={e => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1); // Reset to page 1 on search
+              }}
             />
             <LuSearch size={18} />
           </div>
         </div>
       </div>
 
-      {/* WRAP THE TABLE IN s.tableResponsive HERE */}
       <div className={s.tableResponsive}>
         <table className={s.table}>
           <thead>
@@ -105,12 +140,14 @@ export default function ArchiveTable({ transactions, onRestore, onBack }: Archiv
                       <span 
                         className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''}
                         onClick={() => requestSort(col.key as keyof Transaction, 'asc')}
+                        style={{ cursor: 'pointer' }}
                       >
                         <LuChevronUp size={12} />
                       </span>
                       <span 
                         className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''}
                         onClick={() => requestSort(col.key as keyof Transaction, 'desc')}
+                        style={{ cursor: 'pointer' }}
                       >
                         <LuChevronDown size={12} />
                       </span>
@@ -123,8 +160,8 @@ export default function ArchiveTable({ transactions, onRestore, onBack }: Archiv
           </thead>
 
           <tbody>
-            {sortedTx.length ? (
-              sortedTx.map((tx, i) => (
+            {paginatedTx.length ? (
+              paginatedTx.map((tx, i) => (
                 <tr key={tx.no} className={i % 2 !== 0 ? s.rowOdd : ''}>
                   <td style={{ color: '#94a3b8' }}>{tx.no}</td>
                   <td style={{ fontWeight: 600, color: '#64748b' }}>{tx.name}</td>
@@ -160,8 +197,19 @@ export default function ArchiveTable({ transactions, onRestore, onBack }: Archiv
         </table>
       </div>
 
-      <div className={s.footer} style={{ color: '#94a3b8' }}>
-        Showing {sortedTx.length} archived items
+      <div className={s.footer}>
+        <div className={s.showDataText} style={{ color: '#94a3b8' }}>
+          Showing <span className={s.countBadge}>{paginatedTx.length}</span> of {sortedTx.length}
+        </div>
+        <div className={s.pagination}>
+          <button className={s.nextBtn} disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}>
+            <LuChevronLeft />
+          </button>
+          {renderPageNumbers()}
+          <button className={s.nextBtn} disabled={currentPage >= totalPages} onClick={() => setCurrentPage(prev => prev + 1)}>
+            <LuChevronRight />
+          </button>
+        </div>
       </div>
     </div>
   )

@@ -544,7 +544,7 @@ export default function Suppliers({
 
   /* ================= PAGINATION ================= */
 
-  const totalPages = Math.ceil(sorted.length / ROWS_PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / ROWS_PER_PAGE));
   const paginated = sorted.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
 
   const changePage = (page: number) => {
@@ -685,17 +685,15 @@ export default function Suppliers({
               <div className={s.showDataText}>
                 Showing <span className={s.countBadge}>{paginated.length}</span> of {sorted.length}
               </div>
-              {totalPages > 1 && (
-                <div className={s.pagination}>
-                  <button className={s.nextBtn} disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}>
-                    <LuChevronLeft />
-                  </button>
-                  {renderPageNumbers()}
-                  <button className={s.nextBtn} disabled={currentPage >= totalPages} onClick={() => setCurrentPage(prev => prev + 1)}>
-                    <LuChevronRight />
-                  </button>
-                </div>
-              )}
+              <div className={s.pagination}>
+                <button className={s.nextBtn} disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}>
+                  <LuChevronLeft />
+                </button>
+                {renderPageNumbers()}
+                <button className={s.nextBtn} disabled={currentPage >= totalPages} onClick={() => setCurrentPage(prev => prev + 1)}>
+                  <LuChevronRight />
+                </button>
+              </div>
             </div>
           </div>
         )}

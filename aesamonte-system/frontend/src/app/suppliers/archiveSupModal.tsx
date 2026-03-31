@@ -7,7 +7,9 @@ import {
   LuChevronUp,
   LuChevronDown,
   LuArrowLeft,
-  LuArchiveRestore
+  LuArchiveRestore,
+  LuChevronLeft,
+  LuChevronRight
 } from 'react-icons/lu'
 
 export interface Supplier {
@@ -27,9 +29,12 @@ interface ArchiveSupplierTableProps {
   onBack: () => void
 }
 
+const ROWS_PER_PAGE = 10;
+
 export default function ArchiveSupplierTable({ suppliers, onRestore, onBack }: ArchiveSupplierTableProps) {
   const s = styles as Record<string, string>
   const [searchTerm, setSearchTerm] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
   const [sortConfig, setSortConfig] = useState<{
     key: keyof Supplier | ''
     direction: 'asc' | 'desc' | null
@@ -55,6 +60,34 @@ export default function ArchiveSupplierTable({ suppliers, onRestore, onBack }: A
     if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc'
     setSortConfig({ key, direction })
   }
+
+  // Pagination Logic
+  const totalPages = Math.max(1, Math.ceil(sortedSuppliers.length / ROWS_PER_PAGE));
+  const paginatedSuppliers = sortedSuppliers.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
+
+  const renderPageNumbers = () => {
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+    
+    const pages = [];
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(
+        <button 
+          key={i} 
+          className={currentPage === i ? s.pageCircleActive : s.pageCircle} 
+          onClick={() => setCurrentPage(i)}
+        >
+          {i}
+        </button>
+      );
+    }
+    return pages;
+  };
 
   const columns: { label: string; key: keyof Supplier }[] = [
   { label: 'ID',             key: 'id' },
@@ -82,7 +115,10 @@ export default function ArchiveSupplierTable({ suppliers, onRestore, onBack }: A
               className={s.searchInput}
               placeholder="Search archives..."
               value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
+              onChange={e => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1); // Reset to page 1 on search
+              }}
             />
             <LuSearch size={18} />
           </div>
@@ -110,8 +146,8 @@ export default function ArchiveSupplierTable({ suppliers, onRestore, onBack }: A
             </tr>
           </thead>
           <tbody>
-            {sortedSuppliers.length ? (
-              sortedSuppliers.map((sup, i) => (
+            {paginatedSuppliers.length ? (
+              paginatedSuppliers.map((sup, i) => (
                 <tr key={sup.id} className={i % 2 ? s.altRow : ''}>
                   <td style={{ color: '#94a3b8' }}>{sup.id}</td>
                   <td style={{ fontWeight: 600, color: '#64748b' }}>{sup.supplierName}</td>
@@ -154,8 +190,19 @@ export default function ArchiveSupplierTable({ suppliers, onRestore, onBack }: A
         </table>
       </div>
 
-      <div className={s.footer} style={{ color: '#94a3b8' }}>
-        Showing {sortedSuppliers.length} archived supplier{sortedSuppliers.length !== 1 ? 's' : ''}
+      <div className={s.footer}>
+        <div className={s.showDataText} style={{ color: '#94a3b8' }}>
+          Showing <span className={s.countBadge}>{paginatedSuppliers.length}</span> of {sortedSuppliers.length}
+        </div>
+        <div className={s.pagination}>
+          <button className={s.nextBtn} disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}>
+            <LuChevronLeft />
+          </button>
+          {renderPageNumbers()}
+          <button className={s.nextBtn} disabled={currentPage >= totalPages} onClick={() => setCurrentPage(prev => prev + 1)}>
+            <LuChevronRight />
+          </button>
+        </div>
       </div>
     </div>
   )

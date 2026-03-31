@@ -253,8 +253,7 @@ export default function SalesPage({ role = 'Admin', employeeId = 0, onLogout, in
     })
   }, [filteredTx, sortConfig])
 
-  const totalPages  = Math.ceil(sortedTx.length / itemsPerPage)
-  const paginatedTx = sortedTx.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+const totalPages = Math.max(1, Math.ceil(sortedTx.length / itemsPerPage));  const paginatedTx = sortedTx.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
   if (isLoading) return <div className={s.loadingContainer}>Connecting to database...</div>
 
