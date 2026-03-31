@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
@@ -20,9 +21,10 @@ export default function Login({ onLogin }: LoginProps) {
   // Login fields
   const [employeeId,      setEmployeeId]      = useState("");
   const [employeeIdError, setEmployeeIdError] = useState("");
-  const passwordRef = useRef<HTMLInputElement>(null);
+  const [password, setPassword] = useState("");
   const [showPassword,    setShowPassword]    = useState(false);
   const [rememberMe,      setRememberMe]      = useState(false);
+  const [passwordError, setPasswordError] = useState("");
 
   // 2FA OTP state
   const [otpEmployeeId, setOtpEmployeeId] = useState<number>(0);
@@ -56,7 +58,7 @@ export default function Login({ onLogin }: LoginProps) {
     try {
       // Include any stored device trust token so backend can skip OTP if still valid
       const deviceTrustToken = localStorage.getItem(`2fa_trust_${employeeId}`) ?? '';
-      const passwordValue = passwordRef.current?.value ?? '';
+      const passwordValue = password;
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -65,7 +67,7 @@ export default function Login({ onLogin }: LoginProps) {
       const data = await response.json();
 
       if (!response.ok) {
-        showToast(data.message || "Invalid credentials. Please check your Employee ID and password.", "error");
+        showToast(data.message || "Invalid credentials. Please check your Username and password.", "error");
         return;
       }
 
@@ -157,15 +159,8 @@ export default function Login({ onLogin }: LoginProps) {
   // ── Resend 2FA OTP ──
   const handleResendOtp = async () => {
     try {
-      // Re-trigger login which will re-send the OTP
-      // We can't resend without the password, so we use send-otp with the known email
-      // The contact shown is masked; backend send-otp via email doesn't need exact match for 2FA resend
-      // We call the dedicated resend endpoint pattern: just re-call complete-2fa-login will fail,
-      // so we need a resend — call send-otp with the stored email is the right approach.
-      // Since we only have the masked email, we inform the user to re-login instead.
-      // Better UX: go back to login
       setView("login");
-      if (passwordRef.current) passwordRef.current.value = "";
+      setPassword(""); 
       showToast("Please log in again to receive a new code.", "info");
     } catch {
       showToast("Failed to resend code.", "error");
@@ -180,15 +175,39 @@ export default function Login({ onLogin }: LoginProps) {
     }
   }, []);
 
-  const handleEmployeeIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    if (val === "" || /^\d+$/.test(val)) {
-      setEmployeeId(val);
-      setEmployeeIdError("");
-    } else {
-      setEmployeeIdError("Employee ID must contain numbers only.");
-    }
-  };
+      const handleEmployeeIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = e.target.value;
+      if (/\s/.test(val)) return; // block spaces
+      if (val.length > 25) {
+        setEmployeeIdError("Username must be 25 characters only.");
+        return;
+      }
+      if (val === "" || /^[a-zA-Z0-9._@]+$/.test(val)) {
+        setEmployeeId(val);
+        if (val.length > 0 && val.length < 8) {
+          setEmployeeIdError("Username must be at least 8 characters.");
+        } else {
+          setEmployeeIdError("");
+        }
+      } else {
+        setEmployeeIdError("Username may only contain letters, numbers, and special characters ( _, . , @)");
+      }
+    };
+      
+      const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = e.target.value;
+      if (/\s/.test(val)) return; // block spaces
+      if (val.length > 25) {
+        setPasswordError("Password must be 25 characters only.");
+        return;
+      }
+      setPassword(val);
+      if (val.length > 0 && val.length < 8) {
+        setPasswordError("Password must be at least 8 characters.");
+      } else {
+        setPasswordError("");
+      }
+    };
 
   return (
     <div className={styles.loginContainer}>
@@ -209,7 +228,7 @@ export default function Login({ onLogin }: LoginProps) {
           /* ── LOGIN ── */
           <form onSubmit={handleLogin} className={styles.loginForm}>
             <div className={styles.loginField}>
-              <label className={styles.loginLabel}>Employee ID <span style={{ color: "red" }}>*</span></label>
+              <label className={styles.loginLabel}>Username <span style={{ color: "red" }}>*</span></label>
               <input
                 type="text"
                 value={employeeId}
@@ -226,14 +245,16 @@ export default function Login({ onLogin }: LoginProps) {
               <div className={styles.passwordWrapper}>
                 <input
                   type={showPassword ? "text" : "password"}
-                  ref={passwordRef}
+                  value={password}
                   className={styles.loginInput}
+                  onChange={handlePasswordChange}
                   required
                 />
                 <span className={styles.eyeIcon} onClick={() => setShowPassword(!showPassword)}>
                   {showPassword ? <AiFillEyeInvisible /> : <AiFillEye />}
                 </span>
               </div>
+              {passwordError && <span className={styles.fieldError}>{passwordError}</span>}
             </div>
 
             <div className={styles.formOptions}>
@@ -258,7 +279,7 @@ export default function Login({ onLogin }: LoginProps) {
         ) : view === "otp" ? (
           /* ── 2FA OTP ── */
           <div className={styles.forgotContainer}>
-            <button className={styles.backBtn} onClick={() => { setView("login"); if (passwordRef.current) passwordRef.current.value = ""; }}>
+            <button className={styles.backBtn} onClick={() => { setView("login"); setPassword(""); }}>
               <FaArrowLeft />
             </button>
             <h2 className={styles.forgotTitle}>Two-Factor Authentication</h2>

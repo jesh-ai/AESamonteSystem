@@ -105,13 +105,13 @@ export default function ForgotPassword({
             <FaArrowLeft />
           </button>
           <h2 className={styles.forgotTitle}>Forgot Password?</h2>
-          <p className={styles.forgotSubtitle}>Enter your Employee ID and registered email to receive a verification code.</p>
+          <p className={styles.forgotSubtitle}>Enter your Username and registered email to receive a verification code.</p>
 
           <div className={styles.loginField}>
-            <label className={styles.loginLabel}>Employee ID <span style={{ color: "red" }}>*</span></label>
+            <label className={styles.loginLabel}>Username <span style={{ color: "red" }}>*</span></label>
             <input
               type="text"
-              placeholder="Employee ID"
+              placeholder="Username"
               value={employeeId}
               onChange={handleEmployeeIdChange}
               className={styles.loginInput}

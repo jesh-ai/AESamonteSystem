@@ -72,6 +72,13 @@ const EDIT_REQUIRED: { field: keyof Supplier; label: string }[] = [
 
 const errStyle = { borderColor: '#fca5a5', backgroundColor: '#fff5f5' };
 
+// ── ADDED: matches Add Order LABEL_STYLE ──
+const LABEL_STYLE: React.CSSProperties = {
+  display: 'block', fontSize: '0.72rem', fontWeight: 700,
+  textTransform: 'uppercase', letterSpacing: '0.5px',
+  color: '#6b7280', marginBottom: '4px',
+};
+
 /* ================= COMPONENT ================= */
 
 export default function Suppliers({
@@ -106,6 +113,8 @@ export default function Suppliers({
   const [createFormError, setCreateFormError] = useState('');
   const [createEmptyFields, setCreateEmptyFields] = useState<Set<string>>(new Set());
   const [showCreateCancelConfirm, setShowCreateCancelConfirm] = useState(false);
+  // ── ADDED ──
+  const [createSubmitAttempted, setCreateSubmitAttempted] = useState(false);
 
   // --- EDIT MODAL STATE ---
   const [editModal, setEditModal] = useState(false);
@@ -177,6 +186,7 @@ export default function Suppliers({
     setCreateFormError('');
     setCreateEmptyFields(new Set());
     setShowCreateCancelConfirm(false);
+    setCreateSubmitAttempted(false); // ── ADDED ──
   };
 
     const handleCreateCancelClick = () => {
@@ -249,6 +259,7 @@ export default function Suppliers({
     /* ================= HANDLERS ================= */
 
     const handleCreateSupplier = async () => {
+      setCreateSubmitAttempted(true); // ── ADDED ──
       if (!validateCreate()) return;
 
       const newName = normalize(supplierFormData.supplierName);
@@ -706,7 +717,10 @@ export default function Suppliers({
               <h4 className={s.sectionTitle}>Company Information</h4>
               <div className={s.formRow}>
                 <div className={s.formGroup}>
-                  <label>Supplier Name <span style={{ color: '#ef4444' }}>*</span></label>
+                  {/* ── CHANGED: label now uses LABEL_STYLE, turns red on error ── */}
+                  <label style={{ ...LABEL_STYLE, color: createSubmitAttempted && createEmptyFields.has('supplierName') ? '#dc2626' : '#6b7280' }}>
+                    Supplier Name <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
                   <input
                     name="supplierName"
                     value={supplierFormData.supplierName}
@@ -718,6 +732,10 @@ export default function Suppliers({
                     style={createEmptyFields.has('supplierName') || createDupError ? errStyle : {}}
                     placeholder="e.g. Juan dela Cruz Trading"
                   />
+                  {/* ── ADDED: helper text below field ── */}
+                  {createSubmitAttempted && createEmptyFields.has('supplierName') && (
+                    <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Supplier name is required.</p>
+                  )}
                 </div>
               </div>
 
@@ -728,7 +746,10 @@ export default function Suppliers({
               )}
 
               <div className={s.formGroupFull}>
-                <label>Address <span style={{ color: '#ef4444' }}>*</span></label>
+                {/* ── CHANGED ── */}
+                <label style={{ ...LABEL_STYLE, color: createSubmitAttempted && createEmptyFields.has('address') ? '#dc2626' : '#6b7280' }}>
+                  Address <span style={{ color: '#ef4444' }}>*</span>
+                </label>
                 <input
                   name="address"
                   value={supplierFormData.address}
@@ -736,12 +757,19 @@ export default function Suppliers({
                   style={createEmptyFields.has('address') ? errStyle : {}}
                   placeholder="Street, Barangay, City"
                 />
+                {/* ── ADDED ── */}
+                {createSubmitAttempted && createEmptyFields.has('address') && (
+                  <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Address is required.</p>
+                )}
               </div>
 
               <h4 className={s.sectionTitle}>Primary Contact</h4>
               <div className={s.formRow}>
                 <div className={s.formGroup}>
-                  <label>Contact Person <span style={{ color: '#ef4444' }}>*</span></label>
+                  {/* ── CHANGED ── */}
+                  <label style={{ ...LABEL_STYLE, color: createSubmitAttempted && createEmptyFields.has('contactPerson') ? '#dc2626' : '#6b7280' }}>
+                    Contact Person <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
                   <input
                     name="contactPerson"
                     value={supplierFormData.contactPerson}
@@ -749,9 +777,16 @@ export default function Suppliers({
                     style={createEmptyFields.has('contactPerson') ? errStyle : {}}
                     placeholder="Full name"
                   />
+                  {/* ── ADDED ── */}
+                  {createSubmitAttempted && createEmptyFields.has('contactPerson') && (
+                    <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Contact person is required.</p>
+                  )}
                 </div>
                 <div className={s.formGroup}>
-                  <label>Contact No. <span style={{ color: '#ef4444' }}>*</span></label>
+                  {/* ── CHANGED ── */}
+                  <label style={{ ...LABEL_STYLE, color: createSubmitAttempted && createEmptyFields.has('contact') ? '#dc2626' : '#6b7280' }}>
+                    Contact No. <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
                   <input
                     name="contact"
                     value={supplierFormData.contact}
@@ -759,11 +794,15 @@ export default function Suppliers({
                     style={createEmptyFields.has('contact') ? errStyle : {}}
                     placeholder="09XXXXXXXXX"
                   />
+                  {/* ── ADDED ── */}
+                  {createSubmitAttempted && createEmptyFields.has('contact') && (
+                    <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Contact number is required.</p>
+                  )}
                 </div>
               </div>
 
               <div className={s.formGroupFull}>
-                <label>Email Address</label>
+                <label style={{ ...LABEL_STYLE }}>Email Address</label>
                 <input
                   name="email"
                   value={supplierFormData.email}
@@ -774,7 +813,7 @@ export default function Suppliers({
 
               <h4 className={s.sectionTitle}>Terms & Notes</h4>
               <div className={s.formGroup}>
-                <label>Payment Terms</label>
+                <label style={{ ...LABEL_STYLE }}>Payment Terms</label>
                 <select
                   name="paymentTerms"
                   value={supplierFormData.paymentTerms}
@@ -831,7 +870,8 @@ export default function Suppliers({
               <h4 className={s.sectionTitle}>Company Information</h4>
               <div className={s.formRow}>
                 <div className={s.formGroup}>
-                  <label style={editSubmitAttempted && editEmptyFields.has('supplierName') ? { color: '#dc2626', fontWeight: 700, textTransform: 'uppercase' as const, fontSize: '0.72rem', letterSpacing: '0.5px' } : {}}>
+                  {/* ── CHANGED ── */}
+                  <label style={{ ...LABEL_STYLE, color: editSubmitAttempted && editEmptyFields.has('supplierName') ? '#dc2626' : '#6b7280' }}>
                     Supplier Name <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
@@ -841,8 +881,9 @@ export default function Suppliers({
                       clearEditEmpty('supplierName');
                       setEditFormData({ ...editFormData, supplierName: e.target.value });
                     }}
-                    style={editSubmitAttempted && editEmptyFields.has('supplierName') ? { borderColor: '#f87171', backgroundColor: '#fff5f5' } : editDupError ? errStyle : {}}
+                    style={editEmptyFields.has('supplierName') ? { borderColor: '#f87171', backgroundColor: '#fff5f5' } : editDupError ? errStyle : {}}
                   />
+                  {/* ── ADDED ── */}
                   {editSubmitAttempted && editEmptyFields.has('supplierName') && (
                     <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Supplier name is required.</p>
                   )}
@@ -856,14 +897,16 @@ export default function Suppliers({
               )}
 
               <div className={s.formGroupFull}>
-                <label style={editSubmitAttempted && editEmptyFields.has('address') ? { color: '#dc2626', fontWeight: 700, textTransform: 'uppercase' as const, fontSize: '0.72rem', letterSpacing: '0.5px' } : {}}>
+                {/* ── CHANGED ── */}
+                <label style={{ ...LABEL_STYLE, color: editSubmitAttempted && editEmptyFields.has('address') ? '#dc2626' : '#6b7280' }}>
                   Address <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <input
                   value={editFormData.address}
                   onChange={e => { clearEditEmpty('address'); setEditFormData({ ...editFormData, address: e.target.value }); }}
-                  style={editSubmitAttempted && editEmptyFields.has('address') ? { borderColor: '#f87171', backgroundColor: '#fff5f5' } : {}}
+                  style={editEmptyFields.has('address') ? { borderColor: '#f87171', backgroundColor: '#fff5f5' } : {}}
                 />
+                {/* ── ADDED ── */}
                 {editSubmitAttempted && editEmptyFields.has('address') && (
                   <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Address is required.</p>
                 )}
@@ -872,27 +915,31 @@ export default function Suppliers({
               <h4 className={s.sectionTitle}>Primary Contact</h4>
               <div className={s.formRow}>
                 <div className={s.formGroup}>
-                  <label style={editSubmitAttempted && editEmptyFields.has('contactPerson') ? { color: '#dc2626', fontWeight: 700, textTransform: 'uppercase' as const, fontSize: '0.72rem', letterSpacing: '0.5px' } : {}}>
+                  {/* ── CHANGED ── */}
+                  <label style={{ ...LABEL_STYLE, color: editSubmitAttempted && editEmptyFields.has('contactPerson') ? '#dc2626' : '#6b7280' }}>
                     Contact Person <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     value={editFormData.contactPerson}
                     onChange={e => { clearEditEmpty('contactPerson'); setEditFormData({ ...editFormData, contactPerson: e.target.value }); }}
-                    style={editSubmitAttempted && editEmptyFields.has('contactPerson') ? { borderColor: '#f87171', backgroundColor: '#fff5f5' } : {}}
+                    style={editEmptyFields.has('contactPerson') ? { borderColor: '#f87171', backgroundColor: '#fff5f5' } : {}}
                   />
+                  {/* ── ADDED ── */}
                   {editSubmitAttempted && editEmptyFields.has('contactPerson') && (
                     <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Contact person is required.</p>
                   )}
                 </div>
                 <div className={s.formGroup}>
-                  <label style={editSubmitAttempted && editEmptyFields.has('contactNumber') ? { color: '#dc2626', fontWeight: 700, textTransform: 'uppercase' as const, fontSize: '0.72rem', letterSpacing: '0.5px' } : {}}>
+                  {/* ── CHANGED ── */}
+                  <label style={{ ...LABEL_STYLE, color: editSubmitAttempted && editEmptyFields.has('contactNumber') ? '#dc2626' : '#6b7280' }}>
                     Contact No. <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     value={editFormData.contactNumber}
                     onChange={e => { clearEditEmpty('contactNumber'); setEditFormData({ ...editFormData, contactNumber: e.target.value.replace(/[^\d]/g, '') }); }}
-                    style={editSubmitAttempted && editEmptyFields.has('contactNumber') ? { borderColor: '#f87171', backgroundColor: '#fff5f5' } : {}}
+                    style={editEmptyFields.has('contactNumber') ? { borderColor: '#f87171', backgroundColor: '#fff5f5' } : {}}
                   />
+                  {/* ── ADDED ── */}
                   {editSubmitAttempted && editEmptyFields.has('contactNumber') && (
                     <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Contact number is required.</p>
                   )}
@@ -900,14 +947,13 @@ export default function Suppliers({
               </div>
 
               <div className={s.formGroupFull}>
-                <label>Email Address</label>
+                <label style={{ ...LABEL_STYLE }}>Email Address</label>
                 <input
                   value={editFormData.email}
                   onChange={e => setEditFormData({ ...editFormData, email: e.target.value })}
                 />
               </div>
 
-              {/* Banner only for no-changes / dup errors */}
               {editFormError && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#fee2e2', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: '8px', padding: '12px 16px', fontSize: '0.85rem', fontWeight: 500, marginTop: '8px' }}>
                   ⚠ {editFormError}
