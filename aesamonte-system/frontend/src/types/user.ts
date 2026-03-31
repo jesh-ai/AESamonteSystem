@@ -17,9 +17,10 @@ export interface UserPermissions {
 }
 
 export interface UserInfo {
-  employeeId: number;
-  roleName: string;
-  employeeName: string;
-  permissions: UserPermissions;
-  token: string;
+  employeeId:       number;
+  employeeName:     string;
+  employeeUsername: string;
+  roleName:         string;
+  permissions:      UserPermissions;
+  token:            string;
 }

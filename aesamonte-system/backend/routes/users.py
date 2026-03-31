@@ -47,10 +47,10 @@ def create_employee():
         hashed = bcrypt.hashpw(data['password'].encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
         
         cursor.execute("""
-            INSERT INTO employee (employee_name, employee_email, employee_contact, 
+            INSERT INTO employee (employee_name, employee_username, employee_email, employee_contact,
                                employee_password, role_id, employed_date, employee_status_id)
-            VALUES (%s, %s, %s, %s, %s, CURRENT_DATE, %s)
-        """, (data['name'], data['email'], data['contact'], hashed, data['role_id'], status_id))
+            VALUES (%s, %s, %s, %s, %s, %s, CURRENT_DATE, %s)
+        """, (data['name'], data['username'], data['email'], data['contact'], hashed, data['role_id'], status_id))
         
         conn.commit()
         return jsonify({"message": "Created"}), 201
@@ -70,10 +70,10 @@ def update_employee(employee_id):
     try:
         cursor.execute("SET app.current_user_id = %s", (1,))
         cursor.execute("""
-            UPDATE employee SET employee_name=%s, employee_email=%s, 
+            UPDATE employee SET employee_name=%s, employee_username=%s, employee_email=%s,
             employee_contact=%s, role_id=%s, employee_status_id=%s
             WHERE employee_id=%s
-        """, (data['name'], data['email'], data['contact'], data['role_id'], status_id, employee_id))
+        """, (data['name'], data['username'], data['email'], data['contact'], data['role_id'], status_id, employee_id))
         
         if data.get("password") and data.get("password").strip():
             hashed = bcrypt.hashpw(data['password'].encode("utf-8"), bcrypt.gensalt()).decode("utf-8")

@@ -12,6 +12,7 @@ interface RoleOption {
 
 export default function AddEmployeeModal({ onClose, onAdd, employee }: any) {
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [contact, setContact] = useState("");
   const [role, setRole] = useState("");
@@ -37,6 +38,7 @@ export default function AddEmployeeModal({ onClose, onAdd, employee }: any) {
   useEffect(() => {
     if (employee) {
       setName(employee.name || "");
+      setUsername(employee.username || "");
       setEmail(employee.email || "");
       setContact(employee.contact || "");
       setRole(employee.role_id?.toString() || "");
@@ -45,12 +47,13 @@ export default function AddEmployeeModal({ onClose, onAdd, employee }: any) {
   }, [employee]);
 
   const handleSubmit = async () => {
-    if (!name || !email || !contact) return alert("Please fill in all required fields.");
+    if (!name || !username || !email || !contact) return alert("Please fill in all required fields.");
     if (!employee && !password) return alert("Password is required for new accounts.");
     if (password && password !== confirmPassword) return alert("Passwords do not match.");
 
     const payload = {
       name: name.trim(),
+      username: username.trim(),
       email: email.trim(),
       contact: contact.trim(),
       role_id: parseInt(role),
@@ -97,6 +100,10 @@ export default function AddEmployeeModal({ onClose, onAdd, employee }: any) {
             <div className={styles.formGroupFull}>
               <label>Full Name</label>
               <input value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <div className={styles.formGroupFull}>
+              <label>Username</label>
+              <input value={username} onChange={(e) => setUsername(e.target.value)} />
             </div>
             <div className={styles.formGridTwo}>
               <div className={styles.formGroup}>

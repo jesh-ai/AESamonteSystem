@@ -64,7 +64,7 @@ export default function ForgotPassword({
       const response = await fetch("/api/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ otp: otp.join(""), employeeId, method: "email" }),
+        body: JSON.stringify({ otp: otp.join(""), username: employeeId, method: "email" }),
       });
       const data = await response.json();
       if (response.ok) {
@@ -82,7 +82,7 @@ export default function ForgotPassword({
       const response = await fetch("/api/auth/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ employeeId, contact: emailAddress, method: "email" }),
+        body: JSON.stringify({ username: employeeId, contact: emailAddress, method: "email" }),
       });
       const data = await response.json();
       if (response.ok) {
@@ -205,7 +205,7 @@ export default function ForgotPassword({
                     const response = await fetch("/api/auth/reset-password", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ employeeId, email: emailAddress }),
+                      body: JSON.stringify({ username: employeeId, email: emailAddress }),
                     });
                     const data = await response.json();
                     setShowPop(false);
