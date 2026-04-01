@@ -93,45 +93,60 @@ def orders_summary():
 def orders_list():
     conn = get_connection()
     cur = conn.cursor()
-    
+
     try:
         cur.execute("""
             SELECT
                 ot.order_id,
                 c.customer_name,
                 c.customer_address,
-                c.customer_contact, 
+                c.customer_contact,
                 ot.order_date,
-                sl.status_code AS order_status,
-                COALESCE(pm.status_name, 'Cash') AS payment_method_name, 
-                COALESCE(SUM(od.order_quantity), 0) as total_qty,
-                COALESCE(SUM(od.order_total), 0) as total_amount,
-                COALESCE(json_agg(
-                    json_build_object(
-                        'inventory_id', od.inventory_id,
-                        'order_quantity', od.order_quantity,
-                        'available_quantity', COALESCE((SELECT SUM(ib.total_quantity) FROM inventory_brand ib WHERE ib.inventory_id = i.inventory_id), 0),
-                        'item_name', i.item_name,
-                        'description', (SELECT ib2.item_description FROM inventory_brand ib2 WHERE ib2.inventory_id = i.inventory_id LIMIT 1),
-                        'amount', od.order_total,
-                        'uom', (SELECT u2.uom_name FROM inventory_brand ib2 JOIN unit_of_measure u2 ON ib2.uom_id = u2.uom_id WHERE ib2.inventory_id = i.inventory_id LIMIT 1)
-                    )
-                ) FILTER (WHERE od.order_id IS NOT NULL), '[]') AS items_json
+                COALESCE(sl_status.status_name, 'Preparing') AS order_status,
+                COALESCE(sl_pm.status_name, 'Cash')          AS payment_method_name,
+                COALESCE(sl_ps.status_name, NULL)            AS payment_status_name,
+                COALESCE(
+                    SUM(od.order_quantity)
+                    FILTER (WHERE od.order_item_id IS NOT NULL
+                              AND NOT COALESCE(od.is_archived, FALSE)),
+                    0
+                ) AS total_qty,
+                COALESCE(ot.total_amount, 0) AS total_amount,
+                COALESCE(
+                    json_agg(
+                        json_build_object(
+                            'inventory_id',        ib.inventory_id,
+                            'inventory_brand_id',  od.inventory_brand_id,
+                            'order_quantity',      od.order_quantity,
+                            'available_quantity',  COALESCE(ib.total_quantity, 0),
+                            'item_status_id',      ib.item_status_id,
+                            'item_name',           i.item_name,
+                            'amount',              od.order_total,
+                            'uom',                 u.uom_name
+                        )
+                    ) FILTER (WHERE od.order_item_id IS NOT NULL
+                                AND NOT COALESCE(od.is_archived, FALSE)),
+                    '[]'
+                ) AS items_json
             FROM order_transaction ot
-            JOIN customer c ON ot.customer_id = c.customer_id
-            JOIN static_status sl ON ot.order_status_id = sl.status_id
-            LEFT JOIN static_status pm ON ot.payment_method_id = pm.status_id
-            LEFT JOIN order_details od ON od.order_id = ot.order_id
-            LEFT JOIN inventory i ON i.inventory_id = od.inventory_id
-            WHERE sl.status_scope = 'ORDER_STATUS'
-            GROUP BY 
-                ot.order_id, 
-                c.customer_name, 
-                c.customer_address, 
-                c.customer_contact, 
-                ot.order_date, 
-                sl.status_code,
-                pm.status_name
+            JOIN  customer      c         ON c.customer_id       = ot.customer_id
+            LEFT JOIN static_status sl_status ON sl_status.status_id = ot.order_status_id
+            LEFT JOIN static_status sl_pm     ON sl_pm.status_id     = ot.payment_method_id
+            LEFT JOIN static_status sl_ps     ON sl_ps.status_id     = ot.payment_status_id
+            LEFT JOIN order_details  od  ON od.order_id           = ot.order_id
+            LEFT JOIN inventory_brand ib ON ib.inventory_brand_id = od.inventory_brand_id
+            LEFT JOIN inventory       i  ON i.inventory_id        = ib.inventory_id
+            LEFT JOIN unit_of_measure u  ON u.uom_id              = ib.uom_id
+            GROUP BY
+                ot.order_id,
+                c.customer_name,
+                c.customer_address,
+                c.customer_contact,
+                ot.order_date,
+                sl_status.status_name,
+                sl_pm.status_name,
+                sl_ps.status_name,
+                ot.total_amount
             ORDER BY ot.order_id DESC
         """)
 
@@ -139,10 +154,12 @@ def orders_list():
         orders = []
 
         for row in rows:
-            order_id, customer_name, customer_address, customer_contact, order_date, order_status, payment_method, total_qty, total_amount, items_json = row
-            
+            (order_id, customer_name, customer_address, customer_contact,
+             order_date, order_status, payment_method, payment_status,
+             total_qty, total_amount, items_json) = row
+
             order_status_upper = (order_status or "").upper()
-            is_archived = order_status_upper == 'INACTIVE'  
+            is_archived = order_status_upper == 'INACTIVE'
 
             if isinstance(items_json, str):
                 try:
@@ -150,38 +167,40 @@ def orders_list():
                 except json.JSONDecodeError:
                     items_list = []
             else:
-                items_list = items_json or []
+                items_list = items_json if isinstance(items_json, list) else []
 
             problematic_items = []
             if order_status_upper == "PREPARING":
                 for item in items_list:
-                    order_qty = item.get('order_quantity') or 0
+                    order_qty    = item.get('order_quantity')    or 0
                     available_qty = item.get('available_quantity') or 0
-                    item_name = item.get('item_name') or 'Unknown'
+                    item_name    = item.get('item_name')         or 'Unknown'
                     if available_qty < order_qty:
                         problematic_items.append(f"{item_name} ({available_qty}/{order_qty})")
 
             availability_status = "Out of Stock" if problematic_items else None
 
             orders.append({
-            "id": order_id,
-            "customer": customer_name,
-            "address": customer_address,     
-            "contact": customer_contact,     
-            "date": order_date.strftime("%m/%d/%y") if order_date else None,
-            "status": order_status_upper.replace("_", " ").title(),
-            "paymentMethod": payment_method, 
-            "totalQty": total_qty,           
-            "totalAmount": total_amount,     
-            "availabilityStatus": availability_status,
-            "problematicItems": problematic_items,
-            "items": items_list,
-            "is_archived": is_archived,
-        })
+                "id":                 order_id,
+                "customer":           customer_name,
+                "address":            customer_address,
+                "contact":            customer_contact,
+                "date":               order_date.strftime("%m/%d/%y") if order_date else None,
+                "status":             order_status_upper.replace("_", " ").title(),
+                "paymentMethod":      payment_method,
+                "paymentStatus":      payment_status,
+                "totalQty":           int(total_qty),
+                "totalAmount":        float(total_amount) if total_amount is not None else 0.0,
+                "availabilityStatus": availability_status,
+                "problematicItems":   problematic_items,
+                "items":              items_list,
+                "is_archived":        is_archived,
+            })
 
         return jsonify(orders)
     except Exception as e:
-        print("Error fetching list:", e)
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
     finally:
         cur.close()

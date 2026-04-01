@@ -41,7 +41,7 @@ type SortKey = 'id' | 'customer' | 'address' | 'totalQty' | 'totalAmount' | 'pay
 const getViewStatusClass = (status: string, s: Record<string, string>) => {
   switch (status?.toUpperCase()) {
     case 'PREPARING': return s.viewStatusPreparing;
-    case 'TO SHIP':   return s.viewStatusToShip;
+    case 'SHIPPING':   return s.viewStatusToShip;
     case 'RECEIVED':  return s.viewStatusReceived;
     case 'CANCELLED': return s.viewStatusCancelled;
     default:          return s.viewStatusDefault;
