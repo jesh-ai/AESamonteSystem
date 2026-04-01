@@ -430,7 +430,44 @@ const totalPages = Math.max(1, Math.ceil(sortedProducts.length / ROWS_PER_PAGE))
     );
   };
 
-  if (isLoading) return <div className={s.loadingContainer}>Loading Inventory...</div>;
+  if (isLoading) return (
+  <div className={s.container}>
+    <TopHeader role={role} onLogout={onLogout} />
+    <div className={s.mainContent}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <div>
+          <div className={s.skeleton} style={{ width: 140, height: 28, marginBottom: 8 }} />
+          <div className={s.skeleton} style={{ width: 260, height: 13 }} />
+        </div>
+        <div className={s.skeleton} style={{ width: 110, height: 36, borderRadius: 6 }} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: '1.5rem' }}>
+        {[0,1,2].map(i => (
+          <div key={i} style={{ background: 'white', border: '0.5px solid #e5e7eb', borderRadius: 12, padding: '1.1rem 1.25rem' }}>
+            <div className={s.skeleton} style={{ width: 80, height: 13, marginBottom: 10 }} />
+            <div className={s.skeleton} style={{ width: '80%', height: 28, marginBottom: 12 }} />
+            <div className={s.skeleton} style={{ width: '100%', height: 13 }} />
+          </div>
+        ))}
+      </div>
+      <div style={{ background: 'white', border: '0.5px solid #e5e7eb', borderRadius: 12, padding: '1.1rem 1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div className={s.skeleton} style={{ width: 110, height: 20 }} />
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[100,100,34,180,60].map((w,i) => <div key={i} className={s.skeleton} style={{ width: w, height: 34, borderRadius: 6 }} />)}
+          </div>
+        </div>
+        {[0,1,2,3,4,5,6,7].map(i => (
+          <div key={i} style={{ display: 'flex', gap: 14, padding: '10px 0', borderBottom: '0.5px solid #e5e7eb' }}>
+            {[40,140,120,50,50,70,40].map((w,j) => (
+              <div key={j} className={s.skeleton} style={{ width: w, height: 12, borderRadius: j === 5 ? 20 : 4, flexShrink: 0 }} />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
 
   return (
     <div className={s.container}>
