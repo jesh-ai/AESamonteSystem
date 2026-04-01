@@ -119,8 +119,24 @@ export default function UserManagement({ onBack }: { onBack: () => void }) {
                 {user.status}
               </span>
               <div className={styles.actionGroup}>
-                <button className={styles.iconBtn} onClick={() => { setSelectedUser(user); setIsModalOpen(true); }}><FiEdit3 /></button>
-                <button className={`${styles.iconBtn} ${styles.delete}`} onClick={() => initiateDelete(user.id)}><LuTrash2 /></button>
+                <button
+                  className={styles.iconBtn}
+                  onClick={() => { setSelectedUser(user); setIsModalOpen(true); }}
+                  disabled={user.role_id === 1 || user.role_id === 2}
+                  title={user.role_id === 1 ? 'Super Admin cannot be edited' : user.role_id === 2 ? 'Admin cannot be edited' : undefined}
+                  style={user.role_id === 1 || user.role_id === 2 ? { opacity: 0.35, cursor: 'not-allowed' } : undefined}
+                >
+                  <FiEdit3 />
+                </button>
+                <button
+                  className={`${styles.iconBtn} ${styles.delete}`}
+                  onClick={() => initiateDelete(user.id)}
+                  disabled={user.role_id === 1 || user.role_id === 2}
+                  title={user.role_id === 1 ? 'Super Admin cannot be deleted' : user.role_id === 2 ? 'Admin cannot be deleted' : undefined}
+                  style={user.role_id === 1 || user.role_id === 2 ? { opacity: 0.35, cursor: 'not-allowed' } : undefined}
+                >
+                  <LuTrash2 />
+                </button>
               </div>
             </div>
           ))

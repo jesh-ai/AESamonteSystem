@@ -55,14 +55,76 @@ const ACTIONS: { key: keyof GranularPerm; label: string }[] = [
 
 const DEFAULT_PERM: GranularPerm = { can_view: false, can_create: false, can_edit: false, can_archive: false, can_export: false };
 
+// ── Business Rules ────────────────────────────────────────────────────────────
+type CellRule = 'hidden' | 'allowed' | 'admin_only' | 'superadmin_only';
+
+const MODULE_RULES: Record<string, Record<keyof GranularPerm, CellRule>> = {
+  dashboard: {
+    can_view: 'allowed', can_create: 'hidden',         can_edit: 'allowed',
+    can_archive: 'hidden', can_export: 'hidden',
+  },
+  sales: {
+    can_view: 'allowed', can_create: 'hidden',         can_edit: 'allowed',
+    can_archive: 'allowed', can_export: 'allowed',
+  },
+  inventory: {
+    can_view: 'allowed', can_create: 'allowed',        can_edit: 'allowed',
+    can_archive: 'allowed', can_export: 'allowed',
+  },
+  orders: {
+    can_view: 'allowed', can_create: 'allowed',        can_edit: 'allowed',
+    can_archive: 'allowed', can_export: 'allowed',
+  },
+  supplier: {
+    can_view: 'allowed', can_create: 'allowed',        can_edit: 'allowed',
+    can_archive: 'allowed', can_export: 'allowed',
+  },
+  reports: {
+    can_view: 'allowed', can_create: 'hidden',         can_edit: 'hidden',
+    can_archive: 'hidden', can_export: 'admin_only',
+  },
+  settings: {
+    can_view: 'allowed', can_create: 'allowed',        can_edit: 'allowed',
+    can_archive: 'superadmin_only', can_export: 'superadmin_only',
+  },
+};
+
+function getRowState(
+  module: string,
+  currentUserRole: string,
+  moduleAccessFlags: Record<string, boolean>,
+): 'visible' | 'hidden' {
+  if (moduleAccessFlags[module] === false) return 'hidden';
+  if (module === 'reports' && !['Admin', 'Super Admin'].includes(currentUserRole)) return 'hidden';
+  return 'visible';
+}
+
+function getCellState(
+  module: string,
+  action: keyof GranularPerm,
+  currentUserRole: string,
+): 'hidden' | 'restricted' | 'active' {
+  const rule = MODULE_RULES[module]?.[action] ?? 'allowed';
+  if (rule === 'hidden') return 'hidden';
+  if (rule === 'admin_only')
+    return ['Admin', 'Super Admin'].includes(currentUserRole) ? 'active' : 'restricted';
+  if (rule === 'superadmin_only')
+    return currentUserRole === 'Super Admin' ? 'active' : 'restricted';
+  return 'active';
+}
+
 export default function EditRoleModal({
   roleId,
   onClose,
   onSave,
+  currentUserRole = 'Admin',
+  moduleAccessFlags = {},
 }: {
   roleId: number;
   onClose: () => void;
   onSave: () => void;
+  currentUserRole?: string;
+  moduleAccessFlags?: Record<string, boolean>;
 }) {
   const [loading, setLoading]         = useState(true);
   const [roleName, setRoleName]       = useState('');
@@ -109,22 +171,29 @@ export default function EditRoleModal({
     setPerms(prev => {
       const cur = { ...prev[module] };
       if (action === 'can_view' && !value) {
-        // Unchecking View clears all other permissions
-        return { ...prev, [module]: { can_view: false, can_create: false, can_edit: false, can_archive: false, can_export: false } };
+        // Unchecking View clears all non-hidden actions for this module
+        ACTIONS.forEach(a => {
+          if (getCellState(module, a.key, currentUserRole) !== 'hidden') cur[a.key] = false;
+        });
+        return { ...prev, [module]: cur };
       }
-      if (action !== 'can_view' && value) {
-        // Checking any action auto-enables View
-        cur.can_view = true;
-      }
+      if (action !== 'can_view' && value) cur.can_view = true;
       cur[action] = value;
       return { ...prev, [module]: cur };
     });
   };
 
+  // 'All' only toggles cells that are currently 'active' (not hidden or restricted)
   const toggleRow = (module: string) => {
-    const allOn = ACTIONS.every(a => perms[module]?.[a.key]);
-    const next: GranularPerm = { can_view: !allOn, can_create: !allOn, can_edit: !allOn, can_archive: !allOn, can_export: !allOn };
-    setPerms(prev => ({ ...prev, [module]: next }));
+    const activeActions = ACTIONS.filter(
+      a => getCellState(module, a.key, currentUserRole) === 'active',
+    );
+    const allOn = activeActions.length > 0 && activeActions.every(a => perms[module]?.[a.key]);
+    setPerms(prev => {
+      const cur = { ...prev[module] };
+      activeActions.forEach(a => { cur[a.key] = !allOn; });
+      return { ...prev, [module]: cur };
+    });
   };
 
   const handleAssign = async (emp: Employee) => {
@@ -173,11 +242,26 @@ export default function EditRoleModal({
     if (!roleName.trim()) { setError('Role name is required.'); return; }
     setSaving(true);
     setError('');
+
+    // Build cleaned payload: zero-out hidden rows and hidden cells
+    const cleanedPerms: Record<string, GranularPerm> = {};
+    MODULES.forEach(m => {
+      if (getRowState(m.key, currentUserRole, moduleAccessFlags) === 'hidden') {
+        cleanedPerms[m.key] = { ...DEFAULT_PERM };
+      } else {
+        cleanedPerms[m.key] = { ...perms[m.key] };
+        ACTIONS.forEach(a => {
+          if (getCellState(m.key, a.key, currentUserRole) === 'hidden')
+            cleanedPerms[m.key][a.key] = false;
+        });
+      }
+    });
+
     try {
       const res = await fetch(`/api/roles/${roleId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role_name: roleName, description, is_active: isActive, granular_permissions: perms }),
+        body: JSON.stringify({ role_name: roleName, description, is_active: isActive, granular_permissions: cleanedPerms }),
       });
       const data = await res.json();
       if (res.ok) { onSave(); onClose(); }
@@ -267,34 +351,60 @@ export default function EditRoleModal({
                     <span>All</span>
                   </div>
                   {MODULES.map(m => {
+                    if (getRowState(m.key, currentUserRole, moduleAccessFlags) === 'hidden')
+                      return null;
+
                     const mp = perms[m.key] ?? { ...DEFAULT_PERM };
-                    const allOn = ACTIONS.every(a => mp[a.key]);
                     const viewOff = !mp.can_view;
+                    const activeActions = ACTIONS.filter(
+                      a => getCellState(m.key, a.key, currentUserRole) === 'active',
+                    );
+                    const allOn = activeActions.length > 0 && activeActions.every(a => mp[a.key]);
+
                     return (
                       <div key={m.key} className={styles.matrixRow}>
                         <span className={styles.moduleCol}>{m.label}</span>
+
                         {ACTIONS.map(a => {
-                          const disabled = a.key !== 'can_view' && viewOff;
+                          const cellState = getCellState(m.key, a.key, currentUserRole);
+
+                          if (cellState === 'hidden') {
+                            return (
+                              <span
+                                key={a.key}
+                                className={styles.checkCell}
+                                style={{ color: '#bbb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                              >
+                                —
+                              </span>
+                            );
+                          }
+
+                          const isDisabled =
+                            cellState === 'restricted' || (a.key !== 'can_view' && viewOff);
+
                           return (
                             <span key={a.key} className={styles.checkCell}>
                               <input
                                 type="checkbox"
                                 className={styles.permCheck}
                                 checked={mp[a.key] ?? false}
-                                disabled={disabled}
+                                disabled={isDisabled}
                                 onChange={e => togglePerm(m.key, a.key, e.target.checked)}
-                                style={disabled ? { opacity: 0.35, cursor: 'not-allowed' } : undefined}
+                                style={isDisabled ? { opacity: 0.35, cursor: 'not-allowed' } : undefined}
                               />
                             </span>
                           );
                         })}
+
+                        {/* All column */}
                         <span className={styles.checkCell}>
                           <input
                             type="checkbox"
                             className={styles.permCheck}
                             checked={allOn}
                             onChange={() => toggleRow(m.key)}
-                            title="Toggle all"
+                            title="Toggle all available permissions"
                           />
                         </span>
                       </div>

@@ -48,7 +48,7 @@ interface Toast {
   type: 'success' | 'error';
 }
 
-export default function AccessControl({ onBack }: { onBack: () => void }) {
+export default function AccessControl({ onBack, currentUserRole = 'Admin' }: { onBack: () => void; currentUserRole?: string }) {
   const [roles, setRoles] = useState<Role[]>([]);
 
   // Modals
@@ -95,8 +95,8 @@ export default function AccessControl({ onBack }: { onBack: () => void }) {
     }
   };
 
-  // Exclude system roles: Super Admin (role_id === 1) and Admin (role_id === 2)
-  const visibleRoles = roles.filter(r => r.role_id !== 1 && r.role_id !== 2);
+  // Show all roles; Super Admin and Admin are protected (buttons disabled)
+  const visibleRoles = roles;
 
   return (
     <div className={styles.settingsCard}>
@@ -146,12 +146,18 @@ export default function AccessControl({ onBack }: { onBack: () => void }) {
               <button
                 className={styles.editBtn}
                 onClick={() => setEditRoleId(role.role_id)}
+                disabled={role.role_id === 1 || role.role_id === 2}
+                title={role.role_id === 1 ? 'Super Admin cannot be edited' : role.role_id === 2 ? 'Admin cannot be edited' : undefined}
+                style={role.role_id === 1 || role.role_id === 2 ? { opacity: 0.35, cursor: 'not-allowed' } : undefined}
               >
                 <FiEdit3 size={13} /> Edit
               </button>
               <button
                 className={styles.deleteBtn}
                 onClick={() => setDeleteRoleId(role.role_id)}
+                disabled={role.role_id === 1 || role.role_id === 2}
+                title={role.role_id === 1 ? 'Super Admin cannot be deleted' : role.role_id === 2 ? 'Admin cannot be deleted' : undefined}
+                style={role.role_id === 1 || role.role_id === 2 ? { opacity: 0.35, cursor: 'not-allowed' } : undefined}
               >
                 <LuTrash2 size={13} /> Delete
               </button>
@@ -171,6 +177,7 @@ export default function AccessControl({ onBack }: { onBack: () => void }) {
       {editRoleId !== null && (
         <EditRoleModal
           roleId={editRoleId}
+          currentUserRole={currentUserRole}
           onClose={() => setEditRoleId(null)}
           onSave={() => {
             fetchRoles();
@@ -182,6 +189,7 @@ export default function AccessControl({ onBack }: { onBack: () => void }) {
       {/* ── Add Role Modal ── */}
       {showAddModal && (
         <AddRoleModal
+          currentUserRole={currentUserRole}
           onClose={() => setShowAddModal(false)}
           onSave={() => {
             fetchRoles();
