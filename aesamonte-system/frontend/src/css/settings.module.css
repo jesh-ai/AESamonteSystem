@@ -3,6 +3,7 @@
   flex-direction: column;
   min-height: 100vh;
   width: 100%;
+  background-color: #F9FAFB;
 }
 
 .mainContent {
@@ -60,7 +61,7 @@
 }
 
 .configItem:hover {
-  background-color: #f4e4b7;
+  background-color: #f0ba5c;
   transform: translateX(5px);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
 }

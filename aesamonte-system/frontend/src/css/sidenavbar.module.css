@@ -121,7 +121,7 @@
 }
 
 .activeNavItem {
-  background-color: #ECD693 !important; /* Gold highlight */
+  background-color: #fff !important; /* Gold highlight */
   color: #000000 !important;
   font-weight: 700;
   box-shadow:
@@ -135,7 +135,7 @@
 }
 
 .navItem:active {
-  background-color: #ECD693;
+  background-color: #3e73b1;
   color: #000000;
   font-weight: 700;
   box-shadow:
@@ -172,7 +172,7 @@
 }
 
 .collapsed .navItem:active {
-  background-color: #ECD693;
+  background-color: #3e73b1;
   color: #000000;
   font-weight: 700;
   box-shadow:

@@ -2,7 +2,7 @@
 .container {
   display: flex;
   flex-direction: column;
-  background-color: #F8F3D9;
+  background-color: #F9FAFB;
   min-height: 100vh;
   width: 100%;
   overflow: hidden;
