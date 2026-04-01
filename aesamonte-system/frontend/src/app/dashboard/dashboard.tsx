@@ -49,16 +49,16 @@ export default function Dashboard({ role = "Admin", onLogout, onNavigate }: Dash
   const [insights, setInsights] = useState<InsightsData | null>(null);
   const [lowStockItems, setLowStockItems] = useState<LowStockItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [receipt, setReceipt] = useState<OrderReceipt | null>(null);
   const [receiptLoading, setReceiptLoading] = useState(false);
 
-  const fetchData = () => {
-    Promise.all([
-      fetch(`${API}/api/dashboard/all`, { credentials: "include" }).then((r) => r.json()),
-      fetch(`/api/inventory`, { headers: { "Cache-Control": "no-cache" } }).then((r) => r.json()),
-    ])
-      .then(([dashData, inventoryData]) => {
+  useEffect(() => {
+    const fetchData = () => {
+      Promise.all([
+        fetch(`${API}/api/dashboard/all`, { credentials: "include" }).then((r) => r.json()),
+        fetch(`/api/inventory`, { headers: { "Cache-Control": "no-cache" } }).then((r) => r.json()),
+      ])
+        .then(([dashData, inventoryData]) => {
           const { metrics: m, recentOrders: ro, charts: ch, insights: ins, lowStockItems: dashLowStock } = dashData;
 
           if (ch && !ch.error) setCharts(ch);
@@ -121,19 +121,13 @@ export default function Dashboard({ role = "Admin", onLogout, onNavigate }: Dash
         })
         .catch((e) => console.error("Dashboard fetch error:", e))
         .finally(() => setLoading(false));
-  };
+    };
 
-  useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 30_000);
+    fetchData(); // run on mount
+
+    const interval = setInterval(fetchData, 30_000); // re-fetch every 30s
     return () => clearInterval(interval);
   }, []);
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    fetchData();
-    setTimeout(() => setIsRefreshing(false), 800);
-  };
 
   const handleOrderClick = async (orderId: number) => {
     setReceiptLoading(true);

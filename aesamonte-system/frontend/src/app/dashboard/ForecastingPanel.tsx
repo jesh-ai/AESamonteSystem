@@ -2,94 +2,38 @@
 
 import { useState } from "react";
 import styles from "@/css/dashboard.module.css";
-import { ChartsData, InsightsData, ForecastView, PeriodSalesMonth } from "./types";
-
-function fmt(n: number | undefined | null) {
-  if (n == null || isNaN(n as number)) return "₱ 0";
-  return "₱ " + n.toLocaleString("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-}
+import { InsightsData } from "./types";
 
 interface ForecastingPanelProps {
-  charts: ChartsData | null;
+  charts?: unknown;
   insights: InsightsData | null;
   loading: boolean;
 }
 
-export default function ForecastingPanel({ charts, insights, loading }: ForecastingPanelProps) {
-  const [forecastView, setForecastView] = useState<ForecastView>("Weekly");
+export default function ForecastingPanel({ insights, loading }: ForecastingPanelProps) {
   const [slideIndex, setSlideIndex] = useState(0);
 
-  const forecastPeriods: PeriodSalesMonth[] =
-    charts == null
-      ? []
-      : forecastView === "Weekly"
-      ? (charts.weeklySales ?? [])
-      : forecastView === "Quarterly"
-      ? (charts.quarterlySales ?? [])
-      : (charts.lastTwelveMonths ?? []);
-
-  const maxPeriod = Math.max(...forecastPeriods.map((p) => p.total), 1);
-  const sorted = [...forecastPeriods].sort((a, b) => b.total - a.total);
- 
   return (
     <>
       <div className={`${styles.panel} ${styles.panelCream}`}>
         <div className={styles.panelHeader}>
           <div>
             <h3 className={styles.panelTitle}>
-              {slideIndex === 0
-                ? "Sales Forecasting"
-                : slideIndex === 1
-                ? "Smart Reorder Suggestion"
-                : "Stock-Out Prediction"}
+              {slideIndex === 0 ? "Smart Reorder Suggestion" : "Stock-Out Prediction"}
             </h3>
-            {slideIndex === 0 && <p className={styles.panelSub}>{forecastView}</p>}
           </div>
         </div>
 
         <div
           className={styles.sliderOuter}
-          style={{ height: slideIndex === 0 ? "210px" : "270px", cursor: "pointer" }}
-          onClick={() => setSlideIndex((prev) => (prev + 1) % 3)}
+          style={{ height: "270px", cursor: "pointer" }}
+          onClick={() => setSlideIndex((prev) => (prev + 1) % 2)}
         >
           <div
             className={styles.sliderTrack}
             style={{ transform: `translateX(-${slideIndex * 100}%)` }}
           >
-            {/* Slide 0: Forecast Cards */}
-            <div className={styles.slide}>
-              {loading ? (
-                <div className={styles.skeletonBlock} />
-              ) : (
-                <div
-                className={`${styles.forecastCards} ${styles.forecastCardsScroll}`}
-                >
-                  {forecastPeriods.map((p, i) => {
-                    const isTop = p.total === maxPeriod && p.total > 0;
-                    const subLabel =
-                      forecastView === "Monthly"
-                        ? (p as PeriodSalesMonth).year ?? ""
-                        : p.dateRange;
-                    return (
-                      <div
-                        key={i}
-                        className={`${styles.forecastCard} ${isTop ? styles.forecastCardActive : ""}`}
-                      >
-                         <div className={styles.forecastCardTop}> 
-                        <p className={styles.forecastCardLabel}>{p.label}</p>
-                        {subLabel && <p className={styles.forecastCardRange}>{subLabel}</p>}
-                        </div>
-                        <div className={styles.forecastCardBottom}>
-                          <p className={styles.forecastCardTotal}>{fmt(p.total)}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Slide 1: Smart Reorder Suggestion */}
+            {/* Slide 0: Smart Reorder Suggestion */}
             <div className={styles.slide}>
               {loading || !insights ? (
                 <div className={styles.skeletonBlock} />
@@ -137,7 +81,7 @@ export default function ForecastingPanel({ charts, insights, loading }: Forecast
               )}
             </div>
 
-            {/* Slide 2: Stock-Out Prediction */}
+            {/* Slide 1: Stock-Out Prediction */}
             <div className={styles.slide}>
               {loading || !insights ? (
                 <div className={styles.skeletonBlock} />
@@ -184,25 +128,11 @@ export default function ForecastingPanel({ charts, insights, loading }: Forecast
             </div>
           </div>
         </div>
-
-        {slideIndex === 0 && (
-          <div className={styles.forecastTabs}>
-            {(["Weekly", "Quarterly", "Monthly"] as ForecastView[]).map((v) => (
-              <button
-                key={v}
-                className={`${styles.forecastTab} ${forecastView === v ? styles.forecastTabActive : ""}`}
-                onClick={() => setForecastView(v)}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Dot indicators */}
       <div className={styles.slideDots}>
-        {[0, 1, 2].map((i) => (
+        {[0, 1].map((i) => (
           <button
             key={i}
             className={`${styles.slideDot} ${slideIndex === i ? styles.slideDotActive : ""}`}
