@@ -54,12 +54,12 @@ def get_inventory():
         rows = cur.fetchall()
 
         cur.execute("""
-            SELECT ib.inventory_id, b.brand_id, b.brand_name,
+            SELECT ib.inventory_id, b.brand_id, COALESCE(b.brand_name, 'Generic') AS brand_name,
                    ib.item_sku, ib.item_unit_price, ib.item_selling_price,
                    ib.total_quantity
             FROM inventory_brand ib
-            JOIN brand b ON ib.brand_id = b.brand_id
-            ORDER BY ib.inventory_id, b.brand_name
+            LEFT JOIN brand b ON ib.brand_id = b.brand_id
+            ORDER BY ib.inventory_id, COALESCE(b.brand_name, 'Generic')
         """)
         brand_rows = cur.fetchall()
 
@@ -361,12 +361,12 @@ def get_inventory_item(id):
             return jsonify({"error": "Item not found"}), 404
 
         cur.execute("""
-            SELECT b.brand_id, b.brand_name, ib.item_sku, ib.item_unit_price,
+            SELECT b.brand_id, COALESCE(b.brand_name, 'Generic') AS brand_name, ib.item_sku, ib.item_unit_price,
                    ib.item_selling_price, ib.total_quantity
             FROM inventory_brand ib
-            JOIN brand b ON ib.brand_id = b.brand_id
+            LEFT JOIN brand b ON ib.brand_id = b.brand_id
             WHERE ib.inventory_id = %s
-            ORDER BY b.brand_name
+            ORDER BY COALESCE(b.brand_name, 'Generic')
         """, (id,))
         brands_list = [
             {

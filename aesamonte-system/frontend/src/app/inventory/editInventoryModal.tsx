@@ -36,7 +36,7 @@ interface EditInventoryModalProps {
   onOpenUomModal: () => void;
   onOpenSupplierModal: () => void;
   suppliers: any[];
-  brands: { id: number; code: string; name: string }[];
+  brands: { id: number; name: string }[];
   uoms: any[];
   existingProducts?: { id: string; item_name: string }[];
 }

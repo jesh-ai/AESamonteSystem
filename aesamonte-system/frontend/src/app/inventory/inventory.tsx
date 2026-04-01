@@ -99,7 +99,7 @@ interface InventorySummary {
 
 const ROWS_PER_PAGE = 10;
 
-const displayBrandName = (name: string) => name === 'No Brand' ? '—' : name;
+const displayBrandName = (name: string) => (!name || name === 'No Brand') ? 'Generic' : name;
 
 const Inventory: React.FC<InventoryProps> = ({ role, employeeId = 0, onLogout, initialSearch, permissions }) => {
   const s = styles as Record<string, string>;
@@ -577,12 +577,11 @@ const totalPages = Math.max(1, Math.ceil(sortedProducts.length / ROWS_PER_PAGE))
                       {uoms.map(u => (
                         <button
                           key={u.id}
-                          className={`${s.statusFilterMenuItem} ${uomFilter === u.code ? s.statusFilterMenuItemActive : ''}`}
-                          onClick={() => { setUomFilter(u.code); setIsUomDropdownOpen(false); setCurrentPage(1); }}
+                          className={`${s.statusFilterMenuItem} ${uomFilter === u.name ? s.statusFilterMenuItemActive : ''}`}
+                          onClick={() => { setUomFilter(u.name); setIsUomDropdownOpen(false); setCurrentPage(1); }}
                         >
                           <span style={{ fontWeight: 500 }}>{u.name}</span>
-                          <span style={{ fontSize: '0.75rem', color: '#9ca3af', marginLeft: '4px' }}>({u.code})</span>
-                          {uomFilter === u.code && <svg className={s.statusFilterCheckmark} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+                          {uomFilter === u.name && <svg className={s.statusFilterCheckmark} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"></polyline></svg>}
                         </button>
                       ))}
                     </div>
