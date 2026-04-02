@@ -69,7 +69,7 @@ const MODULE_RULES: Record<string, Record<keyof GranularPerm, CellRule>> = {
     can_archive: 'hidden', can_export: 'admin_only',
   },
   settings: {
-    can_view: 'allowed', can_create: 'allowed',        can_edit: 'allowed',
+    can_view: 'allowed', can_create: 'admin_only',     can_edit: 'allowed',
     can_archive: 'superadmin_only', can_export: 'superadmin_only',
   },
 };
@@ -85,11 +85,12 @@ const MODULE_RULES: Record<string, Record<keyof GranularPerm, CellRule>> = {
  */
 function getRowState(
   module: string,
-  currentUserRole: string,
   moduleAccessFlags: Record<string, boolean>,
 ): 'visible' | 'hidden' {
   if (moduleAccessFlags[module] === false) return 'hidden';
-  if (module === 'reports' && !['Admin', 'Super Admin'].includes(currentUserRole)) return 'hidden';
+  // Reports is strictly an Admin / Super Admin privilege —
+  // custom roles configured through this UI should never have Reports access.
+  if (module === 'reports') return 'hidden';
   return 'visible';
 }
 
@@ -176,7 +177,7 @@ export default function AddRoleModal({
     // Build cleaned payload: zero-out hidden rows and hidden cells
     const cleanedPerms: Record<string, GranularPerm> = {};
     MODULES.forEach(m => {
-      if (getRowState(m.key, currentUserRole, moduleAccessFlags) === 'hidden') {
+      if (getRowState(m.key, moduleAccessFlags) === 'hidden') {
         cleanedPerms[m.key] = { ...DEFAULT_PERM };
       } else {
         cleanedPerms[m.key] = { ...perms[m.key] };
@@ -285,7 +286,7 @@ export default function AddRoleModal({
               </div>
 
               {MODULES.map(m => {
-                if (getRowState(m.key, currentUserRole, moduleAccessFlags) === 'hidden')
+                if (getRowState(m.key, moduleAccessFlags) === 'hidden')
                   return null;
 
                 const mp = perms[m.key] ?? { ...DEFAULT_PERM };
@@ -302,7 +303,7 @@ export default function AddRoleModal({
                     {ACTIONS.map(a => {
                       const cellState = getCellState(m.key, a.key, currentUserRole);
 
-                      if (cellState === 'hidden') {
+                      if (cellState === 'hidden' || cellState === 'restricted') {
                         return (
                           <span
                             key={a.key}
@@ -314,8 +315,7 @@ export default function AddRoleModal({
                         );
                       }
 
-                      const isDisabled =
-                        cellState === 'restricted' || (a.key !== 'can_view' && viewOff);
+                      const isDisabled = a.key !== 'can_view' && viewOff;
 
                       return (
                         <span key={a.key} className={styles.checkCell}>

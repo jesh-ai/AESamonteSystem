@@ -48,7 +48,13 @@ interface Toast {
   type: 'success' | 'error';
 }
 
-export default function AccessControl({ onBack, currentUserRole = 'Admin' }: { onBack: () => void; currentUserRole?: string }) {
+export default function AccessControl({
+  onBack,
+  currentUserRole = 'Admin',
+}: {
+  onBack: () => void;
+  currentUserRole?: string;
+}) {
   const [roles, setRoles] = useState<Role[]>([]);
 
   // Modals

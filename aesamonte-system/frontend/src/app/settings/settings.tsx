@@ -106,7 +106,7 @@ export default function SettingsPage({ role = "Admin", roleId, employeeId, onLog
         )}
 
         {activeView === "access" && (
-          <AccessControl onBack={() => setActiveView("main")} currentUserRole={role} />
+          <AccessControl onBack={() => setActiveView("main")} />
         )}
 
         {activeView === "appPreferences" && (
