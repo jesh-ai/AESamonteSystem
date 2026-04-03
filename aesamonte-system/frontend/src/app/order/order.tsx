@@ -544,7 +544,7 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
             <p style={{ fontSize: '0.82rem', color: '#9ca3af', margin: '2px 0 0' }}>Track, manage, and process customer orders.</p>
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            {['Admin', 'Manager'].includes(role) && (
+            {['Super Admin', 'Admin', 'Manager'].includes(role) && (
               <ExportButton onSelect={(type) => { setExportType(type); setShowExportModal(true); }} />
             )}
           </div>

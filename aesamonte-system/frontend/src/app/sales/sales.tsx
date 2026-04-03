@@ -45,8 +45,8 @@ export default function SalesPage({ role = 'Admin', employeeId = 0, onLogout, in
   // ── Permission Logic ──
   const isSalesHead       = role === 'Sales Head'
   const isInventoryHead   = role === 'Inventory Head'
-  const canExport         = ['Admin', 'Manager'].includes(role) || isSalesHead
-  const mustRequestExport = isInventoryHead || role === 'Staff'
+  const canExport         = ['Super Admin', 'Admin', 'Manager'].includes(role) || isSalesHead
+  const mustRequestExport = isInventoryHead || role === 'Staff' || role === 'Cashier' 
 
   // ── State ──
   const [showExportRequestModal, setShowExportRequestModal] = useState(false)
@@ -397,7 +397,7 @@ if (isLoading || summary === null) return (
             {mustRequestExport && (
               <button
                 onClick={() => setShowExportRequestModal(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#475569', color: 'white', padding: '10px 20px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 500, fontSize: '0.95rem', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
+                className={s.requestExportBtn}
               >
                 Request Export
               </button>
