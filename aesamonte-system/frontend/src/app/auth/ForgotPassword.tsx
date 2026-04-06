@@ -101,36 +101,40 @@ export default function ForgotPassword({
       {view === "email_info" ? (
         /* --- EMAIL INFO ENTRY --- */
         <div className={styles.forgotContainer}>
-          <button className={styles.backBtn} onClick={onBack}>
-            <FaArrowLeft />
-          </button>
-          <h2 className={styles.forgotTitle}>Forgot Password?</h2>
+          <div className={styles.headerGroup}>
+            <button className={styles.backBtn} onClick={onBack} aria-label="Go back">
+              <FaArrowLeft />
+            </button>
+            <h2 className={styles.forgotTitle}>Forgot Password?</h2>
+          </div>
           <p className={styles.forgotSubtitle}>Enter your Username and registered email to receive a verification code.</p>
 
-          <div className={styles.loginField}>
-            <label className={styles.loginLabel}>Username <span style={{ color: "red" }}>*</span></label>
-            <input
-              type="text"
-              placeholder="Username"
-              value={employeeId}
-              onChange={handleEmployeeIdChange}
-              className={styles.loginInput}
-            />
-            {employeeIdError && <span className={styles.fieldError}>{employeeIdError}</span>}
+          <div className={styles.formGroup}>
+            <div className={styles.loginField}>
+              <label className={styles.loginLabel}>Username <span className={styles.requiredAsterisk}>*</span></label>
+              <input
+                type="text"
+                placeholder="Username"
+                value={employeeId}
+                onChange={handleEmployeeIdChange}
+                className={styles.loginInput}
+              />
+              {employeeIdError && <span className={styles.fieldError}>{employeeIdError}</span>}
+            </div>
+
+            <div className={styles.loginField}>
+              <label className={styles.loginLabel}>Email Address <span className={styles.requiredAsterisk}>*</span></label>
+              <input
+                type="email"
+                placeholder="Email Address"
+                value={emailAddress}
+                onChange={(e) => setEmailAddress(e.target.value)}
+                className={styles.loginInput}
+              />
+            </div>
           </div>
 
-          <div className={styles.loginField} style={{ marginTop: "15px" }}>
-            <label className={styles.loginLabel}>Email Address <span style={{ color: "red" }}>*</span></label>
-            <input
-              type="email"
-              placeholder="Email Address"
-              value={emailAddress}
-              onChange={(e) => setEmailAddress(e.target.value)}
-              className={styles.loginInput}
-            />
-          </div>
-
-          <button className={styles.loginSubmit} style={{ marginTop: "25px" }} onClick={handleSendOtp}>
+          <button className={styles.loginSubmit} onClick={handleSendOtp}>
             Send OTP
           </button>
         </div>
@@ -138,10 +142,12 @@ export default function ForgotPassword({
       ) : (
         /* --- EMAIL OTP VIEW --- */
         <div className={styles.forgotContainer}>
-          <button className={styles.backBtn} onClick={() => setView("email_info")}>
-            <FaArrowLeft />
-          </button>
-          <h2 className={styles.forgotTitle}>Enter Verification Code</h2>
+          <div className={styles.headerGroup}>
+            <button className={styles.backBtn} onClick={() => setView("email_info")} aria-label="Go back">
+              <FaArrowLeft />
+            </button>
+            <h2 className={styles.forgotTitle}>Enter Verification Code</h2>
+          </div>
           <p className={styles.forgotSubtitle}>
             Please enter the One Time Passcode sent to your registered email address.
           </p>

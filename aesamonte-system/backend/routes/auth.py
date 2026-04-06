@@ -219,7 +219,7 @@ def send_otp():
     method   = data.get('method')
 
     if not username or not contact:
-        return jsonify({"status": "error", "message": "Username and contact are required."}), 400
+        return jsonify({"status": "error", "message": "Username and email address are required."}), 400
 
     conn = get_connection()
     cur  = conn.cursor(cursor_factory=RealDictCursor)

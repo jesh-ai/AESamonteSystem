@@ -1,3 +1,6 @@
+/* =========================================
+   1. GLOBAL & CONTAINERS
+========================================= */
 .loginContainer {
   position: relative;
   display: flex;
@@ -5,362 +8,288 @@
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  width: 100vw;
-  padding: 10px;
-  background: linear-gradient(to bottom, #0A2A43,#0B2B44,#2e6996);
+  width: 100%; /* Changed from 100vw to prevent horizontal scrollbars */
+  padding: 20px;
+  background: linear-gradient(to bottom, #0A2A43, #0B2B44, #2e6996);
   font-family: Arial, sans-serif;
+  box-sizing: border-box;
 }
 
-/* Logo Section */
+.loginFormBox {
+  background: #FFD54F;
+  padding: 40px 35px; /* Increased padding for more breathing room */
+  border-radius: 12px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: inset 5px 0 10px -3px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0,0,0,0.15); 
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px; /* Consistent spacing between form sections */
+  box-sizing: border-box; 
+}
+
+/* =========================================
+   2. LOGO & HEADER
+========================================= */
 .loginLogo {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 30px;
+  margin-bottom: 10px;
 }
 
 .loginLogoImg {
-  width: 100px;
-  height: 100px;
+  width: 90px;
+  height: 90px;
   object-fit: contain;
 }
 
 .loginTitle {
-  margin-top: 10px;
+  margin-top: 15px;
+  margin-bottom: 5px;
   font-size: 26px;
   font-weight: 700;
   color: white !important;
   text-align: center;
 }
 
-
-/* Form Container */
-.loginFormBox {
-  background: #FFD54F;
-  padding: 30px 35px;
-  border-radius: 10px;
-  width: 90%;
-  max-width: 420px;
-  min-width: 280px; 
-  box-shadow: inset 5px 0 10px -3px rgba(0, 0, 0, 0.3); /* inner shadow */
-  display: flex;
-  flex-direction: column;
-  align-items: center; /* center the button */
-  gap: 15px; /* gap between children (labels/inputs) */
-  box-sizing: border-box; /* ensures padding is included in width */
-}
-
+/* =========================================
+   3. STANDARD FORM ELEMENTS
+========================================= */
 .loginForm {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 20px; /* Clean gap between input fields */
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 20px; /* This adds the exact amount of space between the Username and Email fields */
+  width: 100%;
 }
 
 .loginField {
   display: flex;
   flex-direction: column;
+  width: 100%;
 }
 
 .loginLabel {
   font-size: 14px;
   color: #444;
   font-weight: 600;
-  margin-bottom: 4px;
-  align-self: flex-start; /* keep label left aligned */
+  margin-bottom: 8px; /* Increased space between label and input */
 }
 
 .loginInput {
-  background: #fff;         /* white background */
-  border: 1px solid #ffffff;   /* light border */
-  max-width: 100%;         /* prevents overflowing */
-  padding: 10px 10px;
-  border-radius: 6px;
-  color: #000;              /* black text */
-  font-size: 14px;
-  font-weight: normal;
+  width: 100%;
+  background: #fff;
+  border: 1px solid #ccc;
+  padding: 14px 16px; /* Slightly thicker inputs for a modern feel */
+  border-radius: 8px;
+  color: #000;
+  font-size: 15px;
   outline: none;
-  box-sizing: border-box;   /* include padding in width */
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .loginInput:focus {
   border-color: #164163;
+  box-shadow: 0 0 0 3px rgba(22, 65, 99, 0.1);
 }
 
-/*Log In Button */
-.loginSubmit {
-  background: #164163;
-  border: none;
-  padding: 10px 45px; /* reduced horizontal padding */
-  border-radius: 6px;
-  color: white;
-  cursor: pointer;
-  font-weight: bold;
-  transition: 0.2s;
-  align-self: center;
+.fieldError {
+  display: block;
+  font-size: 12px;
+  color: #e53935;
+  margin-top: 6px;
+  font-weight: 500;
 }
 
-.loginSubmit:hover {
-  background: #3776bd;
-}
-
-.loginBack:hover {
-  background: #b3b3b3;
-}
-
-/* Wrap input + eye icon */
+/* Password & Icons */
 .passwordWrapper {
   position: relative;
   width: 100%;
 }
 
-/* Input with space for icon */
-.loginInput {
-  width: 100%;
-  padding: 10px 40px 10px 10px; /* right padding leaves space for the eye */
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  font-size: 14px;
-  outline: none;
-  color: #000;
-  box-sizing: border-box;
+.passwordWrapper .loginInput {
+  padding-right: 45px; /* Ample space for the eye icon */
 }
 
-/* Eye icon inside the input */
 .eyeIcon {
   position: absolute;
-  right: 10px;           /* distance from right edge */
-  top: 50%;              
+  right: 14px;
+  top: 50%;
   transform: translateY(-50%);
   cursor: pointer;
   font-size: 18px;
-  color: #696969;
+  color: #666;
+  transition: color 0.2s;
 }
 
-/* --- NEW UPDATES FOR REMEMBER ME & FORGOT PASSWORD --- */
+.eyeIcon:hover {
+  color: #333;
+}
 
+/* =========================================
+   4. OPTIONS (Remember Me / Forgot)
+========================================= */
 .formOptions {
   display: flex;
-  justify-content: space-between; /* This pushes checkbox left and link right */
+  justify-content: space-between;
   align-items: center;
   width: 100%;
-  margin-top: -5px;   
-  margin-bottom: 5px;
+  flex-wrap: wrap; /* Prevents overlap on very small screens */
+  gap: 12px;
+  margin-top: 5px;
 }
 
 .rememberLabel {
   display: flex;
   align-items: center;
-  gap: 8px;           /* Space between checkbox and text */
-  font-size: 12px;
-  color: #444;       
+  gap: 8px;
+  font-size: 13px;
+  color: #444;
   cursor: pointer;
   font-weight: 500;
 }
 
 .forgotLink {
-  font-size: 12px;
-  color: #3D86C7;   
+  font-size: 13px;
+  color: #3D86C7;
   text-decoration: none;
   font-weight: 600;
+  transition: color 0.2s;
 }
 
 .forgotLink:hover {
+  color: #164163;
   text-decoration: underline;
 }
 
+/* =========================================
+   5. BUTTONS
+========================================= */
+.loginSubmit {
+  background: #164163;
+  border: none;
+  padding: 15px;
+  margin-top: 15px;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 15px;
+  width: 100%;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.loginSubmit:active {
+  transform: scale(0.98);
+}
+
+.loginSubmit:hover {
+  background: #255d8a;
+}
+
+/* =========================================
+   6. FORGOT PASSWORD & OTP SECTION
+========================================= */
 .forgotContainer {
   width: 100%;
   display: flex;
   flex-direction: column;
-  align-items: center;
   position: relative;
+  gap: 15px; /* Handles internal spacing cleanly */
 }
 
 .backBtn {
-  position: absolute;
-  left: -10px;
-  top: -10px;
+  align-self: flex-start;
   background: none;
   border: none;
   font-size: 18px;
   cursor: pointer;
   color: #333;
+  padding: 8px 12px 8px 0; /* Larger clickable area, aligned left */
+  margin-bottom: 5px;
+  display: flex;
+  align-items: center;
+  transition: opacity 0.2s;
+}
+
+.backBtn:hover {
+  opacity: 0.7;
 }
 
 .forgotTitle {
-  font-size: 22px;
-  margin-bottom: 5px;
+  font-size: 24px;
   color: #333;
+  margin: 0;
+  font-weight: bold;
 }
 
 .forgotSubtitle {
-  font-size: 12px;
-  color: #666;
-  margin-bottom: 25px;
-  text-align: center;
-}
-
-.recoveryOption {
-  width: 100%;
-  background: white;
-  border: none;
-  border-radius: 10px;
-  padding: 15px;
-  margin-bottom: 15px;
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  text-align: left;
-  cursor: pointer;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-  transition: transform 0.2s;
-}
-
-.recoveryOption:hover {
-  transform: translateY(-2px);
-}
-
-.recoveryIcon {
-  font-size: 24px;
-  color: #333;
-}
-
-.recoveryText {
-  display: flex;
-  flex-direction: column;
-}
-
-.recoveryText strong {
   font-size: 14px;
-  color: #333;
+  color: #555;
+  margin: 0 0 15px 0;
+  line-height: 1.5;
 }
 
-.recoveryText span {
-  font-size: 10px;
-  color: #777;
-}
-
-.forgotContainer .loginInput {
-  width: 100%;        
-  padding: 12px;      
-  font-size: 15px;   
-  border: 1px solid #ccc; 
-}
-
-.forgotContainer .loginField {
-  width: 100%; 
-  max-width: 320px;   
-  margin: 0 auto;     
-}
-
-
-/* Container for the 6 input boxes */
+/* Responsive OTP Boxes */
 .otpInputGroup {
   display: flex;
-  gap: 10px;           
+  gap: 10px;
   justify-content: center;
-  margin-top: -5px;
-  margin-bottom: 30px;     
+  width: 100%;
+  margin: 15px 0 25px 0;
 }
 
-/* The individual white digit boxes */
 .otpBox {
-  width: 45px;
-  height: 55px;
+  flex: 1; /* Fluid sizing */
+  max-width: 55px;
+  aspect-ratio: 4 / 5; /* Maintains rectangular shape on all devices */
   text-align: center;
   font-size: 24px;
   font-weight: bold;
-  border-radius: 10px;
-  border: none;      
+  border-radius: 8px;
+  border: 1px solid #ddd;
   background-color: white;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15); 
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
   color: #333;
   outline: none;
-  transition: transform 0.2s, box-shadow 0.2s;
-  flex-shrink: 0;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  box-sizing: border-box;
+  padding: 0;
 }
 
 .otpBox:focus {
-  box-shadow: 0 0 0 2px #164163, 0 4px 12px rgba(217, 211, 127, 0.2);
-  transform: translateY(-2px);
+  border-color: #164163;
+  box-shadow: 0 0 0 3px rgba(22, 65, 99, 0.15);
+  transform: translateY(-3px);
 }
 
-.modalOverlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.5); 
+.emailResendWrapper {
   display: flex;
-  justify-content: center;
   align-items: center;
-  z-index: 9999;
-  border-radius: 20px; 
-}
-
-.modalContent {
-  background: #fffcf2; 
-  width: 70%;
-  padding: 25px;
-  border-radius: 20px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  text-align: left;
-}
-
-.modalTitle {
-  font-size: 18px;
-  color: #164163; /* Deep blue */
-  margin-bottom: 12px;
-  font-weight: bold;
-}
-
-.modalText, .modalQuestion {
-  font-size: 14px;
-  color: #444;
-  line-height: 1.4;
-  margin-bottom: 15px;
-}
-
-.modalButtons {
-  display: flex;
-  gap: 10px;
-}
-
-.closeBtn, .confirmBtn {
-  flex: 1;
-  padding: 10px;
-  border-radius: 8px;
-  border: none;
-  font-weight: bold;
-  cursor: pointer;
-}
-
-.closeBtn {
-  background: #ccc;
-  color: #333;
-}
-
-.confirmBtn {
-  background: #164163; 
-  color: white;
-}
-
-.confirmBtn:hover {
-  background: #0d2b42;
+  justify-content: center;
+  margin-top: 10px;
+  width: 100%;
 }
 
 .resendBtn {
-  background: none;      
-  border: none;          
-  margin-top: 5px;
-  color: #3D86C7;       
+  background: none;
+  border: none;
+  color: #3D86C7;
   font-size: 14px;
   text-decoration: underline;
   cursor: pointer;
-  font-weight: 500;
-  font-family: inherit;
+  font-weight: 600;
+  padding: 10px;
+  transition: color 0.2s;
 }
 
 .resendBtn:hover {
@@ -369,22 +298,95 @@
 
 .timerText {
   font-size: 14px;
-  color: #164163; 
+  color: #164163;
+  font-weight: bold;
+  padding: 10px;
+}
+
+/* =========================================
+   7. MODALS (Overlays & Dialogs)
+========================================= */
+.modalOverlay {
+  position: fixed;
+  inset: 0; /* Shorthand for top/left/right/bottom 0 */
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(3px); /* Adds a modern blurred background effect */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.modalContent {
+  background: #fffcf2;
+  width: 100%;
+  max-width: 400px; /* Restricts width on desktop, fluid on mobile */
+  padding: 35px 30px;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.modalTitle {
+  font-size: 20px;
+  color: #164163;
+  margin: 0 0 15px 0;
   font-weight: bold;
 }
 
-.emailResendWrapper {
+.modalText, .modalQuestion {
+  font-size: 14px;
+  color: #555;
+  line-height: 1.6;
+  margin: 0 0 15px 0;
+}
+
+.modalButtons {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: -5px;
+  gap: 15px;
+  margin-top: 25px;
   width: 100%;
 }
 
-/* ── Alert Modal ── */
+.closeBtn, .confirmBtn {
+  flex: 1;
+  padding: 14px;
+  border-radius: 8px;
+  border: none;
+  font-weight: bold;
+  font-size: 15px;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.closeBtn:active, .confirmBtn:active {
+  transform: scale(0.96);
+}
+
+.closeBtn {
+  background: #e0e0e0;
+  color: #333;
+}
+
+.confirmBtn {
+  background: #164163;
+  color: white;
+}
+
+.closeBtn:hover, .confirmBtn:hover {
+  opacity: 0.85;
+}
+
+/* =========================================
+   8. ALERT MODALS (Success/Error/Info)
+========================================= */
 .alertModal {
   background: #fff;
-  width: 260px;
+  width: 100%;
+  max-width: 320px;
   border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
@@ -402,19 +404,18 @@
 
 .alertModalCircle {
   position: absolute;
-  top: 48px;
+  top: 45px;
   left: 50%;
   transform: translateX(-50%);
-  width: 52px;
-  height: 52px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   background: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
-  font-weight: bold;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  font-size: 28px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
 .alertCircle_error   { color: #e53935; }
@@ -422,33 +423,34 @@
 .alertCircle_info    { color: #1e88e5; }
 
 .alertModalBody {
-  padding: 38px 20px 20px;
+  padding: 45px 25px 25px;
   text-align: center;
 }
 
 .alertModalTitle {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: bold;
   color: #1a1a1a;
-  margin: 0 0 8px;
+  margin: 0 0 10px;
 }
 
 .alertModalMessage {
-  font-size: 13px;
+  font-size: 14px;
   color: #555;
   line-height: 1.5;
-  margin-bottom: 18px;
+  margin-bottom: 25px;
 }
 
 .alertModalOkBtn {
   width: 100%;
-  padding: 10px;
+  padding: 14px;
   border-radius: 8px;
   border: none;
   font-weight: bold;
   cursor: pointer;
   color: white;
-  font-size: 14px;
+  font-size: 15px;
+  transition: filter 0.2s, transform 0.1s;
 }
 
 .alertOkBtn_error   { background: #e53935; }
@@ -456,13 +458,4 @@
 .alertOkBtn_info    { background: #1e88e5; }
 
 .alertModalOkBtn:hover { filter: brightness(0.9); }
-
-/* ── Field Error ── */
-.fieldError {
-  display: block;
-  font-size: 12px;
-  color: #e53935;
-  margin-top: 4px;
-  padding-left: 4px;
-}
-
+.alertModalOkBtn:active { transform: scale(0.97); }
