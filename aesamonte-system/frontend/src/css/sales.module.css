@@ -25,6 +25,31 @@
   margin-bottom: 0.5rem;
 }
 
+.requestExportBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #475569;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.95rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.requestExportBtn:hover {
+  background-color: #8aa7cf;
+  transform: translateY(-1px);
+}
+
+.requestExportBtn:active {
+  transform: translateY(0);
+}
+
 /* ===== SUMMARY CARDS ===== */
 .topGrid {
   display: grid;
