@@ -130,7 +130,6 @@ export default function EditRoleModal({
   const [loading, setLoading]         = useState(true);
   const [roleName, setRoleName]       = useState('');
   const [description, setDescription] = useState('');
-  const [isActive, setIsActive]       = useState(true);
   const [perms, setPerms]             = useState<Record<string, GranularPerm>>({});
   const [assignedUsers, setAssignedUsers] = useState<AssignedUser[]>([]);
   const [allEmployees, setAllEmployees]   = useState<Employee[]>([]);
@@ -150,7 +149,6 @@ export default function EditRoleModal({
 
         setRoleName(roleData.role_name);
         setDescription(roleData.description || '');
-        setIsActive(roleData.is_active ?? true);
         setAssignedUsers(roleData.assigned_users || []);
         setAllEmployees(empData);
 
@@ -262,7 +260,7 @@ export default function EditRoleModal({
       const res = await fetch(`/api/roles/${roleId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role_name: roleName, description, is_active: isActive, granular_permissions: cleanedPerms }),
+        body: JSON.stringify({ role_name: roleName, description, is_active: true, granular_permissions: cleanedPerms }),
       });
       const data = await res.json();
       if (res.ok) { onSave(); onClose(); }
@@ -324,18 +322,6 @@ export default function EditRoleModal({
                       rows={3}
                       placeholder="Describe what this role can do..."
                     />
-                  </div>
-                  <div className={styles.field}>
-                    <label>Status</label>
-                    <div className={styles.toggleRow}>
-                      <label className={styles.toggle}>
-                        <input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} />
-                        <span className={styles.slider} />
-                      </label>
-                      <span className={isActive ? styles.statusOn : styles.statusOff}>
-                        {isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </div>
                   </div>
                 </div>
               </section>

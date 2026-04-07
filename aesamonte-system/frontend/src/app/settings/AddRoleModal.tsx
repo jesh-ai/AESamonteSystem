@@ -135,7 +135,6 @@ export default function AddRoleModal({
 }) {
   const [roleName, setRoleName]       = useState('');
   const [description, setDescription] = useState('');
-  const [isActive, setIsActive]       = useState(true);
   const [perms, setPerms]             = useState<Record<string, GranularPerm>>(initPerms());
   const [saving, setSaving]           = useState(false);
   const [error, setError]             = useState('');
@@ -194,7 +193,8 @@ export default function AddRoleModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           role_name: roleName, description,
-          is_active: isActive, granular_permissions: cleanedPerms,
+          is_active: true, 
+          granular_permissions: cleanedPerms,
         }),
       });
       const data = await res.json();
@@ -257,18 +257,6 @@ export default function AddRoleModal({
                   rows={3}
                   placeholder="Describe what this role can do..."
                 />
-              </div>
-              <div className={styles.field}>
-                <label>Status</label>
-                <div className={styles.toggleRow}>
-                  <label className={styles.toggle}>
-                    <input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} />
-                    <span className={styles.slider} />
-                  </label>
-                  <span className={isActive ? styles.statusOn : styles.statusOff}>
-                    {isActive ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
               </div>
             </div>
           </section>

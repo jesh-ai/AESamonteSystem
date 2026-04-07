@@ -32,6 +32,37 @@ def get_roles():
             FROM employee_role r
             LEFT JOIN employee e ON e.role_id = r.role_id
             LEFT JOIN static_status s ON e.employee_status_id = s.status_id
+            WHERE COALESCE(r.is_active, TRUE) = TRUE
+            GROUP BY r.role_id, r.role_name, r.is_active,
+                     r.sales_permissions, r.inventory_permissions, r.order_permissions,
+                     r.supplier_permissions, r.reports_permissions, r.settings_permissions
+            ORDER BY r.role_id
+        """)
+        return jsonify([dict(r) for r in cur.fetchall()])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
+@roles_bp.route('/roles/archived', methods=['GET'])
+def get_archived_roles():
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT r.role_id, r.role_name,
+                   COALESCE(r.is_active, TRUE) AS is_active,
+                   r.sales_permissions, r.inventory_permissions, r.order_permissions,
+                   r.supplier_permissions, r.reports_permissions, r.settings_permissions,
+                   COUNT(e.employee_id) FILTER (
+                       WHERE s.status_code = 'ACTIVE'
+                   ) AS user_count
+            FROM employee_role r
+            LEFT JOIN employee e ON e.role_id = r.role_id
+            LEFT JOIN static_status s ON e.employee_status_id = s.status_id
+            WHERE COALESCE(r.is_active, TRUE) = FALSE
             GROUP BY r.role_id, r.role_name, r.is_active,
                      r.sales_permissions, r.inventory_permissions, r.order_permissions,
                      r.supplier_permissions, r.reports_permissions, r.settings_permissions
@@ -59,8 +90,6 @@ def create_role():
     conn = get_connection()
     cur  = conn.cursor()
     try:
-        # Derive boolean columns from granular permissions
-        # Any single TRUE in can_view/create/edit/archive/export means the module is accessible
         bool_vals = {}
         for module in MODULES:
             mp = granular.get(module, {})
@@ -70,7 +99,6 @@ def create_role():
                 mp.get('can_export', False),
             ])
 
-        # export_permissions = true if any module grants can_export
         has_export = any(granular.get(m, {}).get('can_export', False) for m in MODULES)
 
         try:
@@ -107,7 +135,6 @@ def create_role():
         new_id = cur.fetchone()[0]
         conn.commit()
 
-        # Save granular permissions
         try:
             cur2 = conn.cursor()
             for module, perms in granular.items():
@@ -126,7 +153,7 @@ def create_role():
                       perms.get('can_export', False)))
             conn.commit()
         except Exception:
-            conn.rollback()  # Granular save failed — basic role still created
+            conn.rollback()
 
         return jsonify({"message": "Role created", "role_id": new_id}), 201
     except Exception as e:
@@ -165,7 +192,6 @@ def get_role_detail(role_id):
         if not role:
             return jsonify({"error": "Role not found"}), 404
 
-        # Boolean fallback map
         bool_map = {
             'dashboard': role.get('dashboard_permissions', False),
             'sales':     role['sales_permissions'],
@@ -176,7 +202,6 @@ def get_role_detail(role_id):
             'settings':  role['settings_permissions'],
         }
 
-        # Granular permissions — use module_name column
         try:
             cur.execute("""
                 SELECT module_name AS module, can_view, can_create, can_edit, can_archive,
@@ -201,7 +226,6 @@ def get_role_detail(role_id):
                 for m, v in bool_map.items()
             }
 
-        # Assigned active employees
         cur.execute("""
             SELECT e.employee_id, e.employee_name, e.employee_email
             FROM employee e
@@ -228,9 +252,9 @@ def update_role(role_id):
     conn = get_connection()
     cur = conn.cursor()
     try:
+        cur.execute("SET LOCAL app.current_user_id = %s", (1,))
         granular = data.get('granular_permissions', {})
 
-        # ── Step 1: Update basic info + boolean columns ──
         try:
             cur.execute("""
                 UPDATE employee_role
@@ -243,8 +267,6 @@ def update_role(role_id):
             cur.execute("UPDATE employee_role SET role_name = %s WHERE role_id = %s",
                         (data.get('role_name'), role_id))
 
-        # Sync boolean columns from granular data
-        # Any single TRUE permission means the module is accessible (visible but limited)
         for module in MODULES:
             mp = granular.get(module, {})
             has_access = any([
@@ -255,7 +277,6 @@ def update_role(role_id):
             col = MODULE_COL[module]
             cur.execute(f"UPDATE employee_role SET {col} = %s WHERE role_id = %s", (has_access, role_id))
 
-        # export_permissions = true if any module grants can_export
         has_export = any(granular.get(m, {}).get('can_export', False) for m in MODULES)
         try:
             cur.execute("UPDATE employee_role SET export_permissions = %s WHERE role_id = %s", (has_export, role_id))
@@ -265,7 +286,6 @@ def update_role(role_id):
 
         conn.commit()
 
-        # ── Step 2: Replace granular permissions (DELETE + INSERT) ──
         try:
             cur2 = conn.cursor()
             cur2.execute("DELETE FROM role_permissions WHERE role_id = %s", (role_id,))
@@ -279,7 +299,7 @@ def update_role(role_id):
                       perms.get('can_export', False)))
             conn.commit()
         except Exception:
-            conn.rollback()  # Only loses granular — basic info already committed
+            conn.rollback()
 
         return jsonify({"message": "Role updated"}), 200
     except Exception as e:
@@ -339,10 +359,11 @@ def update_permissions(role_id):
 @roles_bp.route('/roles/<int:role_id>', methods=['DELETE'])
 def delete_role(role_id):
     if role_id in (1, 2):
-        return jsonify({"error": "Cannot delete a system role"}), 400
+        return jsonify({"error": "Cannot archive a system role"}), 400
     conn = get_connection()
     cur = conn.cursor()
     try:
+        cur.execute("SET LOCAL app.current_user_id = %s", (1,))
         cur.execute("""
             SELECT COUNT(*) FROM employee e
             JOIN static_status s ON e.employee_status_id = s.status_id
@@ -350,10 +371,29 @@ def delete_role(role_id):
         """, (role_id,))
         count = cur.fetchone()[0]
         if count > 0:
-            return jsonify({"error": f"Cannot delete: {count} active employee(s) assigned to this role"}), 400
-        cur.execute("DELETE FROM employee_role WHERE role_id = %s", (role_id,))
+            return jsonify({"error": f"Cannot archive: {count} active employee(s) assigned to this role"}), 400
+        cur.execute("UPDATE employee_role SET is_active = FALSE WHERE role_id = %s", (role_id,))
         conn.commit()
-        return jsonify({"message": "Role deleted"}), 200
+        return jsonify({"message": "Role archived"}), 200
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
+@roles_bp.route('/roles/<int:role_id>/restore', methods=['PUT'])
+def restore_role(role_id):
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SET LOCAL app.current_user_id = %s", (1,))
+        cur.execute("UPDATE employee_role SET is_active = TRUE WHERE role_id = %s", (role_id,))
+        if cur.rowcount == 0:
+            return jsonify({"error": "Role not found"}), 404
+        conn.commit()
+        return jsonify({"message": "Role restored successfully"}), 200
     except Exception as e:
         conn.rollback()
         return jsonify({"error": str(e)}), 500
