@@ -153,8 +153,77 @@
   border-radius: 4px;
   cursor: pointer;
 }
+.archBtn {
+  background: #788991;
+  color: white;
+  border: none;
+  padding: 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
 
-.iconBtn.delete { background: #dc3545; }
+/* ===== TAB TOGGLE (User Management) ===== */
+.tabToggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tabBtn {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+  transition: all 0.2s ease;
+}
+
+.tabBtn:hover {
+  border-color: #1a4263;
+  color: #6b7280;
+}
+
+.tabActive {
+  background: #1a4263;
+  color: #fff;
+  border-color: #1a4263;
+}
+
+/* ===== LOADING STATE ===== */
+.loadingState {
+  text-align: center;
+  padding: 2rem;
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+/* ===== USER ID & NAME ===== */
+.userId {
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.userName {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* ===== ICON BOX (Settings main menu) ===== */
+.iconBox {
+  background-color: #1a4263;
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
 
 .createBtn {
   margin: 2rem auto 0;
@@ -667,7 +736,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  background: #dc3545;
+  background: #788991;
   color: white;
   border: none;
   padding: 5px 10px;
