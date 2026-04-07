@@ -315,7 +315,7 @@
   flex-shrink: 0;
 }
 
-/* ─── EXPORT BUTTON ─────────────────────────────────────────────────────── */
+/* ─── EXPORT BUTTON (legacy, kept for ExportButton component) ───────────── */
 .exportBtn {
   background-color: #1a4263;
   color: white;
@@ -342,3 +342,266 @@
   color: #000000 !important;
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
+
+/* ─── EXPORT CSV BUTTON (top-right, table-linked) ───────────────────────── */
+.exportCsvBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #1a4263;
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 9px 18px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(26, 66, 99, 0.25);
+  transition: background 0.2s, transform 0.15s;
+  white-space: nowrap;
+}
+
+.exportCsvBtn:hover  { background-color: #235080; transform: translateY(-1px); }
+.exportCsvBtn:active { background-color: #12304d; transform: translateY(0); }
+
+/* ─── TAB BAR ────────────────────────────────────────────────────────────── */
+.tabBar {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid #e2e8f0;
+  margin-bottom: 0;
+}
+
+.tabBtn {
+  padding: 10px 22px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #64748b;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  border-radius: 6px 6px 0 0;
+}
+
+.tabBtn:hover       { color: #1a4263; background: #f1f5f9; }
+.tabBtnActive       { color: #1a4263 !important; font-weight: 700; border-bottom-color: #1a4263 !important; }
+
+/* ─── REPORT PANEL (white card below tabs) ───────────────────────────────── */
+.reportPanel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  padding: 20px 24px 28px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  margin-bottom: 40px;
+}
+
+/* ─── FILTER BAR ─────────────────────────────────────────────────────────── */
+.filterBar {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  padding: 16px 0 20px;
+  border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.filterLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dateInput {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  font-size: 0.875rem;
+  color: #1e293b;
+  background: #f8fafc;
+  outline: none;
+  transition: border-color 0.15s;
+  cursor: pointer;
+}
+
+.dateInput:focus { border-color: #1a4263; background: #fff; }
+
+.generateBtn {
+  padding: 9px 22px;
+  background: #1a4263;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+  align-self: flex-end;
+}
+
+.generateBtn:hover  { background: #235080; transform: translateY(-1px); }
+.generateBtn:active { background: #12304d; }
+
+/* ─── TABLE META ROW ─────────────────────────────────────────────────────── */
+.tableMetaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.tableTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.tableCount {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  background: #f1f5f9;
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+/* ─── TABLE WRAPPER (horizontal scroll) ─────────────────────────────────── */
+.tableWrapper {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+/* ─── REPORT TABLE ───────────────────────────────────────────────────────── */
+.reportTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.reportTable thead tr {
+  background: #f8fafc;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.reportTable th {
+  padding: 11px 14px;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.reportTable tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.1s;
+}
+
+.reportTable tbody tr:last-child { border-bottom: none; }
+.reportTable tbody tr:hover       { background: #f8fafc; }
+
+.reportTable td {
+  padding: 11px 14px;
+  color: #334155;
+  vertical-align: middle;
+}
+
+.reportTable tfoot tr {
+  background: #f0f4f8;
+  border-top: 2px solid #e2e8f0;
+}
+
+.reportTable tfoot td {
+  padding: 11px 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* ─── TABLE COLUMN HELPERS ───────────────────────────────────────────────── */
+.numCol    { text-align: right !important; font-variant-numeric: tabular-nums; }
+.itemsCell { max-width: 260px; color: #475569; }
+
+/* ─── INLINE ELEMENTS ────────────────────────────────────────────────────── */
+.codeText {
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  color: #475569;
+  background: #f1f5f9;
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.paymentBadge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #e0f2fe;
+  color: #0369a1;
+  white-space: nowrap;
+}
+
+/* ─── STATUS BADGES ──────────────────────────────────────────────────────── */
+.statusBadge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.statusDelivered { background: #dcfce7; color: #15803d; }
+.statusPending   { background: #fef9c3; color: #854d0e; }
+.statusPartial   { background: #ffedd5; color: #9a3412; }
+
+/* ─── INVENTORY VALUE COLORS ─────────────────────────────────────────────── */
+.addedVal     { color: #15803d; }
+.soldVal      { color: #b91c1c; }
+.endingNormal { color: #1e293b; font-weight: 600; }
+.endingLow    { color: #b91c1c; font-weight: 600; }
+
+/* ─── TOTALS ROW ─────────────────────────────────────────────────────────── */
+.totalLabel { color: #64748b; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.totalValue { color: #1a4263; font-size: 1rem; font-weight: 700; }
+
+/* ─── EMPTY STATE ────────────────────────────────────────────────────────── */
+.emptyCell {
+  text-align: center;
+  padding: 40px 20px !important;
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+/* ─── STOCK STATUS BADGES ────────────────────────────────────────────────── */
+.statusAvailable { background: #dcfce7; color: #15803d; }
+.statusLow       { background: #fef9c3; color: #854d0e; }
+.statusOut       { background: #fee2e2; color: #b91c1c; }
+.statusArchived  { background: #f1f5f9; color: #64748b; }
+
+/* ─── AGEING BADGES ──────────────────────────────────────────────────────── */
+.ageActive  { background: #dcfce7; color: #15803d; }
+.ageSlow    { background: #fef9c3; color: #854d0e; }
+.ageRisk    { background: #ffedd5; color: #9a3412; }
+.ageDead    { background: #fee2e2; color: #b91c1c; }
+.ageNever   { background: #f1f5f9; color: #475569; }
+
+/* ─── REVENUE COLOR (blue-tinted for sales figures) ─────────────────────── */
+.revenueVal { color: #1a4263; font-weight: 600; }

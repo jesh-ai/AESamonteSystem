@@ -375,23 +375,25 @@ def update_order(order_id):
             
             # FIX STEP 3: INSERT NEW ITEMS & DEDUCT NEW AMOUNTS
             for item in data.get('items', []):
-                inv_id = item.get('inventory_id')
+                inv_id   = item.get('inventory_id')
+                brand_id = item.get('brand_id')
                 if inv_id and str(inv_id).strip() != "":
-                    
-                    # --- SECURITY CHECK: REJECT ARCHIVED ITEMS ---
+
+                    # Resolve inventory_brand_id and check archive status
                     cur.execute("""
-                        SELECT ss.status_code, i.item_name 
-                        FROM inventory i
-                        JOIN static_status ss ON i.item_status_id = ss.status_id
-                        WHERE i.inventory_id = %s
-                    """, (inv_id,))
-                    inv_check = cur.fetchone()
-                    if not inv_check:
-                        raise Exception(f"Item ID {inv_id} not found.")
-                    if inv_check[0] == 'INACTIVE':
-                        raise Exception(f"Cannot add '{inv_check[1]}' because it has been archived.")
-                    # ---------------------------------------------
-                    
+                        SELECT ib.inventory_brand_id, ss.status_code, i.item_name
+                        FROM inventory_brand ib
+                        JOIN inventory i      ON i.inventory_id   = ib.inventory_id
+                        JOIN static_status ss ON ss.status_id     = i.item_status_id
+                        WHERE ib.inventory_id = %s AND ib.brand_id = %s
+                    """, (inv_id, brand_id))
+                    ib_row = cur.fetchone()
+                    if not ib_row:
+                        raise Exception(f"Item not found (inventory_id={inv_id}, brand_id={brand_id}).")
+                    inventory_brand_id, status_code, item_name = ib_row
+                    if status_code == 'INACTIVE':
+                        raise Exception(f"Cannot add '{item_name}' because it has been archived.")
+
                     try:
                         qty = int(item.get('quantity', 1)) or 1
                     except (ValueError, TypeError):
@@ -400,26 +402,22 @@ def update_order(order_id):
                         amount = float(item.get('amount', 0))
                     except (ValueError, TypeError):
                         amount = 0.0
-                        
+
                     unit_price = (amount / qty) if qty > 0 else 0.0
 
                     cur.execute("""
-                        INSERT INTO order_details (order_id, inventory_id, order_quantity, unit_price, order_total)
+                        INSERT INTO order_details (order_id, inventory_brand_id, order_quantity, unit_price, order_total)
                         VALUES (%s, %s, %s, %s, %s)
-                    """, (order_id, inv_id, qty, unit_price, amount))
+                    """, (order_id, inventory_brand_id, qty, unit_price, amount))
 
-                    # Deduct the new quantities from the first brand variant
                     cur.execute("""
                         UPDATE inventory_brand
-                        SET item_qty = item_qty - %s
-                        WHERE inventory_id = %s AND brand_id = (
-                            SELECT brand_id FROM inventory_brand
-                            WHERE inventory_id = %s ORDER BY brand_id LIMIT 1
-                        )
-                    """, (qty, inv_id, inv_id))
+                        SET total_quantity = total_quantity - %s
+                        WHERE inventory_brand_id = %s
+                    """, (qty, inventory_brand_id))
 
                     cur.execute("""
-                        SELECT COALESCE(SUM(item_qty), 0) FROM inventory_brand WHERE inventory_id = %s
+                        SELECT COALESCE(SUM(total_quantity), 0) FROM inventory_brand WHERE inventory_id = %s
                     """, (inv_id,))
                     new_qty = cur.fetchone()[0]
                     # Automatically set status to "Out of Stock" if total drops to 0
@@ -507,64 +505,74 @@ def add_order():
         pm_row = cur.fetchone()
         pm_id = pm_row[0] if pm_row else None
 
+        # Default payment status for new orders: first PENDING-like status in PAYMENT_STATUS scope
+        cur.execute("""
+            SELECT status_id FROM static_status
+            WHERE status_scope = 'PAYMENT_STATUS'
+            ORDER BY
+                CASE WHEN status_code ILIKE 'PENDING%' OR status_code ILIKE 'UNPAID%' THEN 0 ELSE 1 END,
+                status_id
+            LIMIT 1
+        """)
+        ps_row = cur.fetchone()
+        if not ps_row:
+            raise Exception("No PAYMENT_STATUS entries found in static_status. Please seed the table.")
+        ps_id = ps_row[0]
+
         # 3. Create Order Transaction
         today = date.today()
         cur.execute("""
-            INSERT INTO order_transaction (customer_id, order_date, order_status_id, payment_method_id)
-            VALUES (%s, %s, %s, %s) RETURNING order_id
-        """, (customer_id, today, status_id, pm_id))
+            INSERT INTO order_transaction (customer_id, order_date, order_status_id, payment_method_id, payment_status_id)
+            VALUES (%s, %s, %s, %s, %s) RETURNING order_id
+        """, (customer_id, today, status_id, pm_id, ps_id))
         order_id = cur.fetchone()[0]
 
         # 4. Insert Items and UPDATE INVENTORY
         for item in items:
-            inv_id = item.get('inventory_id')
+            inv_id   = item.get('inventory_id')
+            brand_id = item.get('brand_id')
             if inv_id and str(inv_id).strip() != "":
-                
-                # --- SECURITY CHECK: REJECT ARCHIVED ITEMS ---
+
+                # Resolve inventory_brand_id and check archive status
                 cur.execute("""
-                    SELECT ss.status_code, i.item_name 
-                    FROM inventory i
-                    JOIN static_status ss ON i.item_status_id = ss.status_id
-                    WHERE i.inventory_id = %s
-                """, (inv_id,))
-                inv_check = cur.fetchone()
-                
-                if not inv_check:
-                    raise Exception(f"Item ID {inv_id} not found.")
-                if inv_check[0] == 'INACTIVE':
-                    raise Exception(f"Order failed: '{inv_check[1]}' is archived.")
-                # ---------------------------------------------
+                    SELECT ib.inventory_brand_id, ss.status_code, i.item_name
+                    FROM inventory_brand ib
+                    JOIN inventory i      ON i.inventory_id   = ib.inventory_id
+                    JOIN static_status ss ON ss.status_id     = i.item_status_id
+                    WHERE ib.inventory_id = %s AND ib.brand_id = %s
+                """, (inv_id, brand_id))
+                ib_row = cur.fetchone()
+                if not ib_row:
+                    raise Exception(f"Item not found (inventory_id={inv_id}, brand_id={brand_id}).")
+                inventory_brand_id, status_code, item_name = ib_row
+                if status_code == 'INACTIVE':
+                    raise Exception(f"Order failed: '{item_name}' is archived.")
 
                 try:
                     qty = int(item.get('quantity', 1)) or 1
                 except (ValueError, TypeError):
                     qty = 1
-                    
+
                 try:
                     amount = float(item.get('amount', 0))
                 except (ValueError, TypeError):
                     amount = 0.0
-                    
+
                 unit_price = (amount / qty) if qty > 0 else 0.0
 
-                # Insert into order details
                 cur.execute("""
-                    INSERT INTO order_details (order_id, inventory_id, order_quantity, unit_price, order_total)
+                    INSERT INTO order_details (order_id, inventory_brand_id, order_quantity, unit_price, order_total)
                     VALUES (%s, %s, %s, %s, %s)
-                """, (order_id, inv_id, qty, unit_price, amount))
+                """, (order_id, inventory_brand_id, qty, unit_price, amount))
 
-                # Deduct from the first brand variant automatically
                 cur.execute("""
                     UPDATE inventory_brand
-                    SET item_qty = item_qty - %s
-                    WHERE inventory_id = %s AND brand_id = (
-                        SELECT brand_id FROM inventory_brand
-                        WHERE inventory_id = %s ORDER BY brand_id LIMIT 1
-                    )
-                """, (qty, inv_id, inv_id))
+                    SET total_quantity = total_quantity - %s
+                    WHERE inventory_brand_id = %s
+                """, (qty, inventory_brand_id))
 
                 cur.execute("""
-                    SELECT COALESCE(SUM(item_qty), 0) FROM inventory_brand WHERE inventory_id = %s
+                    SELECT COALESCE(SUM(total_quantity), 0) FROM inventory_brand WHERE inventory_id = %s
                 """, (inv_id,))
                 new_qty = cur.fetchone()[0]
 

@@ -1,352 +1,702 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
-
-import React, { useEffect, useState, useCallback } from 'react';
-import styles from "@/css/reports.module.css";
-import exportStyles from "../../css/exportReports.module.css";
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import styles from '@/css/reports.module.css';
+import exportStyles from '../../css/exportReports.module.css';
 import TopHeader from '@/components/layout/TopHeader';
-import ExportButton from "@/components/features/ExportButton";
-import ExportReportsModal from './exportReports';
+import { LuDownload, LuSearch, LuX } from 'react-icons/lu';
+import ExportReportsModal, { type TabKey } from './exportReports';
 
-interface SalesReportData {
-  weekly: number;
-  monthly: number;
-  yearly: number;
+// ─── Tab configuration ────────────────────────────────────────────────────────
+interface TabConfig {
+  key:           TabKey;
+  label:         string;
+  usesDateFilter: boolean;
+  endpoint:      string;
 }
 
-interface InventoryReportData {
-  weekly: number;
-  monthly: number;
-  yearly: number;
+const TABS: TabConfig[] = [
+  { key: 'stock-on-hand',       label: 'Stock on Hand',       usesDateFilter: false, endpoint: '/api/reports/stock-on-hand'       },
+  { key: 'product-performance', label: 'Product Performance', usesDateFilter: true,  endpoint: '/api/reports/product-performance' },
+  { key: 'inventory-turnover',  label: 'Inventory Turnover',  usesDateFilter: true,  endpoint: '/api/reports/inventory-turnover'  },
+  { key: 'inventory-valuation', label: 'Inventory Valuation', usesDateFilter: false, endpoint: '/api/reports/inventory-valuation' },
+  { key: 'stock-ageing',        label: 'Stock Ageing',        usesDateFilter: false, endpoint: '/api/reports/stock-ageing'        },
+  { key: 'reorder',             label: 'Reorder Report',      usesDateFilter: false, endpoint: '/api/reports/reorder'             },
+  { key: 'customer-sales',      label: 'Customer Sales',      usesDateFilter: true,  endpoint: '/api/reports/customer-sales'      },
+];
+
+// ─── Row type definitions ─────────────────────────────────────────────────────
+
+interface StockOnHandRow        { sku: string; item_name: string; brand_name: string; uom: string; qty_on_hand: number; unit_cost: number; selling_price: number; stock_status: string; }
+interface ProductPerfRow        { item_name: string; brand_name: string; sku: string; uom: string; units_sold: number; revenue: number; cogs: number; gross_profit: number; margin_pct: number; }
+interface InventoryTurnoverRow  { sku: string; item_name: string; brand_name: string; uom: string; units_sold: number; ending_qty: number; avg_inventory: number; turnover_rate: number; days_to_sell: number | null; }
+interface InventoryValuationRow { sku: string; item_name: string; brand_name: string; uom: string; qty_on_hand: number; unit_cost: number; total_cost_value: number; selling_price: number; total_retail_value: number; potential_profit: number; }
+interface StockAgeingRow        { sku: string; item_name: string; brand_name: string; uom: string; qty_on_hand: number; last_sold_date: string | null; days_since_last_sale: number | null; ageing_status: string; }
+interface ReorderRow            { sku: string; item_name: string; brand_name: string; uom: string; qty_on_hand: number; reorder_point: number; min_order_qty: number; lead_time_days: number; suggested_order_qty: number; primary_supplier: string; supplier_contact: string; }
+interface CustomerSalesRow      { customer_name: string; total_orders: number; total_qty: number; total_revenue: number; total_cogs: number; total_profit: number; margin_pct: number; avg_order_value: number; payment_methods: string; }
+
+// ─── Formatting helpers ───────────────────────────────────────────────────────
+
+const peso = (v: number) =>
+  `₱${v.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const num  = (v: number) => v.toLocaleString('en-PH');
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function EmptyRow({ cols, message }: { cols: number; message?: string }) {
+  return (
+    <tr>
+      <td colSpan={cols} className={styles.emptyCell}>
+        {message ?? 'No data found for the selected period.'}
+      </td>
+    </tr>
+  );
 }
 
-interface ExtraReportData {
-  totals: {
-    orders: number;
-    ordersGrowth: number;
-    sales: number;
-    salesGrowth: number;
+function LoadingRow({ cols }: { cols: number }) {
+  return (
+    <tr>
+      <td colSpan={cols} className={styles.emptyCell} style={{ color: '#94a3b8' }}>
+        Loading…
+      </td>
+    </tr>
+  );
+}
+
+function SkuCell({ sku }: { sku: string }) {
+  return <span className={styles.codeText}>{sku}</span>;
+}
+
+function StockStatusBadge({ status }: { status: string }) {
+  const map: Record<string, string> = {
+    Available:    styles.statusAvailable,
+    'Low Stock':  styles.statusLow,
+    'Out of Stock': styles.statusOut,
+    Archived:     styles.statusArchived,
   };
-  topClients: {
-    name: string;
-    orders: number;
-    percentage: number;
-  }[];
-  mostStock: {
-    name: string;
-    qty: number;
-    percentage: number;
-  }[];
-  yearlyHistory: {
-    year: number;
-    sales: number;
-    percentage: number;
-  }[];
+  return <span className={`${styles.statusBadge} ${map[status] ?? ''}`}>{status}</span>;
 }
 
-const TOP_CLIENT_COLORS = ["#1e3a5f", "#ef4444", "#facc15"];
-
-export default function ReportsPage({ role = "Admin", onLogout }: { role?: string; onLogout: () => void }) {
-  const [salesData,     setSalesData]     = useState<SalesReportData | null>(null);
-  const [inventoryData, setInventoryData] = useState<InventoryReportData | null>(null);
-  const [extraData,     setExtraData]     = useState<ExtraReportData | null>(null);
-  const [errorMsg,      setErrorMsg]      = useState<string | null>(null);
-
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [toastMessage,    setToastMessage]    = useState('');
-  const [isError,         setIsError]         = useState(false);
-  const [showToast,       setShowToast]       = useState(false);
-
-  const handleExportSuccess = (msg: string, type: 'success' | 'error' = 'success') => {
-    setToastMessage(msg);
-    setIsError(type === 'error');
-    setShowToast(true);
+function AgeingBadge({ status }: { status: string }) {
+  const map: Record<string, string> = {
+    Active:        styles.ageActive,
+    'Slow-Moving': styles.ageSlow,
+    'At Risk':     styles.ageRisk,
+    'Dead Stock':  styles.ageDead,
+    'Never Sold':  styles.ageNever,
   };
+  return <span className={`${styles.statusBadge} ${map[status] ?? ''}`}>{status}</span>;
+}
 
-  const fetchReports = useCallback(async () => {
+// ─── Utility ──────────────────────────────────────────────────────────────────
+
+function sumField<T>(arr: T[], key: keyof T): number {
+  return arr.reduce((s, r) => s + (Number(r[key]) || 0), 0);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN COMPONENT
+// ─────────────────────────────────────────────────────────────────────────────
+
+export default function ReportsPage({
+  role = 'Admin',
+  onLogout,
+}: {
+  role?: string;
+  onLogout: () => void;
+}) {
+  // ── Active tab ──
+  const [activeTab, setActiveTab] = useState<TabKey>('stock-on-hand');
+
+  // ── Date range (default: first day of month → today) ──
+  const today    = new Date().toISOString().split('T')[0];
+  const firstDay = today.slice(0, 8) + '01';
+  const [startDate, setStartDate] = useState(firstDay);
+  const [endDate,   setEndDate]   = useState(today);
+
+  // ── Per-tab data cache ──
+  const [dataMap,  setDataMap]  = useState<Partial<Record<TabKey, Record<string, unknown>[]>>>({});
+  const [extraMap, setExtraMap] = useState<Partial<Record<TabKey, unknown>>>({});
+
+  // ── UI state ──
+  const [loading,  setLoading]  = useState(false);
+  const [errMsg,   setErrMsg]   = useState<string | null>(null);
+  const [search,   setSearch]   = useState('');
+
+  // ── Export modal ──
+  const [showExport, setShowExport] = useState(false);
+
+  // ── Toast ──
+  const [showToast, setShowToast] = useState(false);
+  const [toastMsg,  setToastMsg]  = useState('');
+  const [isError,   setIsError]   = useState(false);
+
+  const toast = useCallback((msg: string, err = false) => {
+    setToastMsg(msg); setIsError(err); setShowToast(true);
+    setTimeout(() => setShowToast(false), 4000);
+  }, []);
+
+  // ── Fetch current tab ──────────────────────────────────────────────────────
+  const fetchTab = useCallback(async (tab: TabKey, sd: string, ed: string) => {
+    const cfg = TABS.find(t => t.key === tab)!;
+    setLoading(true);
+    setErrMsg(null);
+
+    let url = cfg.endpoint;
+    if (cfg.usesDateFilter) url += `?start_date=${sd}&end_date=${ed}`;
+
     try {
-      const t = new Date().getTime();
+      const res  = await fetch(url, { cache: 'no-store' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Request failed');
 
-      const salesRes = await fetch(`/api/reports/sales?t=${t}`, { cache: 'no-store' });
-      if (salesRes.ok) setSalesData(await salesRes.json());
-      else throw new Error("Failed to load sales report.");
-
-      const extraRes = await fetch(`/api/reports/extra?t=${t}`, { cache: 'no-store' });
-      if (extraRes.ok) setExtraData(await extraRes.json());
-      else throw new Error("Failed to load extra report data.");
-
-      try {
-        const invRes = await fetch(`/api/inventory/summary?t=${t}`, { cache: 'no-store' });
-        if (invRes.ok) {
-          const data = await invRes.json();
-          setInventoryData({ weekly: data.weekly || 0, monthly: data.monthly || 0, yearly: data.yearly || 0 });
-        } else {
-          setInventoryData({ weekly: 0, monthly: 0, yearly: 0 });
-        }
-      } catch {
-        setInventoryData({ weekly: 0, monthly: 0, yearly: 0 });
+      if (tab === 'inventory-turnover') {
+        setDataMap(prev  => ({ ...prev,  [tab]: json.rows }));
+        setExtraMap(prev => ({ ...prev,  [tab]: { period_days: json.period_days } }));
+      } else {
+        setDataMap(prev  => ({ ...prev,  [tab]: json }));
       }
-
-    } catch (e: any) {
-      setErrorMsg(e.message || "Network error. Is Flask running?");
+    } catch (e: unknown) {
+      setErrMsg(e instanceof Error ? e.message : 'Unknown error');
+    } finally {
+      setLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchReports(); }, [fetchReports]);
+  // Auto-fetch: re-runs whenever tab, startDate, or endDate changes.
+  // Snapshot reports (no date filter) are fetched once and cached.
+  useEffect(() => {
+    const cfg = TABS.find(t => t.key === activeTab)!;
+    if (!cfg.usesDateFilter && dataMap[activeTab] !== undefined) return;
+    fetchTab(activeTab, startDate, endDate);
+    setSearch('');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, startDate, endDate]);
 
+  // ── Rows ───────────────────────────────────────────────────────────────────
+  const allRows: Record<string, unknown>[] = dataMap[activeTab] ?? [];
 
-  const maxOrders = extraData && extraData.topClients.length > 0
-    ? Math.max(...extraData.topClients.map(c => c.orders))
-    : 100;
+  // ── Client-side search filter ─────────────────────────────────────────────
+  const rows = useMemo(() => {
+    if (!search.trim()) return allRows;
+    const q = search.toLowerCase();
+    return allRows.filter(r =>
+      Object.values(r).some(v => String(v ?? '').toLowerCase().includes(q))
+    );
+  }, [allRows, search]);
 
-  const renderGrowthPill = (value: number) => {
-      let icon = '—';
-      let textColor = '#ca8a04'; // Yellow-600
-      let bgColor = '#fef08a'; // Yellow-200
+  const cfg      = TABS.find(t => t.key === activeTab)!;
+  const canExport = ['Admin', 'Manager'].includes(role ?? '');
 
-      if (value > 0) {
-        icon = '↗';
-        textColor = '#15803d'; // Green-700
-        bgColor = '#dcfce7'; // Green-100
-      } else if (value < 0) {
-        icon = '↘';
-        textColor = '#b91c1c'; // Red-700
-        bgColor = '#fee2e2'; // Red-100
-      }
-
-      const displayValue = Math.abs(value);
-
-      return (
-        <span 
-          style={{ 
-            color: textColor, 
-            backgroundColor: bgColor,
-            fontWeight: 600,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px',
-            padding: '2px 8px',
-            borderRadius: '999px',
-            fontSize: '0.85rem'
-          }}
-        >
-          {icon} {displayValue}%
-        </span>
-      );
-    }
-
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className={styles.container}>
-      <TopHeader role={role} onLogout={onLogout} />
-
-      {/* ══════════ TOAST ══════════ */}
+      {/* In reports.tsx — wrap TopHeader */}
+      <div style={{ flexShrink: 0 }}>
+        <TopHeader role={role} onLogout={onLogout} />
+      </div>
+      {/* ── Toast notification ── */}
       {showToast && (
         <div className={exportStyles.toastBackdrop}>
           <div className={exportStyles.toastCard}>
             <div className={`${exportStyles.toastBand} ${isError ? exportStyles.toastBandError : exportStyles.toastBandSuccess}`}>
               <div className={exportStyles.toastIcon}>
-                {isError ? (
-                  <span className={exportStyles.toastIconExclaim}>!</span>
-                ) : (
-                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none"
-                    stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                )}
+                {isError
+                  ? <span className={exportStyles.toastIconExclaim}>!</span>
+                  : <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                }
               </div>
             </div>
             <div className={exportStyles.toastBody}>
               <h2 className={exportStyles.toastTitle}>{isError ? 'Oops!' : 'Success!'}</h2>
-              <p className={exportStyles.toastMessage}>{toastMessage}</p>
-              <button
-                onClick={() => setShowToast(false)}
-                className={`${exportStyles.toastOkBtn} ${isError ? exportStyles.toastOkBtnError : exportStyles.toastOkBtnSuccess}`}
-              >
-                OK
-              </button>
+              <p className={exportStyles.toastMessage}>{toastMsg}</p>
+              <button onClick={() => setShowToast(false)} className={`${exportStyles.toastOkBtn} ${isError ? exportStyles.toastOkBtnError : exportStyles.toastOkBtnSuccess}`}>OK</button>
             </div>
           </div>
         </div>
       )}
 
-      <main className={styles.mainContent}>
-
-        {/* ── HEADER ROW: Title + Export ── */}
-        <div className={styles.headerActions}>
-          <div>
-            <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#164163', margin: 0 }}>REPORTS</h1>
-            <p style={{ fontSize: '0.82rem', color: '#9ca3af', margin: '2px 0 0' }}>
-              View sales, inventory, and client performance data.
-            </p>
-          </div>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            {['Admin', 'Manager'].includes(role ?? '') && (
-              <div onClick={() => setShowExportModal(true)}>
-                <ExportButton />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {errorMsg ? (
-          <div style={{ color: '#ef4444', padding: '20px', backgroundColor: '#fee2e2', borderRadius: '8px', border: '1px solid #fca5a5' }}>
-            <strong>Database Error:</strong> {errorMsg}
-          </div>
-        ) : !salesData || !inventoryData || !extraData ? (
-          <div style={{ color: '#64748b' }}>Loading Dashboard Data...</div>
-        ) : (
-
-          <div className={styles.reportsGrid}>
-
-            {/* ── Row 1, Col 1 — Sales Report ── */}
-            <div className={`${styles.reportCard} ${styles.salesCard}`}>
-              <p className={styles.cardTitle}>Sales Report</p>
-              <div className={styles.listGroup}>
-                <div className={styles.listRow}>
-                  <span className={styles.listLabel}>Weekly Sales</span>
-                  <span className={styles.valRed}>{salesData.weekly.toLocaleString()}</span>
-                </div>
-                <div className={`${styles.listRow} ${styles.listRowAlt}`}>
-                  <span className={styles.listLabel}>Monthly Sales</span>
-                  <span className={styles.valBlue}>{salesData.monthly.toLocaleString()}</span>
-                </div>
-                <div className={styles.listRow}>
-                  <span className={styles.listLabel}>Yearly Sales</span>
-                  <span className={styles.valYellow}>{salesData.yearly.toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* ── Row 1, Col 2 — Inventory Report ── */}
-            <div className={`${styles.reportCard} ${styles.inventoryCard}`}>
-              <p className={styles.cardTitle}>Inventory Report</p>
-              <div className={styles.listGroup}>
-                <div className={`${styles.listRow} ${styles.listRowAlt}`}>
-                  <span className={styles.listLabel}>Weekly Inventory</span>
-                  <span className={styles.valDark}>{inventoryData.weekly.toLocaleString()}</span>
-                </div>
-                <div className={styles.listRow}>
-                  <span className={styles.listLabel}>Monthly Inventory</span>
-                  <span className={styles.valDark}>{inventoryData.monthly.toLocaleString()}</span>
-                </div>
-                <div className={`${styles.listRow} ${styles.listRowAlt}`}>
-                  <span className={styles.listLabel}>Yearly Inventory</span>
-                  <span className={styles.valDark}>{inventoryData.yearly.toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* ── Right column — Total Orders, Total Sales, Yearly Sales ── */}
-            <div className={styles.rightColumn}>
-
-              {/* Total Orders */}
-              <div className={`${styles.reportCard} ${styles.totalOrdersCard}`}>
-                <p className={styles.miniLabel}>Total Orders</p>
-                <div className={styles.miniRow}>
-                  <p className={`${styles.bigNum} ${styles.bigNumBlue}`}>
-                    {extraData.totals.orders.toLocaleString()}
-                  </p>
-                  <div className={styles.growthWrap}>
-                    <p className={styles.vsLabel}>vs last month</p>
-                    {renderGrowthPill(extraData.totals.ordersGrowth)}
-                  </div>
-                </div>
-              </div>
-
-              {/* Total Sales */}
-              <div className={`${styles.reportCard} ${styles.totalSalesCard}`}>
-                <p className={styles.miniLabel}>Total Sales</p>
-                <div className={styles.miniRow}>
-                  <p className={`${styles.bigNum} ${styles.bigNumYellow}`}>
-                    <span style={{ fontSize: '1.5rem', marginRight: '4px' }}>₱</span>
-                    {extraData.totals.sales.toLocaleString()}
-                  </p>
-                  <div className={styles.growthWrap}>
-                    <p className={styles.vsLabel}>vs last month</p>
-                    {renderGrowthPill(extraData.totals.salesGrowth)}
-                  </div>
-                </div>
-              </div>
-
-              {/* Yearly Sales */}
-              <div className={`${styles.reportCard} ${styles.yearlyCard}`}>
-                <p className={styles.cardTitle}>Yearly Sales</p>
-                <p className={styles.cardSubtitle}>Sales from the past years</p>
-                <div className={styles.yrArea}>
-                  {extraData.yearlyHistory.length > 0 ? extraData.yearlyHistory.map((item, i) => (
-                    <div key={i} className={styles.yrRow}>
-                      <span className={styles.yrLabel}>{item.year}</span>
-                      <div className={styles.yrTrack}>
-                        <div className={styles.yrFill} style={{ width: `${Math.max(item.percentage, 2)}%` }} />
-                      </div>
-                      <span className={styles.yrValue}>{item.sales.toLocaleString()}</span>
-                    </div>
-                  )) : <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>No sales history available.</p>}
-                </div>
-              </div>
-
-            </div>
-            <div className={`${styles.reportCard} ${styles.topClientsCard}`}>
-              <p className={styles.cardTitle}>Top Clients Ordered</p>
-              <div className={styles.barArea}>
-                {extraData.topClients.length > 0 ? extraData.topClients.map((client, i) => (
-                  <div key={i} className={styles.barRow}>
-                    <span className={styles.barLabel}>{client.name}</span>
-                    <div className={styles.barTrack}>
-                      <div
-                        className={styles.barFill}
-                        style={{
-                          width: `${Math.max(client.percentage, 2)}%`,
-                          backgroundColor: TOP_CLIENT_COLORS[i % TOP_CLIENT_COLORS.length],
-                        }}
-                      />
-                    </div>
-                    <span style={{ width: '32px', textAlign: 'right', fontWeight: 600, color: '#475569', fontSize: '0.88rem' }}>
-                      {client.orders}
-                    </span>
-                  </div>
-                )) : <p style={{ color: '#94a3b8' }}>No client data available.</p>}
-                <div className={styles.barAxis}>
-                  <span>0</span>
-                  <span>{Math.ceil(maxOrders * 0.25)}</span>
-                  <span>{Math.ceil(maxOrders * 0.50)}</span>
-                  <span>{Math.ceil(maxOrders * 0.75)}</span>
-                  <span>{maxOrders}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* ── Row 3, Col 1–2 — Most Stock Items ── */}
-            <div className={`${styles.reportCard} ${styles.mostStockCard}`}>
-              <p className={styles.cardTitle}>Most Stock Items</p>
-              <div className={styles.hbarArea}>
-                {extraData.mostStock.length > 0 ? extraData.mostStock.map((item, i) => (
-                  <div key={i} className={styles.hbarRow}>
-                    <span className={styles.hbarLabel}>{item.name}</span>
-                    <div className={styles.hbarTrack}>
-                      <div className={styles.hbarFill} style={{ width: `${Math.max(item.percentage, 2)}%` }} />
-                    </div>
-                    <span className={styles.hbarPct}>{Math.round(item.percentage)}%</span>
-                  </div>
-                )) : <p style={{ color: '#94a3b8' }}>No inventory data available.</p>}
-              </div>
-            </div>
-
-
-          </div>
-        )}
-      </main>
-
-      {/* ── Export Reports Modal ── */}
+      {/* ── Export modal ── */}
       <ExportReportsModal
-        isOpen={showExportModal}
-        onClose={() => setShowExportModal(false)}
-        onSuccess={handleExportSuccess}
-        salesData={salesData}
-        inventoryData={inventoryData}
-        extraData={extraData}
+        isOpen={showExport}
+        onClose={() => setShowExport(false)}
+        onSuccess={(msg, type) => { setShowExport(false); toast(msg, type === 'error'); }}
+        activeTab={activeTab}
+        tabLabel={cfg.label}
+        rows={rows}
+        startDate={cfg.usesDateFilter ? startDate : ''}
+        endDate={cfg.usesDateFilter ? endDate : ''}
       />
 
+      <main className={styles.mainContent}>
+
+        {/* ── Page header ── */}
+        <div className={styles.headerActions}>
+          <div>
+            <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#164163', margin: 0 }}>
+              REPORTS
+            </h1>
+            <p style={{ fontSize: '0.82rem', color: '#9ca3af', margin: '2px 0 0' }}>
+              Granular tabular reports across inventory, sales, and customer data.
+            </p>
+          </div>
+
+          {canExport && (
+            <button
+              className={styles.exportCsvBtn}
+              onClick={() => {
+                if (!allRows.length) { toast('No data to export. Generate the report first.', true); return; }
+                setShowExport(true);
+              }}
+            >
+              <LuDownload size={15} />
+              Export Report
+            </button>
+          )}
+        </div>
+
+        {/* ── Tab bar ── */}
+        <div className={styles.tabBar}>
+          {TABS.map(t => (
+            <button
+              key={t.key}
+              className={`${styles.tabBtn} ${activeTab === t.key ? styles.tabBtnActive : ''}`}
+              onClick={() => setActiveTab(t.key)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Report panel ── */}
+        <div className={styles.reportPanel}>
+
+          {/* Date filter bar */}
+          {cfg.usesDateFilter && (
+            <div className={styles.filterBar}>
+              <div className={styles.filterGroup}>
+                <label className={styles.filterLabel}>Start Date</label>
+                <input
+                  type="date"
+                  className={styles.dateInput}
+                  value={startDate}
+                  max={endDate}
+                  onChange={e => setStartDate(e.target.value)}
+                />
+              </div>
+              <div className={styles.filterGroup}>
+                <label className={styles.filterLabel}>End Date</label>
+                <input
+                  type="date"
+                  className={styles.dateInput}
+                  value={endDate}
+                  min={startDate}
+                  onChange={e => setEndDate(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Error banner */}
+          {errMsg && (
+            <div style={{ color: '#b91c1c', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: '0.875rem' }}>
+              <strong>Error:</strong> {errMsg}
+            </div>
+          )}
+
+          {/* Table meta row: title + count + search */}
+          <div className={styles.tableMetaRow}>
+            <span className={styles.tableTitle}>{cfg.label}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
+              {/* Search box */}
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <LuSearch size={14} style={{ position: 'absolute', left: 9, color: '#94a3b8', pointerEvents: 'none' }} />
+                <input
+                  type="text"
+                  placeholder="Search…"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className={styles.dateInput}
+                  style={{ paddingLeft: 28, paddingRight: search ? 28 : 8, width: 180, fontSize: '0.8rem' }}
+                />
+                {search && (
+                  <button
+                    onClick={() => setSearch('')}
+                    style={{ position: 'absolute', right: 7, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 0, display: 'flex' }}
+                    aria-label="Clear search"
+                  >
+                    <LuX size={13} />
+                  </button>
+                )}
+              </div>
+              <span className={styles.tableCount}>
+                {rows.length !== allRows.length
+                  ? `${rows.length} of ${allRows.length} row${allRows.length !== 1 ? 's' : ''}`
+                  : `${rows.length} row${rows.length !== 1 ? 's' : ''}`
+                }
+              </span>
+            </div>
+          </div>
+
+          {/* ══════════════════════════════════════════════════════════════════ */}
+          {/* REPORT 1 — STOCK ON HAND                                          */}
+          {/* ══════════════════════════════════════════════════════════════════ */}
+          {activeTab === 'stock-on-hand' && (() => {
+            const r = rows as unknown as StockOnHandRow[];
+            return (
+              <div className={styles.tableWrapper}>
+                <table className={styles.reportTable}>
+                  <thead><tr>
+                    <th>SKU</th><th>Item Name</th><th>Brand</th><th>UOM</th>
+                    <th className={styles.numCol}>Qty on Hand</th>
+                    <th className={styles.numCol}>Unit Cost</th>
+                    <th className={styles.numCol}>Selling Price</th>
+                    <th>Status</th>
+                  </tr></thead>
+                  <tbody>
+                    {loading ? <LoadingRow cols={8} /> : r.length === 0 ? <EmptyRow cols={8} /> :
+                      r.map((row, i) => (
+                        <tr key={i}>
+                          <td><SkuCell sku={row.sku} /></td>
+                          <td>{row.item_name}</td>
+                          <td>{row.brand_name}</td>
+                          <td>{row.uom}</td>
+                          <td className={styles.numCol}>{num(row.qty_on_hand)}</td>
+                          <td className={styles.numCol}>{peso(row.unit_cost)}</td>
+                          <td className={styles.numCol}>{peso(row.selling_price)}</td>
+                          <td><StockStatusBadge status={row.stock_status} /></td>
+                        </tr>
+                      ))
+                    }
+                  </tbody>
+                  {r.length > 0 && (
+                    <tfoot><tr>
+                      <td colSpan={4} className={styles.totalLabel}>Totals</td>
+                      <td className={`${styles.numCol} ${styles.totalValue}`}>{num(sumField(r, 'qty_on_hand'))}</td>
+                      <td className={styles.numCol} /><td className={styles.numCol} /><td />
+                    </tr></tfoot>
+                  )}
+                </table>
+              </div>
+            );
+          })()}
+
+          {/* ══════════════════════════════════════════════════════════════════ */}
+          {/* REPORT 2 — PRODUCT PERFORMANCE                                    */}
+          {/* ══════════════════════════════════════════════════════════════════ */}
+          {activeTab === 'product-performance' && (() => {
+            const r = rows as unknown as ProductPerfRow[];
+            return (
+              <div className={styles.tableWrapper}>
+                <table className={styles.reportTable}>
+                  <thead><tr>
+                    <th>Item Name</th><th>Brand</th><th>SKU</th><th>UOM</th>
+                    <th className={styles.numCol}>Units Sold</th>
+                    <th className={styles.numCol}>Revenue</th>
+                    <th className={styles.numCol}>COGS</th>
+                    <th className={styles.numCol}>Gross Profit</th>
+                    <th className={styles.numCol}>Margin %</th>
+                  </tr></thead>
+                  <tbody>
+                    {loading ? <LoadingRow cols={9} /> : r.length === 0 ? <EmptyRow cols={9} /> :
+                      r.map((row, i) => (
+                        <tr key={i}>
+                          <td>{row.item_name}</td>
+                          <td>{row.brand_name}</td>
+                          <td><SkuCell sku={row.sku} /></td>
+                          <td>{row.uom}</td>
+                          <td className={styles.numCol}>{num(row.units_sold)}</td>
+                          <td className={`${styles.numCol} ${styles.revenueVal}`}>{peso(row.revenue)}</td>
+                          <td className={`${styles.numCol} ${styles.soldVal}`}>{peso(row.cogs)}</td>
+                          <td className={`${styles.numCol} ${styles.addedVal}`}>{peso(row.gross_profit)}</td>
+                          <td className={`${styles.numCol} ${row.margin_pct >= 20 ? styles.addedVal : row.margin_pct < 10 ? styles.soldVal : ''}`}>
+                            {row.margin_pct.toFixed(1)}%
+                          </td>
+                        </tr>
+                      ))
+                    }
+                  </tbody>
+                  {r.length > 0 && (
+                    <tfoot><tr>
+                      <td colSpan={4} className={styles.totalLabel}>Totals</td>
+                      <td className={`${styles.numCol} ${styles.totalValue}`}>{num(sumField(r, 'units_sold'))}</td>
+                      <td className={`${styles.numCol} ${styles.totalValue}`}>{peso(sumField(r, 'revenue'))}</td>
+                      <td className={`${styles.numCol} ${styles.totalValue}`}>{peso(sumField(r, 'cogs'))}</td>
+                      <td className={`${styles.numCol} ${styles.totalValue}`}>{peso(sumField(r, 'gross_profit'))}</td>
+                      <td className={`${styles.numCol} ${styles.totalValue}`}>
+                        {sumField(r, 'revenue') > 0
+                          ? `${((sumField(r, 'gross_profit') / sumField(r, 'revenue')) * 100).toFixed(1)}%`
+                          : '—'}
+                      </td>
+                    </tr></tfoot>
+                  )}
+                </table>
+              </div>
+            );
+          })()}
+
+          {/* ══════════════════════════════════════════════════════════════════ */}
+          {/* REPORT 3 — INVENTORY TURNOVER                                     */}
+          {/* ══════════════════════════════════════════════════════════════════ */}
+          {activeTab === 'inventory-turnover' && (() => {
+            const r    = rows as unknown as InventoryTurnoverRow[];
+            const meta = extraMap['inventory-turnover'] as { period_days: number } | undefined;
+            return (
+              <>
+                {meta && (
+                  <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: 12 }}>
+                    Analysis period: <strong>{meta.period_days} days</strong>
+                  </p>
+                )}
+                <div className={styles.tableWrapper}>
+                  <table className={styles.reportTable}>
+                    <thead><tr>
+                      <th>SKU</th><th>Item Name</th><th>Brand</th><th>UOM</th>
+                      <th className={styles.numCol}>Units Sold</th>
+                      <th className={styles.numCol}>Ending Qty</th>
+                      <th className={styles.numCol}>Avg Inventory</th>
+                      <th className={styles.numCol}>Turnover Rate</th>
+                      <th className={styles.numCol}>Days to Sell</th>
+                    </tr></thead>
+                    <tbody>
+                      {loading ? <LoadingRow cols={9} /> : r.length === 0 ? <EmptyRow cols={9} /> :
+                        r.map((row, i) => (
+                          <tr key={i}>
+                            <td><SkuCell sku={row.sku} /></td>
+                            <td>{row.item_name}</td>
+                            <td>{row.brand_name}</td>
+                            <td>{row.uom}</td>
+                            <td className={styles.numCol}>{num(row.units_sold)}</td>
+                            <td className={styles.numCol}>{num(row.ending_qty)}</td>
+                            <td className={styles.numCol}>{row.avg_inventory.toFixed(1)}</td>
+                            <td className={`${styles.numCol} ${row.turnover_rate >= 4 ? styles.addedVal : row.turnover_rate < 1 ? styles.soldVal : ''}`}>
+                              {row.turnover_rate.toFixed(2)}×
+                            </td>
+                            <td className={styles.numCol}>
+                              {row.days_to_sell != null ? `${row.days_to_sell} days` : '—'}
+                            </td>
+                          </tr>
+                        ))
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            );
+          })()}
+
+          {/* ══════════════════════════════════════════════════════════════════ */}
+          {/* REPORT 4 — INVENTORY VALUATION                                    */}
+          {/* ══════════════════════════════════════════════════════════════════ */}
+          {activeTab === 'inventory-valuation' && (() => {
+            const r = rows as unknown as InventoryValuationRow[];
+            return (
+              <div className={styles.tableWrapper}>
+                <table className={styles.reportTable}>
+                  <thead><tr>
+                    <th>SKU</th><th>Item Name</th><th>Brand</th><th>UOM</th>
+                    <th className={styles.numCol}>Qty</th>
+                    <th className={styles.numCol}>Unit Cost</th>
+                    <th className={styles.numCol}>Total Cost Value</th>
+                    <th className={styles.numCol}>Selling Price</th>
+                    <th className={styles.numCol}>Total Retail Value</th>
+                    <th className={styles.numCol}>Potential Profit</th>
+                  </tr></thead>
+                  <tbody>
+                    {loading ? <LoadingRow cols={10} /> : r.length === 0 ? <EmptyRow cols={10} /> :
+                      r.map((row, i) => (
+                        <tr key={i}>
+                          <td><SkuCell sku={row.sku} /></td>
+                          <td>{row.item_name}</td>
+                          <td>{row.brand_name}</td>
+                          <td>{row.uom}</td>
+                          <td className={styles.numCol}>{num(row.qty_on_hand)}</td>
+                          <td className={styles.numCol}>{peso(row.unit_cost)}</td>
+                          <td className={`${styles.numCol} ${styles.soldVal}`}>{peso(row.total_cost_value)}</td>
+                          <td className={styles.numCol}>{peso(row.selling_price)}</td>
+                          <td className={`${styles.numCol} ${styles.revenueVal}`}>{peso(row.total_retail_value)}</td>
+                          <td className={`${styles.numCol} ${styles.addedVal}`}>{peso(row.potential_profit)}</td>
+                        </tr>
+                      ))
+                    }
+                  </tbody>
+                  {r.length > 0 && (
+                    <tfoot><tr>
+                      <td colSpan={4} className={styles.totalLabel}>Totals</td>
+                      <td className={`${styles.numCol} ${styles.totalValue}`}>{num(sumField(r, 'qty_on_hand'))}</td>
+                      <td className={styles.numCol} />
+                      <td className={`${styles.numCol} ${styles.totalValue}`}>{peso(sumField(r, 'total_cost_value'))}</td>
+                      <td className={styles.numCol} />
+                      <td className={`${styles.numCol} ${styles.totalValue}`}>{peso(sumField(r, 'total_retail_value'))}</td>
+                      <td className={`${styles.numCol} ${styles.totalValue}`}>{peso(sumField(r, 'potential_profit'))}</td>
+                    </tr></tfoot>
+                  )}
+                </table>
+              </div>
+            );
+          })()}
+
+          {/* ══════════════════════════════════════════════════════════════════ */}
+          {/* REPORT 5 — STOCK AGEING                                           */}
+          {/* ══════════════════════════════════════════════════════════════════ */}
+          {activeTab === 'stock-ageing' && (() => {
+            const r = rows as unknown as StockAgeingRow[];
+            return (
+              <div className={styles.tableWrapper}>
+                <table className={styles.reportTable}>
+                  <thead><tr>
+                    <th>SKU</th><th>Item Name</th><th>Brand</th><th>UOM</th>
+                    <th className={styles.numCol}>Qty on Hand</th>
+                    <th>Last Sold Date</th>
+                    <th className={styles.numCol}>Days Since Sale</th>
+                    <th>Ageing Status</th>
+                  </tr></thead>
+                  <tbody>
+                    {loading ? <LoadingRow cols={8} /> : r.length === 0 ? <EmptyRow cols={8} /> :
+                      r.map((row, i) => (
+                        <tr key={i}>
+                          <td><SkuCell sku={row.sku} /></td>
+                          <td>{row.item_name}</td>
+                          <td>{row.brand_name}</td>
+                          <td>{row.uom}</td>
+                          <td className={styles.numCol}>{num(row.qty_on_hand)}</td>
+                          <td>{row.last_sold_date ?? <span style={{ color: '#94a3b8' }}>Never</span>}</td>
+                          <td className={styles.numCol}>
+                            {row.days_since_last_sale != null
+                              ? row.days_since_last_sale
+                              : <span style={{ color: '#94a3b8' }}>—</span>}
+                          </td>
+                          <td><AgeingBadge status={row.ageing_status} /></td>
+                        </tr>
+                      ))
+                    }
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+
+          {/* ══════════════════════════════════════════════════════════════════ */}
+          {/* REPORT 6 — REORDER REPORT                                         */}
+          {/* ══════════════════════════════════════════════════════════════════ */}
+          {activeTab === 'reorder' && (() => {
+            const r = rows as unknown as ReorderRow[];
+            return (
+              <>
+                {!loading && r.length > 0 && (
+                  <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: '0.8rem', color: '#92400e' }}>
+                    ⚠ <strong>{r.length} item{r.length !== 1 ? 's' : ''}</strong> {r.length === 1 ? 'has' : 'have'} reached or fallen below their reorder point.
+                  </div>
+                )}
+                <div className={styles.tableWrapper}>
+                  <table className={styles.reportTable}>
+                    <thead><tr>
+                      <th>SKU</th><th>Item Name</th><th>Brand</th><th>UOM</th>
+                      <th className={styles.numCol}>Current Qty</th>
+                      <th className={styles.numCol}>Reorder Point</th>
+                      <th className={styles.numCol}>Min Order Qty</th>
+                      <th className={styles.numCol}>Lead Time (Days)</th>
+                      <th className={styles.numCol}>Suggested Order</th>
+                      <th>Primary Supplier</th>
+                      <th>Contact</th>
+                    </tr></thead>
+                    <tbody>
+                      {loading ? <LoadingRow cols={11} /> : r.length === 0
+                        ? <tr><td colSpan={11} className={styles.emptyCell} style={{ color: '#15803d' }}>✓ All items are sufficiently stocked.</td></tr>
+                        : r.map((row, i) => (
+                          <tr key={i}>
+                            <td><SkuCell sku={row.sku} /></td>
+                            <td>{row.item_name}</td>
+                            <td>{row.brand_name}</td>
+                            <td>{row.uom}</td>
+                            <td className={`${styles.numCol} ${row.qty_on_hand === 0 ? styles.soldVal : styles.endingLow}`}>
+                              {num(row.qty_on_hand)}
+                            </td>
+                            <td className={styles.numCol}>{num(row.reorder_point)}</td>
+                            <td className={styles.numCol}>{num(row.min_order_qty)}</td>
+                            <td className={styles.numCol}>{row.lead_time_days}</td>
+                            <td className={`${styles.numCol} ${styles.revenueVal}`} style={{ fontWeight: 700 }}>
+                              {num(row.suggested_order_qty)}
+                            </td>
+                            <td>{row.primary_supplier}</td>
+                            <td style={{ color: '#64748b', fontSize: '0.82rem' }}>{row.supplier_contact}</td>
+                          </tr>
+                        ))
+                      }
+                    </tbody>
+                    {r.length > 0 && (
+                      <tfoot><tr>
+                        <td colSpan={8} className={styles.totalLabel}>Total Suggested Orders</td>
+                        <td className={`${styles.numCol} ${styles.totalValue}`}>{num(sumField(r, 'suggested_order_qty'))}</td>
+                        <td colSpan={2} />
+                      </tr></tfoot>
+                    )}
+                  </table>
+                </div>
+              </>
+            );
+          })()}
+
+          {/* ══════════════════════════════════════════════════════════════════ */}
+          {/* REPORT 7 — CUSTOMER SALES                                         */}
+          {/* ══════════════════════════════════════════════════════════════════ */}
+          {activeTab === 'customer-sales' && (() => {
+            const r = rows as unknown as CustomerSalesRow[];
+            return (
+              <div className={styles.tableWrapper}>
+                <table className={styles.reportTable}>
+                  <thead><tr>
+                    <th>Customer</th>
+                    <th className={styles.numCol}>Total Orders</th>
+                    <th className={styles.numCol}>Total Qty</th>
+                    <th className={styles.numCol}>Revenue</th>
+                    <th className={styles.numCol}>COGS</th>
+                    <th className={styles.numCol}>Profit</th>
+                    <th className={styles.numCol}>Margin %</th>
+                    <th className={styles.numCol}>Avg Order Value</th>
+                    <th>Payment Methods</th>
+                  </tr></thead>
+                  <tbody>
+                    {loading ? <LoadingRow cols={9} /> : r.length === 0 ? <EmptyRow cols={9} /> :
+                      r.map((row, i) => (
+                        <tr key={i}>
+                          <td style={{ fontWeight: 500 }}>{row.customer_name}</td>
+                          <td className={styles.numCol}>{num(row.total_orders)}</td>
+                          <td className={styles.numCol}>{num(row.total_qty)}</td>
+                          <td className={`${styles.numCol} ${styles.revenueVal}`}>{peso(row.total_revenue)}</td>
+                          <td className={`${styles.numCol} ${styles.soldVal}`}>{peso(row.total_cogs)}</td>
+                          <td className={`${styles.numCol} ${styles.addedVal}`}>{peso(row.total_profit)}</td>
+                          <td className={`${styles.numCol} ${row.margin_pct >= 20 ? styles.addedVal : row.margin_pct < 10 ? styles.soldVal : ''}`}>
+                            {row.margin_pct.toFixed(1)}%
+                          </td>
+                          <td className={styles.numCol}>{peso(row.avg_order_value)}</td>
+                          <td><span className={styles.paymentBadge}>{row.payment_methods}</span></td>
+                        </tr>
+                      ))
+                    }
+                  </tbody>
+                  {r.length > 0 && (
+                    <tfoot><tr>
+                      <td className={styles.totalLabel}>Totals</td>
+                      <td className={`${styles.numCol} ${styles.totalValue}`}>{num(sumField(r, 'total_orders'))}</td>
+                      <td className={`${styles.numCol} ${styles.totalValue}`}>{num(sumField(r, 'total_qty'))}</td>
+                      <td className={`${styles.numCol} ${styles.totalValue}`}>{peso(sumField(r, 'total_revenue'))}</td>
+                      <td className={`${styles.numCol} ${styles.totalValue}`}>{peso(sumField(r, 'total_cogs'))}</td>
+                      <td className={`${styles.numCol} ${styles.totalValue}`}>{peso(sumField(r, 'total_profit'))}</td>
+                      <td className={`${styles.numCol} ${styles.totalValue}`}>
+                        {sumField(r, 'total_revenue') > 0
+                          ? `${((sumField(r, 'total_profit') / sumField(r, 'total_revenue')) * 100).toFixed(1)}%`
+                          : '—'}
+                      </td>
+                      <td colSpan={2} />
+                    </tr></tfoot>
+                  )}
+                </table>
+              </div>
+            );
+          })()}
+
+        </div>
+      </main>
     </div>
   );
 }
