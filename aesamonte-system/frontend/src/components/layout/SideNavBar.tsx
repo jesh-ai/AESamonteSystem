@@ -13,7 +13,7 @@ import { MdOutlineInventory } from "react-icons/md";
 import { PiShoppingBag } from "react-icons/pi";
 import { BsPeople } from "react-icons/bs";
 import { RiBarChart2Line, RiLogoutBoxRLine } from "react-icons/ri";
-import { IoArrowUndoCircleOutline } from "react-icons/io5";
+import { IoCloseCircleOutline } from "react-icons/io5";
 import styles from "@/css/sidenavbar.module.css";
 import type { UserInfo } from "@/types/user";
 
@@ -76,7 +76,7 @@ export default function Sidebar({
             <>
               <span className={styles.menuTitle}></span>
               <button onClick={() => setCollapsed(true)} className={styles.toggleButton}>
-                <IoArrowUndoCircleOutline size={24} />
+                <IoCloseCircleOutline size={24} />
               </button>
             </>
           ) : (
