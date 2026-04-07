@@ -239,6 +239,7 @@ const restoreRole = async (id: number) => {
         <EditRoleModal
           roleId={editRoleId}
           currentUserRole={currentUserRole}
+          currentUserRole={currentUserRole}
           onClose={() => setEditRoleId(null)}
           onSave={() => { fetchRoles(); showToast('Role updated successfully.', 'success'); }}
         />
@@ -246,6 +247,7 @@ const restoreRole = async (id: number) => {
 
       {showAddModal && (
         <AddRoleModal
+          currentUserRole={currentUserRole}
           currentUserRole={currentUserRole}
           onClose={() => setShowAddModal(false)}
           onSave={() => { fetchRoles(); showToast('Role created successfully.', 'success'); }}
