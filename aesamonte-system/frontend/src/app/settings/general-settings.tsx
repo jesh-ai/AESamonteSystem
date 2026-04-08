@@ -244,6 +244,7 @@ export default function GeneralSettings({
 
   const handlePasswordChange = async () => {
     if (!currentPw || !newPw || !confirmPw) { setPwError('Please fill in all fields.'); return; }
+    if (/\s/.test(newPw))                   { setPwError('Password cannot contain spaces.'); return; }
     if (newPw !== confirmPw)                { setPwError('New passwords do not match.'); return; }
     if (newPw.length < 8)                   { setPwError('Password must be at least 8 characters.'); return; }
 
@@ -376,21 +377,6 @@ export default function GeneralSettings({
             </button>
           </div>
         </div>
-        <div className={s.notifForm} style={{ maxWidth: '450px' }}>
-          <div className={s.notifRow}>
-            <div>
-              <div className={s.notifLabel}>Two-Factor Authentication</div>
-              <div className={s.notifDescription}>Add an extra layer of security to your account</div>
-            </div>
-            <div className={s.notifToggleWrapper}>
-              <span className={s.notifStatus} style={{ color: twoFA ? '#1a4263' : '#9ca3af' }}>
-                {twoFA ? 'ON' : 'OFF'}
-              </span>
-              <Toggle enabled={twoFA} onToggle={() => setTwoFA(p => !p)} />
-            </div>
-          </div>
-        </div>
-
         {/* ── SYSTEM SETTINGS ── */}
         <h3 className={s.mainSectionLabel} style={{ marginTop: '2.5rem' }}>System Settings</h3>
 
@@ -451,12 +437,11 @@ export default function GeneralSettings({
           </div>
         )}
 
-        {/* ── SAVE — only visible when phone or 2FA has changed ── */}
-        {(phone !== initPhone || twoFA !== initTwoFA) && (
-          <div className={s.formActions}>
-            <button className={s.saveBtn} onClick={handleSave}>SAVE</button>
-          </div>
-        )}
+        {phone !== initPhone && (
+        <div className={s.formActions}>
+          <button className={s.saveBtn} onClick={handleSave}>SAVE</button>
+        </div>
+      )}
 
       </div>
 
@@ -492,55 +477,114 @@ export default function GeneralSettings({
       )}
 
       {/* ── PASSWORD MODAL ── */}
-      {showPwModal && (
-        <div className={s.modalOverlay}>
-          <div className={s.modalBox}>
-            <div className={s.modalHeader} style={{ backgroundColor: '#1a4263' }}>
-              <div className={s.modalCheckCircle} style={{ backgroundColor: '#1a4263' }}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
-              </div>
-            </div>
-            <div className={s.modalBody}>
-              <h3 className={s.modalTitle} style={{ marginBottom: '1.25rem' }}>Change Password</h3>
-              <div className={s.pwForm}>
-                <div className={s.pwField}>
-                  <label>Current Password</label>
-                  <input type="password" className={s.pwInput} value={currentPw} onChange={e => setCurrentPw(e.target.value)} placeholder="Enter current password" />
-                </div>
-                <div className={s.pwField}>
-                  <label>New Password</label>
-                  <input type="password" className={s.pwInput} value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="Min. 8 characters" />
-                </div>
-                <div className={s.pwField}>
-                  <label>Confirm New Password</label>
-                  <input type="password" className={s.pwInput} value={confirmPw} onChange={e => setConfirmPw(e.target.value)} placeholder="Confirm new password" />
-                </div>
-                {pwError && <p className={s.pwError}>{pwError}</p>}
-              </div>
-              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
-                <button
-                  style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #e5e7eb', background: '#f8fafc', color: '#333', fontWeight: 600, cursor: 'pointer', fontSize: '0.95rem' }}
-                  onClick={closePwModal}
-                  disabled={pwLoading}
-                >
-                  Cancel
-                </button>
-                <button
-                  className={s.modalOkBtn}
-                  style={{ flex: 1, padding: '10px', opacity: pwLoading ? 0.7 : 1 }}
-                  onClick={handlePasswordChange}
-                  disabled={pwLoading}
-                >
-                  {pwLoading ? 'Saving...' : 'Save'}
-                </button>
-              </div>
-            </div>
-          </div>
+{showPwModal && (
+  <div className={s.modalOverlay}>
+    <div className={s.modalBox}>
+      <div className={s.modalHeader} style={{ backgroundColor: '#1a4263' }}>
+        <div className={s.modalCheckCircle} style={{ backgroundColor: '#1a4263' }}>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
         </div>
-      )}
+      </div>
+      <div className={s.modalBody}>
+        <h3 className={s.modalTitle} style={{ marginBottom: '1.25rem' }}>Change Password</h3>
+        <div className={s.pwForm}>
+          
+          {/* 1. CURRENT PASSWORD */}
+          <div className={s.pwField}>
+            <label>Current Password</label>
+            <input 
+              type="password" 
+              className={s.pwInput} 
+              value={currentPw} 
+              maxLength={25} // Limits input to 25 characters
+              onChange={e => {
+                const val = e.target.value;
+                if (!/\s/.test(val)) setCurrentPw(val); // Blocks spaces
+              }} 
+              placeholder="Enter current password" 
+              style={currentPw && currentPw.length < 8 ? { borderColor: '#ef4444' } : {}}
+            />
+            {currentPw && currentPw.length < 8 && (
+              <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px' }}>
+                Password must be at least 8 characters.
+              </p>
+            )}
+          </div>
+
+          {/* 2. NEW PASSWORD */}
+          <div className={s.pwField}>
+            <label>New Password</label>
+            <input 
+              type="password" 
+              className={s.pwInput} 
+              value={newPw} 
+              maxLength={25} // Limits input to 25 characters
+              onChange={e => {
+                const val = e.target.value;
+                if (!/\s/.test(val)) setNewPw(val); // Blocks spaces
+              }} 
+              placeholder="8-25 characters"
+              style={newPw && newPw.length < 8 ? { borderColor: '#ef4444' } : {}}
+            />
+            {newPw && newPw.length < 8 && (
+              <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px' }}>
+                Password must be at least 8 characters.
+              </p>
+            )}
+            <p style={{ fontSize: '0.7rem', color: '#94a3b8', textAlign: 'right', marginTop: '2px' }}>
+              {newPw.length}/25
+            </p>
+          </div>
+
+          {/* 3. CONFIRM NEW PASSWORD */}
+          <div className={s.pwField}>
+            <label>Confirm New Password</label>
+            <input 
+              type="password" 
+              className={s.pwInput} 
+              value={confirmPw} 
+              maxLength={25} // Limits input to 25 characters
+              onChange={e => {
+                const val = e.target.value;
+                if (!/\s/.test(val)) setConfirmPw(val); // Blocks spaces
+              }} 
+              placeholder="Confirm new password"
+              style={confirmPw && confirmPw !== newPw ? { borderColor: '#ef4444' } : {}}
+            />
+            {confirmPw && confirmPw !== newPw && (
+              <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px' }}>
+                Passwords do not match.
+              </p>
+            )}
+          </div>
+
+          {pwError && <p className={s.pwError}>{pwError}</p>}
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
+          <button
+            style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #e5e7eb', background: '#f8fafc', color: '#333', fontWeight: 600, cursor: 'pointer', fontSize: '0.95rem' }}
+            onClick={closePwModal}
+            disabled={pwLoading}
+          >
+            Cancel
+          </button>
+          <button
+            className={s.modalOkBtn}
+            style={{ flex: 1, padding: '10px', opacity: pwLoading ? 0.7 : 1 }}
+            onClick={handlePasswordChange}
+            disabled={pwLoading}
+          >
+            {pwLoading ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }

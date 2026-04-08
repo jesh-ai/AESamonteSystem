@@ -752,6 +752,7 @@ const totalPages = Math.max(1, Math.ceil(sortedProducts.length / ROWS_PER_PAGE))
         onSave={handleSave}
         onOpenSupplierModal={() => setShowSupplierModal(true)}
         onOpenUomModal={() => setShowUomModal(true)}
+        onBrandAdded={fetchBrands}  
         suppliers={suppliers}
         brands={brands}
         uoms={uoms}
@@ -765,6 +766,7 @@ const totalPages = Math.max(1, Math.ceil(sortedProducts.length / ROWS_PER_PAGE))
         itemData={selectedProduct}
         onSave={handleUpdate}
         onOpenUomModal={() => setShowUomModal(true)}
+        onBrandAdded={fetchBrands} 
         onOpenSupplierModal={() => setShowSupplierModal(true)}
         suppliers={suppliers}
         brands={brands}
