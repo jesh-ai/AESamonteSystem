@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import styles from "@/css/inventory.module.css";
 import { LuX, LuPlus, LuMinus, LuTrash2, LuSlidersHorizontal } from "react-icons/lu";
+import AddBrandModal from './AddBrandModal';
 
 interface SupplierEntry {
   supplierName: string;
@@ -34,6 +35,7 @@ interface EditInventoryModalProps {
   itemData: any;
   onSave: (updatedItem: any) => void;
   onOpenUomModal: () => void;
+  onBrandAdded?: () => void;
   onOpenSupplierModal: () => void;
   suppliers: any[];
   brands: { id: number; name: string }[];
@@ -102,7 +104,8 @@ const LABEL_STYLE: React.CSSProperties = {
 
 const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
   isOpen, onClose, itemData, onSave, onOpenUomModal, onOpenSupplierModal,
-  suppliers, brands = [], uoms, existingProducts = []
+  suppliers, brands = [], uoms, existingProducts = [],
+  onBrandAdded
 }) => {
   const s = styles as Record<string, string>;
 
@@ -116,6 +119,9 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
   const [supplierError, setSupplierError] = useState('');
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [showBrandModal, setShowBrandModal] = useState(false);
+  const [brandTargetIdx, setBrandTargetIdx] = useState<number | null>(null);
+
 
   useEffect(() => {
     if (itemData) {
@@ -379,7 +385,13 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
               {/* Brand Name | SKU */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                 <div>
-                  <label style={{ ...LABEL_STYLE }}>Brand Name</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <label style={{ ...LABEL_STYLE }}>Brand Name</label>
+                    <span onClick={() => { setBrandTargetIdx(brandIdx); setShowBrandModal(true); }}
+                      style={{ cursor: 'pointer', fontSize: '0.65rem', color: '#2563eb', fontWeight: 600, textTransform: 'uppercase' }}>
+                      + New Brand
+                    </span>
+                  </div>
                   {!brand.isNew ? (
                     <div style={{ ...READ_ONLY_STYLE }}>{brand.brandName || '—'}</div>
                   ) : (
@@ -682,7 +694,21 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
           </div>
         </div>
       )}
-
+      {showBrandModal && (
+      <AddBrandModal
+        isOpen={showBrandModal}
+        onClose={() => setShowBrandModal(false)}
+        onSave={(newBrand) => {
+          if (brandTargetIdx !== null) {
+            handleBrandChange(brandTargetIdx, 'brand_id', newBrand.id);
+            handleBrandChange(brandTargetIdx, 'brandName', newBrand.name);
+          }
+          onBrandAdded?.();
+          setShowBrandModal(false);
+        }}
+        existingBrands={brands}
+      />
+    )}
     </div>
   );
 };
