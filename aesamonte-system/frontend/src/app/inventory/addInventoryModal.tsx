@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useRef } from 'react';
 import styles from "@/css/inventory.module.css";
+import AddBrandModal from './AddBrandModal';
 import { LuPlus, LuTrash2, LuSlidersHorizontal } from "react-icons/lu";
 
 interface Supplier {
@@ -41,6 +42,7 @@ interface AddInventoryModalProps {
   onSave: (items: any[]) => void;
   onOpenSupplierModal: () => void;
   onOpenUomModal: () => void;
+  onBrandAdded?: () => void;  
   suppliers: Supplier[];
   brands: { id: number; name: string }[];
   uoms: { id: number; name: string }[];
@@ -80,12 +82,6 @@ const FIELD_ERROR_STYLE: React.CSSProperties = {
   backgroundColor: '#fff5f5',
 };
 
-const READ_ONLY_STYLE: React.CSSProperties = {
-  padding: '8px 12px', height: '38px', backgroundColor: '#f3f4f6',
-  borderRadius: '6px', border: '1px solid #e5e7eb',
-  color: '#6b7280', fontSize: '0.9rem', display: 'flex', alignItems: 'center',
-};
-
 const DISABLED_STYLE: React.CSSProperties = {
   ...FIELD_STYLE, backgroundColor: '#f3f4f6', color: '#9ca3af', cursor: 'not-allowed',
 };
@@ -106,6 +102,7 @@ function computeSkuPreview(brandName: string, itemName: string): string {
 
 const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
   isOpen, onClose, onSave, onOpenSupplierModal, onOpenUomModal,
+  onBrandAdded,
   suppliers = [], brands = [], uoms = [],
   existingProducts = [], defaultSupplierName = ''
 }) => {
@@ -117,6 +114,9 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
   const [supplierError, setSupplierError] = useState('');
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [showBrandModal, setShowBrandModal] = useState(false);
+  const [brandTargetItem, setBrandTargetItem] = useState<number | null>(null);
+
 
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -139,7 +139,7 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
       setShowCancelConfirm(false);
       setSubmitAttempted(false);
     }
-  }, [isOpen, defaultSupplierName]);
+  }, [isOpen, defaultSupplierName, suppliers]);
 
   const isFormDirty = (): boolean => {
     const hasItemData = itemGroups.some(ig =>
@@ -156,6 +156,15 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
     else onClose();
   };
 
+  // ADD BEW BRAND 
+  const handleBrandSaved = (newBrand: { id: number; name: string }) => {
+  if (brandTargetItem !== null) {
+    const lastBrandIdx = itemGroups[brandTargetItem].brands.length - 1;
+    handleBrandChange(brandTargetItem, lastBrandIdx, 'brand_id', newBrand.id);
+    handleBrandChange(brandTargetItem, lastBrandIdx, 'brandName', newBrand.name);
+  }
+  onBrandAdded?.(); 
+};
   // ── SUPPLIER HANDLERS ──
   const handleSupplierChange = (idx: number, field: keyof SupplierEntry, value: string) => {
     setSupplierError('');
@@ -205,9 +214,9 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
   const handleBrandChange = (itemIdx: number, brandIdx: number, field: keyof BrandVariant, value: string | number | null) => {
     setItemGroups(prev => {
       const updated = [...prev];
-      const brands = [...updated[itemIdx].brands];
-      brands[brandIdx] = { ...brands[brandIdx], [field]: value };
-      updated[itemIdx] = { ...updated[itemIdx], brands };
+      const brandsCopy = [...updated[itemIdx].brands];
+      brandsCopy[brandIdx] = { ...brandsCopy[brandIdx], [field]: value };
+      updated[itemIdx] = { ...updated[itemIdx], brands: brandsCopy };
       return updated;
     });
   };
@@ -356,16 +365,12 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
           display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', minHeight: 0
         }}>
 
-          {/* ── SINGLE SCROLLABLE BODY ── */}
           <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', backgroundColor: '#f9fafb', minHeight: 0 }}>
-
-            {/* ── ITEMS SECTION (top) ── */}
             <div style={{ padding: '20px 24px' }}>
 
               {itemGroups.map((item, itemIdx) => (
                 <div key={itemIdx} style={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', padding: '20px', marginBottom: '20px' }}>
 
-                  {/* Item Group header */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #f3f4f6', paddingBottom: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#111827', fontWeight: 600, fontSize: '1rem' }}>
                       <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700 }}>{itemIdx + 1}</div>
@@ -379,7 +384,6 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
                     )}
                   </div>
 
-                  {/* ITEM NAME */}
                   <div style={{ marginBottom: '16px' }}>
                     <label style={{ ...LABEL_STYLE, color: itemNameHasError(itemIdx) ? '#dc2626' : '#6b7280' }}>
                       Item Name <span style={{ color: '#ef4444' }}>*</span>
@@ -395,11 +399,9 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
                     )}
                   </div>
 
-                  {/* BRAND DETAIL sub-cards */}
                   {item.brands.map((brand, brandIdx) => (
                     <div key={brandIdx} style={{ border: '2px dashed #e2e8f0', borderRadius: '10px', padding: '16px', marginBottom: '12px', backgroundColor: '#fafafa' }}>
 
-                      {/* Brand header row */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                         <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#374151' }}>
                           {brandIdx + 1} Brand Detail
@@ -412,12 +414,21 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
                         )}
                       </div>
 
-                      {/* Row: BRAND NAME | SKU (AUTO) */}
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '10px' }}>
                         <div>
-                          <label style={{ ...LABEL_STYLE, color: brandHasError(itemIdx, brandIdx) ? '#dc2626' : '#6b7280' }}>
-                            Brand Name <span style={{ color: '#ef4444' }}>*</span>
-                          </label>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <label style={{ ...LABEL_STYLE, color: brandHasError(itemIdx, brandIdx) ? '#dc2626' : '#6b7280' }}>
+                              Brand Name <span style={{ color: '#ef4444' }}>*</span>
+                            </label>
+                            {/* UPDATED: TRIGGER FOR BRAND MODAL */}
+                            <span
+                              onClick={() => { setBrandTargetItem(itemIdx); setShowBrandModal(true); }}
+                              style={{ cursor: 'pointer', fontSize: '0.65rem', color: '#2563eb', fontWeight: 600, textTransform: 'uppercase', marginBottom: '4px' }}
+                            >
+                              + New Brand
+                            </span>                          
+                            </div>
+                          
                           <select
                             style={brandHasError(itemIdx, brandIdx) ? FIELD_ERROR_STYLE : FIELD_STYLE}
                             value={brand.brand_id ?? ''}
@@ -449,7 +460,6 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
                         </div>
                       </div>
 
-                      {/* Row: DESCRIPTION */}
                       <div style={{ marginBottom: '10px' }}>
                         <label style={{ ...LABEL_STYLE }}>Description</label>
                         <input
@@ -460,7 +470,6 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
                         />
                       </div>
 
-                      {/* Row: QUANTITY | UNIT (UOM) | REORDER POINT */}
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '10px' }}>
                         <div>
                           <label style={{ ...LABEL_STYLE }}>Quantity</label>
@@ -487,7 +496,7 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
                                 {uoms.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
                               </select>
                               {uomHasError(itemIdx, brandIdx) && (
-                                <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Please select a unit of measure.</p>
+                                <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Please select a unit.</p>
                               )}
                             </div>
                             <button
@@ -511,7 +520,6 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
                         </div>
                       </div>
 
-                      {/* Row: UNIT COST | SELLING PRICE */}
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                         <div>
                           <label style={{ ...LABEL_STYLE, color: unitCostHasError(itemIdx, brandIdx) ? '#dc2626' : '#6b7280' }}>
@@ -525,9 +533,6 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
                             onChange={e => handleBrandChange(itemIdx, brandIdx, 'unitCost', e.target.value)}
                             placeholder="0.00"
                           />
-                          {unitCostHasError(itemIdx, brandIdx) && (
-                            <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Unit cost is required.</p>
-                          )}
                         </div>
                         <div>
                           <label style={{ ...LABEL_STYLE, color: sellingPriceHasError(itemIdx, brandIdx) ? '#dc2626' : '#6b7280' }}>
@@ -541,15 +546,11 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
                             onChange={e => handleBrandChange(itemIdx, brandIdx, 'sellingPrice', e.target.value)}
                             placeholder="0.00"
                           />
-                          {sellingPriceHasError(itemIdx, brandIdx) && (
-                            <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Selling price is required.</p>
-                          )}
                         </div>
                       </div>
                     </div>
                   ))}
 
-                  {/* + Add Another Brand */}
                   <button
                     type="button"
                     onClick={() => handleAddBrand(itemIdx)}
@@ -559,7 +560,6 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
                 </div>
               ))}
 
-              {/* + Add New Item Category */}
               <button type="button" onClick={handleAddItemGroup}
                 style={{ width: '100%', padding: '12px', border: '2px dashed #e5e7eb', borderRadius: '8px', backgroundColor: '#fff', color: '#4b5563', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '4px' }}
                 onMouseOver={e => e.currentTarget.style.borderColor = '#3b82f6'}
@@ -568,11 +568,8 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
               </button>
             </div>
 
-            {/* ── SUPPLIER SECTION (bottom) ── */}
-            <div style={{
-              flexShrink: 0, padding: '20px 24px',
-              backgroundColor: '#fff', borderTop: '1px solid #eaeaea',
-            }}>
+            {/* SUPPLIER SECTION */}
+            <div style={{ flexShrink: 0, padding: '20px 24px', backgroundColor: '#fff', borderTop: '1px solid #eaeaea' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                 <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: '#333' }}>Supplier Details</h4>
                 <span onClick={onOpenSupplierModal} style={{ cursor: 'pointer', fontSize: '0.82rem', color: '#007bff', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -615,9 +612,6 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
                           );
                         })}
                       </select>
-                      {supplierHasError(idx) && (
-                        <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Supplier is required.</p>
-                      )}
                     </div>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 500, color: '#555', marginBottom: '4px' }}>Lead Time (Days)</label>
@@ -628,16 +622,6 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
                       <input type="number" style={{ ...FIELD_STYLE }} value={entry.minOrder} placeholder="e.g. 50" onChange={e => handleSupplierChange(idx, 'minOrder', e.target.value)} />
                     </div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 500, color: '#555', marginBottom: '4px' }}>Contact Person</label>
-                      <div style={{ ...READ_ONLY_STYLE }}>{entry.contactPerson || '—'}</div>
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 500, color: '#555', marginBottom: '4px' }}>Contact Number</label>
-                      <div style={{ ...READ_ONLY_STYLE }}>{entry.contactNumber || '—'}</div>
-                    </div>
-                  </div>
                 </div>
               ))}
               <button type="button" onClick={handleAddSupplier}
@@ -645,43 +629,46 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
                 <LuPlus size={14} /> Add Supplier
               </button>
             </div>
-
           </div>
-          {/* END SINGLE SCROLLABLE BODY */}
 
-          {/* FOOTER */}
           <div className={s.modalFooter} style={{ padding: '20px 24px', borderTop: '1px solid #eaeaea', backgroundColor: '#fff', display: 'flex', flexDirection: 'column', gap: '12px', flexShrink: 0 }}>
             {dupError && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#fee2e2', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: '8px', padding: '10px 14px', fontSize: '0.85rem', fontWeight: 500 }}>
-                <span>⚠</span> {dupError}
+                 <span>⚠</span> {dupError}
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
               <button type="button" onClick={handleCancelClick} className={s.cancelBtn}>Cancel</button>
-              <button type="submit" className={s.saveBtn} style={{ backgroundColor: '#1a4263', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '8px', fontWeight: 600, fontSize: '0.75rem', cursor: 'pointer' }}>
-                Save Items
-              </button>
+              <button type="submit" className={s.saveBtn}>Save Inventory</button>
             </div>
           </div>
         </form>
-      </div>
 
-      {/* Cancel Confirmation */}
-      {showCancelConfirm && (
-        <div className={s.confirmOverlay} onClick={() => setShowCancelConfirm(false)}>
-          <div className={s.confirmBox} onClick={e => e.stopPropagation()}>
-            <div className={s.confirmIconWrap}><div className={s.confirmIcon}>⚠️</div></div>
-            <div className={s.confirmTextWrap}>
-              <p className={s.confirmTitle}>Discard Changes?</p>
-              <p className={s.confirmSubtext}>All entered information will be lost.</p>
-            </div>
-            <div className={s.confirmButtons}>
-              <button className={s.keepEditingBtn} onClick={() => setShowCancelConfirm(false)}>Keep Editing</button>
-              <button className={s.discardBtn} onClick={() => { setShowCancelConfirm(false); onClose(); }}>Yes, Discard</button>
+        {showCancelConfirm && (
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
+            <div style={{ backgroundColor: '#fff', padding: '24px', borderRadius: '12px', width: '320px', textAlign: 'center' }}>
+              <h3 style={{ marginTop: 0 }}>Discard changes?</h3>
+              <p>You have unsaved data. Are you sure you want to exit?</p>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '20px' }}>
+                <button onClick={() => setShowCancelConfirm(false)} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #d1d5db', cursor: 'pointer' }}>No, stay</button>
+                <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '6px', backgroundColor: '#ef4444', color: '#fff', border: 'none', cursor: 'pointer' }}>Yes, discard</button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
+        {showBrandModal && (
+        <AddBrandModal
+          isOpen={showBrandModal}
+          onClose={() => setShowBrandModal(false)}
+          onSave={(newBrand) => {
+            handleBrandSaved(newBrand);
+            setShowBrandModal(false);
+          }}
+          existingBrands={brands}
+        />
       )}
+      </div>
+      
     </div>
   );
 };

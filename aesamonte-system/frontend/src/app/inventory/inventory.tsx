@@ -686,7 +686,18 @@ const totalPages = Math.max(1, Math.ceil(sortedProducts.length / ROWS_PER_PAGE))
                         )}
                       </td>
                       <td>{p.qty}</td>
-                      <td>{p.uom || '—'}</td>
+                      <td style={{ fontSize: '0.83rem', color: '#374151' }}>
+                        {(() => {
+                          const uoms = [...new Set((p.brands || []).map((b: any) => b.uom).filter(Boolean))];
+                          return uoms.length === 0 ? <span style={{ color: '#9ca3af' }}>—</span>
+                            : uoms.map((u, i) => (
+                              <span key={i}>
+                                {i > 0 && <span style={{ color: '#d1d5db', margin: '0 4px' }}>•</span>}
+                                {u}
+                              </span>
+                            ));
+                        })()}
+                      </td>
                       <td>
                         <span className={
                           p.status.includes("Available") ? s.pillGreen
@@ -752,6 +763,7 @@ const totalPages = Math.max(1, Math.ceil(sortedProducts.length / ROWS_PER_PAGE))
         onSave={handleSave}
         onOpenSupplierModal={() => setShowSupplierModal(true)}
         onOpenUomModal={() => setShowUomModal(true)}
+        onBrandAdded={fetchBrands}  
         suppliers={suppliers}
         brands={brands}
         uoms={uoms}
@@ -765,6 +777,7 @@ const totalPages = Math.max(1, Math.ceil(sortedProducts.length / ROWS_PER_PAGE))
         itemData={selectedProduct}
         onSave={handleUpdate}
         onOpenUomModal={() => setShowUomModal(true)}
+        onBrandAdded={fetchBrands} 
         onOpenSupplierModal={() => setShowSupplierModal(true)}
         suppliers={suppliers}
         brands={brands}
@@ -792,7 +805,7 @@ const totalPages = Math.max(1, Math.ceil(sortedProducts.length / ROWS_PER_PAGE))
             <div className={s.viewModalHeader}>
               <div className={s.viewModalHeaderLeft}>
                 <h2 className={s.viewItemName}>{viewProduct.item_name}</h2>
-                <p className={s.viewItemSubtitle}>{viewProduct.id} • {viewProduct.uom || '—'}</p>
+                <p className={s.viewItemSubtitle}>{viewProduct.id}</p>
               </div>
               <div className={s.viewModalHeaderRight}>
                 <span className={getStatusClass(viewProduct.status)}>{viewProduct.status}</span>
@@ -843,6 +856,7 @@ const totalPages = Math.max(1, Math.ceil(sortedProducts.length / ROWS_PER_PAGE))
                     <thead>
                       <tr>
                         <th>BRAND</th>
+                        <th>UOM</th>
                         <th>SKU</th>
                         <th>DESCRIPTION</th>
                         <th>QTY</th>
@@ -859,6 +873,7 @@ const totalPages = Math.max(1, Math.ceil(sortedProducts.length / ROWS_PER_PAGE))
                               <span className={s.viewItemRowName}>{displayBrandName(bv.brand_name)}</span>
                             </div>
                           </td>
+                          <td><span style={{ fontSize: '0.82rem', color: '#374151' }}>{bv.uom || '—'}</span></td>
                           <td><span style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: '#64748b' }}>{bv.sku || '—'}</span></td>
                           <td style={{ color: '#6b7280', fontSize: '0.85rem' }}>{bv.description || '—'}</td>
                           <td>{bv.qty}</td>

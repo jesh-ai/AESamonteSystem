@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import styles from "@/css/inventory.module.css";
 import { LuX, LuPlus, LuMinus, LuTrash2, LuSlidersHorizontal } from "react-icons/lu";
+import AddBrandModal from './AddBrandModal';
 
 interface SupplierEntry {
   supplierName: string;
@@ -14,6 +15,7 @@ interface SupplierEntry {
 }
 
 interface BrandVariant {
+  inventory_brand_id: string | number | null;
   brand_id: string | number | null;
   brandName: string;
   sku: string;
@@ -34,6 +36,7 @@ interface EditInventoryModalProps {
   itemData: any;
   onSave: (updatedItem: any) => void;
   onOpenUomModal: () => void;
+  onBrandAdded?: () => void;
   onOpenSupplierModal: () => void;
   suppliers: any[];
   brands: { id: number; name: string }[];
@@ -68,6 +71,7 @@ const BLANK_SUPPLIER: SupplierEntry = {
 };
 
 const INITIAL_NEW_BRAND: BrandVariant = {
+  inventory_brand_id: null,
   brand_id: null,
   brandName: '',
   sku: '',
@@ -75,7 +79,7 @@ const INITIAL_NEW_BRAND: BrandVariant = {
   qty: '0',
   stockAction: 'add',
   stockDelta: '',
-  uom: 'Select',
+  uom: '',
   reorderPoint: '20',
   unitCost: '',
   sellingPrice: '',
@@ -102,7 +106,8 @@ const LABEL_STYLE: React.CSSProperties = {
 
 const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
   isOpen, onClose, itemData, onSave, onOpenUomModal, onOpenSupplierModal,
-  suppliers, brands = [], uoms, existingProducts = []
+  suppliers, brands = [], uoms, existingProducts = [],
+  onBrandAdded
 }) => {
   const s = styles as Record<string, string>;
 
@@ -116,6 +121,9 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
   const [supplierError, setSupplierError] = useState('');
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [showBrandModal, setShowBrandModal] = useState(false);
+  const [brandTargetIdx, setBrandTargetIdx] = useState<number | null>(null);
+
 
   useEffect(() => {
     if (itemData) {
@@ -146,6 +154,7 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
       setOriginalSuppliers(JSON.parse(JSON.stringify(sups)));
 
       const bvs: BrandVariant[] = (itemData.brands || []).map((b: any) => ({
+        inventory_brand_id: b.inventory_brand_id ?? null,
         brand_id: b.brand_id,
         brandName: b.brand_name || '',
         sku: b.sku || '',
@@ -153,8 +162,8 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
         qty: String(b.qty ?? '0'),
         stockAction: 'add' as const,
         stockDelta: '',
-        uom: itemData.uom || 'Select',
-        reorderPoint: String(itemData.reorderPoint ?? '20'),
+        uom: b.uom || '',
+        reorderPoint: String(b.reorder_point ?? '20'),
         unitCost: String(b.unit_price ?? ''),
         sellingPrice: String(b.selling_price ?? ''),
         isNew: false,
@@ -237,7 +246,7 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
     }
 
     // Check UOM on all brands
-    const missingUom = brandVariants.find(bv => !bv.uom || bv.uom === 'Select');
+    const missingUom = brandVariants.find(bv => !bv.uom || bv.uom === '' || bv.uom === 'Select');
     if (missingUom) {
       setDupError(`Please select a Unit of Measure for brand "${missingUom.brandName || 'unnamed brand'}".`);
       return;
@@ -286,11 +295,14 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
       ...formData,
       suppliers: validSuppliers,
       brands: brandVariants.map(bv => ({
+        ...(bv.inventory_brand_id != null ? { inventory_brand_id: Number(bv.inventory_brand_id) } : {}),
         ...(bv.brand_id ? { brand_id: Number(bv.brand_id) } : {}),
         brand_name: bv.brandName || 'No Brand',
         sku: bv.sku || null,
         uom: bv.uom,
-        qty: Math.max(0, (Number(bv.qty) || 0) + (bv.stockAction === 'add' ? 1 : -1) * (Number(bv.stockDelta) || 0)),
+        qty: Number(bv.qty) || 0,
+        stockAction: bv.stockDelta ? bv.stockAction : 'set',
+        stockDelta: Number(bv.stockDelta) || 0,
         unit_price: Number(bv.unitCost) || 0,
         selling_price: Number(bv.sellingPrice) || 0,
         itemDescription: bv.description,
@@ -302,7 +314,7 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
   // ── ERROR HELPERS ──
   const itemNameHasError = () => submitAttempted && !formData.itemName?.trim();
   const uomHasError = (brandIdx: number) =>
-    submitAttempted && (!brandVariants[brandIdx].uom || brandVariants[brandIdx].uom === 'Select');
+    submitAttempted && (!brandVariants[brandIdx].uom || brandVariants[brandIdx].uom === '' || brandVariants[brandIdx].uom === 'Select');
   const unitCostHasError = (brandIdx: number) =>
     submitAttempted && (brandVariants[brandIdx].unitCost === '' || brandVariants[brandIdx].unitCost === null);
   const sellingPriceHasError = (brandIdx: number) =>
@@ -379,7 +391,13 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
               {/* Brand Name | SKU */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                 <div>
-                  <label style={{ ...LABEL_STYLE }}>Brand Name</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <label style={{ ...LABEL_STYLE }}>Brand Name</label>
+                    <span onClick={() => { setBrandTargetIdx(brandIdx); setShowBrandModal(true); }}
+                      style={{ cursor: 'pointer', fontSize: '0.65rem', color: '#2563eb', fontWeight: 600, textTransform: 'uppercase' }}>
+                      + New Brand
+                    </span>
+                  </div>
                   {!brand.isNew ? (
                     <div style={{ ...READ_ONLY_STYLE }}>{brand.brandName || '—'}</div>
                   ) : (
@@ -422,7 +440,7 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
                     <div style={{ flex: 1 }}>
                       <select style={{ ...(uomHasError(brandIdx) ? FIELD_ERROR_STYLE : FIELD_STYLE), width: '100%' }}
                         value={brand.uom} onChange={e => handleBrandChange(brandIdx, 'uom', e.target.value)}>
-                        <option value="Select">Select</option>
+                        <option value="">Select UOM</option>
                         {uoms.map((u: any) => <option key={u.id} value={u.name}>{u.name}</option>)}
                       </select>
                       {uomHasError(brandIdx) && (
@@ -682,7 +700,21 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
           </div>
         </div>
       )}
-
+      {showBrandModal && (
+      <AddBrandModal
+        isOpen={showBrandModal}
+        onClose={() => setShowBrandModal(false)}
+        onSave={(newBrand) => {
+          if (brandTargetIdx !== null) {
+            handleBrandChange(brandTargetIdx, 'brand_id', newBrand.id);
+            handleBrandChange(brandTargetIdx, 'brandName', newBrand.name);
+          }
+          onBrandAdded?.();
+          setShowBrandModal(false);
+        }}
+        existingBrands={brands}
+      />
+    )}
     </div>
   );
 };

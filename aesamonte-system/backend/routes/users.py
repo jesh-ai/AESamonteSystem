@@ -3,7 +3,6 @@ from database.db_config import get_connection
 import bcrypt
 
 users_bp = Blueprint("users", __name__)
-
 @users_bp.route("/employees", methods=["GET"])
 def get_employees():
     conn = get_connection()
@@ -12,7 +11,8 @@ def get_employees():
         cursor.execute("""
             SELECT e.employee_id, e.employee_name, e.employee_email,
                    e.employee_contact, e.role_id, e.employee_status_id,
-                   s.status_code, e.is_archived
+                   s.status_code, e.is_archived, 
+                   e.employee_username  -- Changed from employed_username to employee_username
             FROM employee e
             JOIN static_status s ON e.employee_status_id = s.status_id
             ORDER BY e.employed_date DESC
@@ -28,6 +28,7 @@ def get_employees():
                 "status_id":   r[5],
                 "status_code": r[6],
                 "is_archived": r[7],
+                "username":    r[8] # This will now have the correct data
             } for r in rows
         ]
         return jsonify(employees)
