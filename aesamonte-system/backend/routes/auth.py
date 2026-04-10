@@ -25,40 +25,66 @@ GMAIL_PASSWORD    = os.environ.get("GMAIL_APP_PASSWORD", "")
 _otp_store: dict = {}
 
 
-def _build_permissions(role: dict) -> dict:
-    """Map employee_role boolean columns to per-module permission objects."""
-    export = bool(role.get('export_permissions'))
+def _build_permissions(role_id: int, role_name: str, cur) -> list[str]:
+    """
+    Return a flat list of permission code strings for the given role.
 
-    def m(flag: bool) -> dict:
-        v = bool(flag)
-        return {
-            "can_view":    v,
-            "can_create":  v,
-            "can_edit":    v,
-            "can_archive": v,
-            "can_export":  export,
-        }
+    System roles (SUPER_ADMIN / ADMIN) receive every permission so that
+    require_permission's bypass logic and the full list are consistent.
 
-    return {
-        "dashboard": m(role.get('dashboard_permissions')),
-        "sales":     m(role.get('sales_permissions')),
-        "inventory": m(role.get('inventory_permissions')),
-        "orders":    m(role.get('order_permissions')),
-        "supplier":  m(role.get('supplier_permissions')),
-        "reports":   m(role.get('reports_permissions')),
-        "settings":  m(role.get('settings_permissions')),
-    }
+    For every other role the list is built from the role_permissions table,
+    which is the single source of truth for what a dynamic role may do.
+    The (module_name, can_*) columns are translated to Permission values
+    via COLUMN_TO_PERMISSION in utils/permissions.py.
+    """
+    from utils.roles       import SYSTEM_ROLE_NAMES
+    from utils.permissions import ALL_PERMISSIONS, COLUMN_TO_PERMISSION
+
+    if role_name in SYSTEM_ROLE_NAMES:
+        return sorted(ALL_PERMISSIONS)
+
+    cur.execute("""
+        SELECT module_name,
+               COALESCE(can_view,    FALSE) AS can_view,
+               COALESCE(can_create,  FALSE) AS can_create,
+               COALESCE(can_edit,    FALSE) AS can_edit,
+               COALESCE(can_archive, FALSE) AS can_archive,
+               COALESCE(can_export,  FALSE) AS can_export
+        FROM role_permissions
+        WHERE role_id = %s
+    """, (role_id,))
+    rows = cur.fetchall()
+
+    granted: list[str] = []
+    columns = ("can_view", "can_create", "can_edit", "can_archive", "can_export")
+    for module_name, *flags in rows:
+        for col, flag in zip(columns, flags):
+            if flag:
+                perm = COLUMN_TO_PERMISSION.get((module_name, col))
+                if perm:
+                    granted.append(perm.value)
+
+    return granted
 
 
-def _build_token_response(user: dict) -> dict:
-    permissions = _build_permissions(user)
+def _build_token_response(user: dict, cur) -> dict:
+    """
+    Build the full login response dict, including a signed JWT.
+
+    permissions  — flat list of permission code strings embedded in the JWT
+                   and returned in the response body.  The backend's
+                   @require_permission decorator reads this list.
+                   Frontend: migrate from the old module-dict format to this
+                   flat list (check if a string is present with Array.includes).
+    """
+    permissions = _build_permissions(user['role_id'], user['role_name'], cur)
     payload = {
         "employee_id":       user['employee_id'],
         "employee_username": user['employee_username'],
         "role_id":           user['role_id'],
         "role_name":         user['role_name'],
         "employee_name":     user['employee_name'],
-        "permissions":       permissions,
+        "permissions":       permissions,          # flat list of strings
         "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=8),
     }
     token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
@@ -166,7 +192,7 @@ def login():
         if not bcrypt.checkpw(password.encode('utf-8'), user['employee_password'].encode('utf-8')):
             return jsonify({"status": "error", "message": "Invalid credentials."}), 401
 
-        return jsonify(_build_token_response(user)), 200
+        return jsonify(_build_token_response(user, cur)), 200
 
     finally:
         cur.close()

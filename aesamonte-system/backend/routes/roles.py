@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from database.db_config import get_connection
 from psycopg2.extras import RealDictCursor
+from utils.roles import Roles, SYSTEM_ROLE_NAMES, DEFAULT_ROLE_NAME
 
 roles_bp = Blueprint('roles', __name__)
 
@@ -212,7 +213,7 @@ def get_role_detail(role_id):
             if rows:
                 granular = {r['module']: dict(r) for r in rows}
             else:
-                is_admin = (role_id == 1)
+                is_admin = (role.get('role_name') in SYSTEM_ROLE_NAMES)
                 granular = {
                     m: {'module': m, 'can_view': v, 'can_create': v, 'can_edit': v, 'can_archive': is_admin and v}
                     for m, v in bool_map.items()
@@ -220,7 +221,7 @@ def get_role_detail(role_id):
         except Exception:
             conn.rollback()
             cur = conn.cursor(cursor_factory=RealDictCursor)
-            is_admin = (role_id == 1)
+            is_admin = (role.get('role_name') in SYSTEM_ROLE_NAMES)
             granular = {
                 m: {'module': m, 'can_view': v, 'can_create': v, 'can_edit': v, 'can_archive': is_admin and v}
                 for m, v in bool_map.items()
@@ -410,8 +411,17 @@ def unassign_user(role_id):
     cur = conn.cursor()
     try:
         cur.execute(
-            "UPDATE employee SET role_id = 4 WHERE employee_id = %s AND role_id = %s",
-            (employee_id, role_id)
+            "SELECT role_id FROM employee_role WHERE role_name = %s",
+            (DEFAULT_ROLE_NAME,)
+        )
+        default_row = cur.fetchone()
+        if not default_row:
+            return jsonify({"error": f"Default role '{DEFAULT_ROLE_NAME}' not found in database"}), 500
+        default_role_id = default_row[0]
+
+        cur.execute(
+            "UPDATE employee SET role_id = %s WHERE employee_id = %s AND role_id = %s",
+            (default_role_id, employee_id, role_id)
         )
         conn.commit()
         return jsonify({"message": "User unassigned"}), 200

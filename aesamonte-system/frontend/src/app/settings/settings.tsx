@@ -14,12 +14,11 @@ import AuditLog from "./audit-log";
 
 interface SettingsPageProps {
   role?: string;
-  roleId?: number;
   employeeId?: number;
   onLogout: () => void;
 }
 
-export default function SettingsPage({ role = "Admin", roleId, employeeId, onLogout }: SettingsPageProps) {
+export default function SettingsPage({ role = "Admin", employeeId, onLogout }: SettingsPageProps) {
   const [activeView, setActiveView] = useState<"main" | "users" | "access" | "appPreferences" | "backupRestore" | "auditlog">("main");
   const [showChangePassword, setShowChangePassword] = useState(false);
 
@@ -38,8 +37,7 @@ export default function SettingsPage({ role = "Admin", roleId, employeeId, onLog
     setTimeout(() => setToast(null), 4000);
   };
 
-  // role_id 1 = Super Admin, role_id 2 = Admin — both get full settings access
-  const isAdmin = roleId === 1 || roleId === 2;
+  const isAdmin = role === "Admin";
   const isManagerOrHead = role === "Manager" || role === "Head";
 
   const allConfigItems = [
@@ -83,9 +81,7 @@ export default function SettingsPage({ role = "Admin", roleId, employeeId, onLog
       <main className={styles.mainContent}>
         {activeView === "main" && (
           <div className={styles.settingsCard}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <h3 className={styles.pageTitle} style={{ margin: 0 }}>Controls & Configurations</h3>
-            </div>
+            <h3 className={styles.pageTitle}>Controls & Configurations</h3>
             <div className={styles.configList}>
               {configItems.map((item) => (
                 <button

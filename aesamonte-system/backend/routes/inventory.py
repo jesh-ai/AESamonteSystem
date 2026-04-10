@@ -227,20 +227,20 @@ def get_inventory():
                 )                                          AS uom,
                 s.status_name                              AS item_status,
                 i.item_status_id,
-                COALESCE(MAX(ia.low_stock_qty), 0)         AS low_stock_qty,
+                COALESCE(
+                    (SELECT ia2.reorder_qty
+                     FROM inventory_brand ib2
+                     JOIN inventory_action ia2 ON ia2.inventory_brand_id = ib2.inventory_brand_id
+                     WHERE ib2.inventory_id = i.inventory_id
+                     LIMIT 1),
+                    0
+                ) AS low_stock_qty,
                 s.status_code
             FROM inventory i
-            JOIN static_status s
-                ON i.item_status_id = s.status_id
-               AND s.status_scope = 'INVENTORY_STATUS'
-            LEFT JOIN inventory_brand ib
-                ON ib.inventory_id = i.inventory_id
-            LEFT JOIN inventory_action ia
-                ON ia.inventory_brand_id = ib.inventory_brand_id
-            GROUP BY
-                i.inventory_id, i.item_name,
-                s.status_name, s.status_code, i.item_status_id
-            ORDER BY i.inventory_id ASC
+            JOIN static_status s ON i.item_status_id = s.status_id
+            LEFT JOIN inventory_brand ib ON ib.inventory_id = i.inventory_id
+            GROUP BY i.inventory_id, i.item_name, s.status_name, s.status_code, i.item_status_id
+            ORDER BY i.inventory_id ASC;
         """)
         rows = cur.fetchall()
 
