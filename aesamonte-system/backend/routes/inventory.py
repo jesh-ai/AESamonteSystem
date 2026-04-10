@@ -255,11 +255,13 @@ def get_inventory():
                 ib.item_selling_price,
                 ib.total_quantity,
                 COALESCE(ia.reorder_qty, 0)        AS reorder_qty,
-                COALESCE(ia.low_stock_qty, 0)      AS low_stock_qty
+                COALESCE(ia.low_stock_qty, 0)      AS low_stock_qty,
+                u.uom_name
             FROM inventory_brand ib
             LEFT JOIN brand b ON ib.brand_id = b.brand_id
             LEFT JOIN inventory_action ia
                 ON ia.inventory_brand_id = ib.inventory_brand_id
+            LEFT JOIN unit_of_measure u ON ib.uom_id = u.uom_id
             ORDER BY ib.inventory_id, COALESCE(b.brand_name, 'Generic')
         """)
         brand_rows = cur.fetchall()
@@ -299,6 +301,7 @@ def get_inventory():
             "unit_price": float(br[4] or 0),
             "selling_price": float(br[5] or 0),
             "qty": int(br[6] or 0),
+            "uom": br[9] or "—",
         })
 
     suppliers_map: dict = {}
@@ -560,8 +563,12 @@ def add_inventory_batch():
 
 # ─────────────────────────── UPDATE INVENTORY (upsert variants) ───────────────────────────
 
-@inventory_bp.route("/api/inventory/update/<string:id>", methods=["PUT"])
-def update_inventory_item(id):
+@inventory_bp.route("/api/inventory/update/<int:inventory_id>", methods=["PUT", "OPTIONS"], strict_slashes=False)
+def update_inventory_item(inventory_id):
+    if request.method == "OPTIONS":
+        return "", 200
+
+    id = inventory_id
     conn = get_connection()
     cur = conn.cursor()
     try:
@@ -608,10 +615,12 @@ def update_inventory_item(id):
             _remove_variants(cur, list(to_delete))
 
         # ── 4. Upsert each variant ────────────────────────────────────────
+        archived_status_id = _get_status_id(cur, "ARCHIVED")
+
         for bv in data.get('brands', []):
             brand_id    = _resolve_brand(cur, bv.get('brand_id'), bv.get('brand_name'))
             uom_id      = _resolve_uom(cur, bv.get('uom'))
-            description = (bv.get('itemDescription') or '').strip() or None
+            description = (bv.get('itemDescription') or bv.get('description') or '').strip() or None
             reorder_pt  = int(bv.get('reorderPoint', 0))
             new_qty     = int(bv.get('qty', 0))
 
@@ -625,13 +634,35 @@ def update_inventory_item(id):
             new_qty = max(0, new_qty)
 
             ibid = bv.get('inventory_brand_id')
+            if ibid is not None:
+                try:
+                    ibid = int(ibid)
+                except (ValueError, TypeError):
+                    ibid = None
 
-            if ibid:
+            if ibid is not None:
                 # ── UPDATE existing variant ──────────────────────────────
+                # Strict duplicate check: no ARCHIVED filter — editing an active
+                # variant to match any existing row (including ghosts) is blocked.
+                cur.execute("""
+                    SELECT 1 FROM inventory_brand
+                    WHERE  inventory_id          = %s
+                      AND  brand_id              = %s
+                      AND  uom_id                = %s
+                      AND  item_description IS NOT DISTINCT FROM %s
+                      AND  inventory_brand_id   != %s
+                    LIMIT 1
+                """, (id, brand_id, uom_id, description, ibid))
+                if cur.fetchone():
+                    raise ValueError("PYTHON CHECK (UPDATE): You cannot edit this variant to match an existing one (it may be Archived).")
+
+                raw_sku = bv.get('sku') or None
+                if isinstance(raw_sku, str) and raw_sku.strip().lower() == 'auto-generated':
+                    raw_sku = None
+
                 cur.execute("""
                     UPDATE inventory_brand SET
                         brand_id           = %s,
-                        item_sku           = %s,
                         item_unit_price    = %s,
                         item_selling_price = %s,
                         total_quantity     = %s,
@@ -641,13 +672,12 @@ def update_inventory_item(id):
                       AND inventory_id = %s
                 """, (
                     brand_id,
-                    bv.get('sku') or None,
                     float(bv.get('unit_price', 0)),
                     float(bv.get('selling_price', 0)),
                     new_qty,
                     uom_id,
                     description,
-                    int(ibid),
+                    ibid,
                     id,
                 ))
 
@@ -660,84 +690,116 @@ def update_inventory_item(id):
                         lead_time_days = %s,
                         action_date    = %s
                     WHERE inventory_brand_id = %s
-                """, (
-                    reorder_pt, reorder_pt,
-                    primary_supplier['minOrder'],
-                    primary_supplier['leadTime'],
-                    datetime.now(),
-                    int(ibid),
-                ))
+                """, (reorder_pt, reorder_pt, primary_supplier['minOrder'],
+                      primary_supplier['leadTime'], datetime.now(), ibid))
                 if cur.rowcount == 0:
                     cur.execute("""
                         INSERT INTO inventory_action
                             (inventory_brand_id, action_date, low_stock_qty,
                              reorder_qty, min_order_qty, lead_time_days)
                         VALUES (%s, %s, %s, %s, %s, %s)
-                    """, (
-                        int(ibid), datetime.now(),
-                        reorder_pt, reorder_pt,
-                        primary_supplier['minOrder'],
-                        primary_supplier['leadTime'],
-                    ))
+                    """, (ibid, datetime.now(), reorder_pt, reorder_pt,
+                          primary_supplier['minOrder'], primary_supplier['leadTime']))
 
                 # Re-link suppliers for this variant
-                cur.execute(
-                    "DELETE FROM inventory_brand_supplier WHERE inventory_brand_id = %s",
-                    (int(ibid),)
-                )
+                cur.execute("DELETE FROM inventory_brand_supplier WHERE inventory_brand_id = %s", (ibid,))
                 for sup in resolved_suppliers:
-                    cur.execute("""
-                        INSERT INTO inventory_brand_supplier (inventory_brand_id, supplier_id)
-                        VALUES (%s, %s)
-                    """, (int(ibid), sup['supplier_id']))
+                    cur.execute("INSERT INTO inventory_brand_supplier (inventory_brand_id, supplier_id) VALUES (%s, %s)",
+                                (ibid, sup['supplier_id']))
 
             else:
-                # ── INSERT new variant ───────────────────────────────────
-                # item_sku is intentionally omitted — it is auto-generated by
-                # the DB and must NOT be copied from the form (would collide
-                # with the existing row's unique constraint).
+                # ── INSERT / REVIVE variant ──────────────────────────────
+                # Check for ANY row with this combination (including ARCHIVED ghosts).
                 cur.execute("""
-                    INSERT INTO inventory_brand
-                        (inventory_id, brand_id, item_unit_price,
-                         item_selling_price, total_quantity, uom_id,
-                         item_status_id, item_description)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING inventory_brand_id
-                """, (
-                    id,
-                    brand_id,
-                    float(bv.get('unit_price', 0)),
-                    float(bv.get('selling_price', 0)),
-                    new_qty,
-                    uom_id,
-                    available_status_id,
-                    description,
-                ))
-                new_ibid = cur.fetchone()[0]
+                    SELECT inventory_brand_id, item_status_id FROM inventory_brand
+                    WHERE  inventory_id          = %s
+                      AND  brand_id              = %s
+                      AND  uom_id                = %s
+                      AND  item_description IS NOT DISTINCT FROM %s
+                    LIMIT 1
+                """, (id, brand_id, uom_id, description))
+                existing_row = cur.fetchone()
 
-                for sup in resolved_suppliers:
+                if existing_row:
+                    existing_ibid, existing_status_id = existing_row
+                    if existing_status_id == archived_status_id:
+                        # ── REVIVE archived ghost ────────────────────────
+                        cur.execute("""
+                            UPDATE inventory_brand SET
+                                item_status_id     = %s,
+                                item_unit_price    = %s,
+                                item_selling_price = %s,
+                                total_quantity     = %s
+                            WHERE inventory_brand_id = %s
+                        """, (available_status_id, float(bv.get('unit_price', 0)),
+                              float(bv.get('selling_price', 0)), new_qty, existing_ibid))
+
+                        cur.execute("""
+                            UPDATE inventory_action SET
+                                low_stock_qty  = %s,
+                                reorder_qty    = %s,
+                                min_order_qty  = %s,
+                                lead_time_days = %s,
+                                action_date    = %s
+                            WHERE inventory_brand_id = %s
+                        """, (reorder_pt, reorder_pt, primary_supplier['minOrder'],
+                              primary_supplier['leadTime'], datetime.now(), existing_ibid))
+                        if cur.rowcount == 0:
+                            cur.execute("""
+                                INSERT INTO inventory_action
+                                    (inventory_brand_id, action_date, low_stock_qty,
+                                     reorder_qty, min_order_qty, lead_time_days)
+                                VALUES (%s, %s, %s, %s, %s, %s)
+                            """, (existing_ibid, datetime.now(), reorder_pt, reorder_pt,
+                                  primary_supplier['minOrder'], primary_supplier['leadTime']))
+
+                        cur.execute("DELETE FROM inventory_brand_supplier WHERE inventory_brand_id = %s", (existing_ibid,))
+                        for sup in resolved_suppliers:
+                            cur.execute("INSERT INTO inventory_brand_supplier (inventory_brand_id, supplier_id) VALUES (%s, %s)",
+                                        (existing_ibid, sup['supplier_id']))
+                    else:
+                        raise ValueError("PYTHON CHECK (INSERT): A variant with this Brand + UOM + Description already exists.")
+                else:
+                    # ── TRUE INSERT ──────────────────────────────────────
                     cur.execute("""
-                        INSERT INTO inventory_brand_supplier (inventory_brand_id, supplier_id)
-                        VALUES (%s, %s)
-                    """, (new_ibid, sup['supplier_id']))
+                        INSERT INTO inventory_brand
+                            (inventory_id, brand_id, item_unit_price,
+                             item_selling_price, total_quantity, uom_id,
+                             item_status_id, item_description)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        RETURNING inventory_brand_id
+                    """, (id, brand_id, float(bv.get('unit_price', 0)),
+                          float(bv.get('selling_price', 0)), new_qty, uom_id,
+                          available_status_id, description))
+                    new_ibid = cur.fetchone()[0]
 
-                cur.execute("""
-                    INSERT INTO inventory_action
-                        (inventory_brand_id, action_date, low_stock_qty,
-                         reorder_qty, min_order_qty, lead_time_days)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                """, (
-                    new_ibid, datetime.now(),
-                    reorder_pt, reorder_pt,
-                    primary_supplier['minOrder'],
-                    primary_supplier['leadTime'],
-                ))
+                    for sup in resolved_suppliers:
+                        cur.execute("INSERT INTO inventory_brand_supplier (inventory_brand_id, supplier_id) VALUES (%s, %s)",
+                                    (new_ibid, sup['supplier_id']))
+
+                    cur.execute("""
+                        INSERT INTO inventory_action
+                            (inventory_brand_id, action_date, low_stock_qty,
+                             reorder_qty, min_order_qty, lead_time_days)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (new_ibid, datetime.now(), reorder_pt, reorder_pt,
+                          primary_supplier['minOrder'], primary_supplier['leadTime']))
 
         conn.commit()
         return jsonify({"message": "Item updated successfully"}), 200
 
+    except ValueError as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 409
     except Exception as e:
         conn.rollback()
+        if getattr(e, 'pgcode', None) == '23505':
+            detail = getattr(getattr(e, 'diag', None), 'message_detail', '') or ''
+            if 'item_sku' in detail:
+                error_msg = "DB CONSTRAINT: That SKU is already in use by another item."
+            else:
+                error_msg = f"DB CONSTRAINT 23505: {detail}"
+            return jsonify({"error": error_msg}), 409
         import traceback; traceback.print_exc()
         return jsonify({"error": str(e)}), 500
     finally:
@@ -838,15 +900,44 @@ def upsert_inventory(inventory_id):
                 # ════════════════════════════════════════════════
                 ibid = int(ibid)
 
-                # Ownership guard: prevent cross-item tampering
+                # Ownership guard + fetch brand/description needed for
+                # the duplicate check (these columns are not in the payload
+                # because the update path only changes uom/price/stock).
+                # Ownership guard + fetch brand/description for the duplicate
+                # check.  Fetch item_description raw (no COALESCE) so NULL
+                # and '' stay distinct for IS NOT DISTINCT FROM below.
                 cur.execute(
-                    "SELECT 1 FROM inventory_brand "
-                    "WHERE inventory_brand_id = %s AND inventory_id = %s",
+                    "SELECT brand_id, item_description "
+                    "FROM   inventory_brand "
+                    "WHERE  inventory_brand_id = %s AND inventory_id = %s",
                     (ibid, inventory_id)
                 )
-                if not cur.fetchone():
+                existing = cur.fetchone()
+                if not existing:
                     raise ValueError(
                         f"Variant {ibid} does not belong to inventory item {inventory_id}."
+                    )
+                cur_brand_id, cur_desc = existing
+
+                # Duplicate check — exclude self so a pure price/stock change
+                # never triggers a false positive. Also skip ARCHIVED variants.
+                cur.execute("""
+                    SELECT 1 FROM inventory_brand
+                    WHERE  inventory_id          = %s
+                      AND  brand_id              = %s
+                      AND  uom_id                = %s
+                      AND  item_description IS NOT DISTINCT FROM %s
+                      AND  inventory_brand_id   != %s
+                      AND  item_status_id != (
+                               SELECT status_id FROM static_status
+                               WHERE  status_code  = 'ARCHIVED'
+                                 AND  status_scope = 'INVENTORY_STATUS'
+                           )
+                    LIMIT 1
+                """, (inventory_id, cur_brand_id, int(uom_id), cur_desc, ibid))
+                if cur.fetchone():
+                    raise ValueError(
+                        "PYTHON CHECK (upsert UPDATE path): A variant with this Brand + UOM + Description already exists."
                     )
 
                 cur.execute("""
@@ -881,29 +972,79 @@ def upsert_inventory(inventory_id):
                 if not brand_id:
                     raise ValueError("New variants require a 'brand_id'.")
 
-                cur.execute("""
-                    INSERT INTO inventory_brand
-                           (inventory_id, brand_id, uom_id,
-                            item_unit_price, item_selling_price,
-                            total_quantity, item_status_id)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    RETURNING inventory_brand_id
-                """, (
-                    inventory_id,
-                    int(brand_id),
-                    int(uom_id),
-                    unit_price,
-                    selling_price,
-                    new_stock,
-                    available_status_id,
-                ))
-                new_ibid = cur.fetchone()[0]
+                item_description = v.get("description") or None
 
+                # Check for ANY existing row with this combination (including ARCHIVED).
+                # This lets us revive an archived variant instead of hitting the DB constraint.
                 cur.execute("""
-                    INSERT INTO inventory_action
-                           (inventory_brand_id, low_stock_qty, action_date)
-                    VALUES (%s, %s, NOW())
-                """, (new_ibid, reorder_pt))
+                    SELECT inventory_brand_id, item_status_id
+                    FROM   inventory_brand
+                    WHERE  inventory_id          = %s
+                      AND  brand_id              = %s
+                      AND  uom_id                = %s
+                      AND  item_description IS NOT DISTINCT FROM %s
+                    LIMIT 1
+                """, (inventory_id, int(brand_id), int(uom_id), item_description))
+                existing_row = cur.fetchone()
+
+                archived_status_id = _get_status_id(cur, "ARCHIVED")
+
+                if existing_row:
+                    existing_ibid, existing_status_id = existing_row
+                    if existing_status_id == archived_status_id:
+                        # ── REVIVE archived variant ──────────────────────
+                        cur.execute("""
+                            UPDATE inventory_brand
+                            SET    item_status_id     = %s,
+                                   item_unit_price    = %s,
+                                   item_selling_price = %s,
+                                   total_quantity     = %s
+                            WHERE  inventory_brand_id = %s
+                        """, (available_status_id, unit_price, selling_price,
+                              new_stock, existing_ibid))
+
+                        cur.execute("""
+                            UPDATE inventory_action
+                            SET    low_stock_qty = %s,
+                                   action_date   = NOW()
+                            WHERE  inventory_brand_id = %s
+                        """, (reorder_pt, existing_ibid))
+                        if cur.rowcount == 0:
+                            cur.execute("""
+                                INSERT INTO inventory_action
+                                       (inventory_brand_id, low_stock_qty, action_date)
+                                VALUES (%s, %s, NOW())
+                            """, (existing_ibid, reorder_pt))
+                    else:
+                        # Active/non-archived duplicate — block it
+                        raise ValueError(
+                            "PYTHON CHECK (upsert INSERT path): A variant with this Brand + UOM + Description already exists."
+                        )
+                else:
+                    # ── Brand-new variant ────────────────────────────────
+                    cur.execute("""
+                        INSERT INTO inventory_brand
+                               (inventory_id, brand_id, uom_id,
+                                item_unit_price, item_selling_price,
+                                total_quantity, item_status_id)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        RETURNING inventory_brand_id
+                    """, (
+                        inventory_id,
+                        int(brand_id),
+                        int(uom_id),
+                        unit_price,
+                        selling_price,
+                        new_stock,
+                        available_status_id,
+                    ))
+                    new_ibid = cur.fetchone()[0]
+
+                    cur.execute("""
+                        INSERT INTO inventory_action
+                               (inventory_brand_id, low_stock_qty, action_date)
+                        VALUES (%s, %s, NOW())
+                    """, (new_ibid, reorder_pt))
 
         # ── 7. Commit ────────────────────────────────────────────────────────
         conn.commit()
@@ -917,6 +1058,11 @@ def upsert_inventory(inventory_id):
         return jsonify({"error": str(e)}), 400
     except Exception as e:
         conn.rollback()
+        if getattr(e, 'pgcode', None) == '23505':
+            err_detail = getattr(e.diag, 'message_detail', '') if hasattr(e, 'diag') else str(e)
+            if 'item_sku' in err_detail:
+                return jsonify({"error": "DB CONSTRAINT: That SKU is already in use by another item."}), 409
+            return jsonify({"error": f"DB CONSTRAINT 23505: {err_detail}"}), 409
         import traceback; traceback.print_exc()
         return jsonify({"error": "Internal server error.", "detail": str(e)}), 500
     finally:
@@ -951,17 +1097,29 @@ def toggle_inventory_archive(inventory_id):
         if not row:
             return jsonify({"error": "Item not found."}), 404
 
-        current_code, total_qty = row[0], int(row[1])
+        current_code = row[0]
 
         if current_code == 'ARCHIVED':
-            target_code = 'AVAILABLE' if total_qty > 0 else 'OUT_OF_STOCK'
-            new_status_id = _get_status_id(cur, target_code)
+            # Restore: always back to AVAILABLE; the GET endpoint computes
+            # the real dynamic status (Low Stock / Out of Stock) at read time.
+            new_status_id = _get_status_id(cur, 'AVAILABLE')
             is_archived   = False
             action_msg    = "Restored from Archive"
         else:
             new_status_id = _get_status_id(cur, 'ARCHIVED')
             is_archived   = True
             action_msg    = "Moved to Archive"
+
+            # Clear stock alerts for every variant so the item no longer
+            # appears in Low Stock / Out of Stock alert lists while archived.
+            cur.execute("""
+                UPDATE inventory_action ia
+                SET    low_stock_qty = 0,
+                       reorder_qty   = 0
+                FROM   inventory_brand ib
+                WHERE  ia.inventory_brand_id = ib.inventory_brand_id
+                  AND  ib.inventory_id = %s
+            """, (inventory_id,))
 
         cur.execute(
             "UPDATE inventory SET item_status_id = %s WHERE inventory_id = %s",
