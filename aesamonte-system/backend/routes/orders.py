@@ -303,159 +303,218 @@ def update_order(order_id):
     data = request.json
     conn = get_connection()
     cur = conn.cursor()
-    
-    try:
-        status_name = data.get('status', '').strip()
-        cur.execute("SELECT status_id FROM static_status WHERE status_scope = 'ORDER_STATUS' AND status_name ILIKE %s", (status_name,))
-        status_row = cur.fetchone()
-        new_status_id = status_row[0] if status_row else None
 
+    try:
+        # --- Resolve new status (id + code) ---
+        status_name = data.get('status', '').strip()
+        cur.execute("""
+            SELECT status_id, status_code
+            FROM static_status
+            WHERE status_scope = 'ORDER_STATUS' AND status_name ILIKE %s
+        """, (status_name,))
+        status_row = cur.fetchone()
+        new_status_id   = status_row[0] if status_row else None
+        new_status_code = status_row[1].upper() if status_row else None
+
+        # --- Resolve payment method ---
         pm_name = data.get('paymentMethod', '').strip()
         cur.execute("SELECT status_id FROM static_status WHERE status_scope = 'PAYMENT_METHOD' AND status_name ILIKE %s", (pm_name,))
         pm_row = cur.fetchone()
         new_pm_id = pm_row[0] if pm_row else None
 
+        # --- Update customer info ---
         cur.execute("SELECT customer_id FROM order_transaction WHERE order_id = %s", (order_id,))
         cust_row = cur.fetchone()
         if cust_row:
             customer_id = cust_row[0]
             cur.execute("""
-                UPDATE customer 
+                UPDATE customer
                 SET customer_name = %s, customer_contact = %s, customer_address = %s
                 WHERE customer_id = %s
             """, (data.get('customerName'), data.get('contact'), data.get('address'), customer_id))
 
+        # --- Fetch old status code ---
         cur.execute("""
-            SELECT sl.status_name 
+            SELECT ss.status_code
             FROM order_transaction ot
-            JOIN static_status sl ON ot.order_status_id = sl.status_id
+            JOIN static_status ss ON ot.order_status_id = ss.status_id
             WHERE ot.order_id = %s
         """, (order_id,))
-        current_status_row = cur.fetchone()
-        current_status = current_status_row[0].upper() if current_status_row else 'PREPARING'
+        old_row = cur.fetchone()
+        old_status_code = old_row[0].upper() if old_row else 'PENDING'
 
-        if current_status == 'PREPARING':
-            
-            # =======================================================
-            # FIX STEP 1: RESTOCK OLD ITEMS
-            # =======================================================
-            cur.execute("SELECT inventory_id, order_quantity FROM order_details WHERE order_id = %s", (order_id,))
-            old_items = cur.fetchall()
-            for old_inv_id, old_qty in old_items:
-                # Add the old quantity back into the first brand variant
+        # --- State machine helpers ---
+        # States where stock has already been deducted from inventory
+        DEDUCTED_STATES = {'PREPARING', 'PACKED', 'SHIPPING'}
+
+        old_is_deducted = old_status_code in DEDUCTED_STATES
+        new_is_active   = new_status_code in DEDUCTED_STATES if new_status_code else False
+
+        def restore_current_items():
+            """Add back stock for every item currently on this order."""
+            cur.execute("""
+                SELECT inventory_brand_id, order_quantity FROM order_details WHERE order_id = %s
+            """, (order_id,))
+            rows = cur.fetchall()
+            for brand_id, qty in rows:
                 cur.execute("""
-                    UPDATE inventory_brand
-                    SET item_qty = item_qty + %s
-                    WHERE inventory_id = %s AND brand_id = (
-                        SELECT brand_id FROM inventory_brand
-                        WHERE inventory_id = %s ORDER BY brand_id LIMIT 1
-                    )
-                """, (old_qty, old_inv_id, old_inv_id))
+                    UPDATE inventory_brand SET total_quantity = total_quantity + %s
+                    WHERE inventory_brand_id = %s
+                """, (qty, brand_id))
 
-                # Automatically restore status to 'Available' if total > 0
-                cur.execute("""
-                    UPDATE inventory
-                    SET item_status_id = (
-                        SELECT status_id FROM static_status
-                        WHERE status_scope = 'INVENTORY_STATUS' AND status_code = 'AVAILABLE'
-                        LIMIT 1
-                    )
-                    WHERE inventory_id = %s
-                      AND COALESCE((SELECT SUM(item_qty) FROM inventory_brand WHERE inventory_id = %s), 0) > 0
-                      AND item_status_id = (
-                        SELECT status_id FROM static_status
-                        WHERE status_scope = 'INVENTORY_STATUS' AND status_code = 'OUT_OF_STOCK'
-                        LIMIT 1
-                    )
-                """, (old_inv_id, old_inv_id))
-            # =======================================================
-
-            # FIX STEP 2: DELETE OLD ITEMS
-            cur.execute("DELETE FROM order_details WHERE order_id = %s", (order_id,))
-            
-            # FIX STEP 3: INSERT NEW ITEMS & DEDUCT NEW AMOUNTS
-            for item in data.get('items', []):
-                inv_id = item.get('inventory_id')
-                if inv_id and str(inv_id).strip() != "":
-                    
-                    # --- SECURITY CHECK: REJECT ARCHIVED ITEMS ---
+                cur.execute("SELECT inventory_id FROM inventory_brand WHERE inventory_brand_id = %s", (brand_id,))
+                inv_row = cur.fetchone()
+                if inv_row:
+                    inv_id = inv_row[0]
+                    # Flip back to AVAILABLE only if total stock is now positive
                     cur.execute("""
-                        SELECT ss.status_code, i.item_name 
-                        FROM inventory i
-                        JOIN static_status ss ON i.item_status_id = ss.status_id
-                        WHERE i.inventory_id = %s
-                    """, (inv_id,))
-                    inv_check = cur.fetchone()
-                    if not inv_check:
-                        raise Exception(f"Item ID {inv_id} not found.")
-                    if inv_check[0] == 'INACTIVE':
-                        raise Exception(f"Cannot add '{inv_check[1]}' because it has been archived.")
-                    # ---------------------------------------------
-                    
-                    try:
-                        qty = int(item.get('quantity', 1)) or 1
-                    except (ValueError, TypeError):
-                        qty = 1
-                    try:
-                        amount = float(item.get('amount', 0))
-                    except (ValueError, TypeError):
-                        amount = 0.0
-                        
-                    unit_price = (amount / qty) if qty > 0 else 0.0
-
-                    cur.execute("""
-                        INSERT INTO order_details (order_id, inventory_id, order_quantity, unit_price, order_total)
-                        VALUES (%s, %s, %s, %s, %s)
-                    """, (order_id, inv_id, qty, unit_price, amount))
-
-                    # Deduct the new quantities from the first brand variant
-                    cur.execute("""
-                        UPDATE inventory_brand
-                        SET item_qty = item_qty - %s
-                        WHERE inventory_id = %s AND brand_id = (
-                            SELECT brand_id FROM inventory_brand
-                            WHERE inventory_id = %s ORDER BY brand_id LIMIT 1
+                        UPDATE inventory
+                        SET item_status_id = (
+                            SELECT status_id FROM static_status
+                            WHERE status_scope = 'INVENTORY_STATUS' AND status_code = 'AVAILABLE'
+                            LIMIT 1
                         )
-                    """, (qty, inv_id, inv_id))
+                        WHERE inventory_id = %s
+                          AND COALESCE((SELECT SUM(total_quantity) FROM inventory_brand WHERE inventory_id = %s), 0) > 0
+                          AND item_status_id = (
+                            SELECT status_id FROM static_status
+                            WHERE status_scope = 'INVENTORY_STATUS' AND status_code = 'OUT_OF_STOCK'
+                            LIMIT 1
+                          )
+                    """, (inv_id, inv_id))
 
+        def insert_and_deduct_items():
+            """Insert items from the request payload and deduct stock for each."""
+            for item in data.get('items', []):
+                inv_brand_id = item.get('inventory_brand_id')
+                if not inv_brand_id or str(inv_brand_id).strip() == "":
+                    continue
+
+                cur.execute("""
+                    SELECT ib.inventory_id, ss.status_code, i.item_name
+                    FROM inventory_brand ib
+                    JOIN inventory i ON i.inventory_id = ib.inventory_id
+                    JOIN static_status ss ON i.item_status_id = ss.status_id
+                    WHERE ib.inventory_brand_id = %s
+                """, (inv_brand_id,))
+                inv_check = cur.fetchone()
+                if not inv_check:
+                    raise Exception(f"Variant ID {inv_brand_id} not found.")
+                inv_id, status_code, item_name = inv_check
+                if status_code == 'INACTIVE':
+                    raise Exception(f"Cannot add '{item_name}' because it has been archived.")
+
+                try:
+                    raw_qty = item.get('quantity') or item.get('qty') or item.get('order_quantity') or 1
+                    qty = int(raw_qty) or 1
+                except (ValueError, TypeError):
+                    qty = 1
+                try:
+                    raw_amount = item.get('amount') or item.get('order_total') or 0
+                    amount = float(raw_amount)
+                except (ValueError, TypeError):
+                    amount = 0.0
+
+                unit_price = (amount / qty) if qty > 0 else 0.0
+
+                cur.execute("""
+                    INSERT INTO order_details (order_id, inventory_brand_id, order_quantity, unit_price, order_total)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (order_id, inv_brand_id, qty, unit_price, amount))
+
+                cur.execute("""
+                    UPDATE inventory_brand SET total_quantity = total_quantity - %s
+                    WHERE inventory_brand_id = %s
+                """, (qty, inv_brand_id))
+
+                cur.execute("""
+                    SELECT COALESCE(SUM(total_quantity), 0) FROM inventory_brand WHERE inventory_id = %s
+                """, (inv_id,))
+                if cur.fetchone()[0] <= 0:
                     cur.execute("""
-                        SELECT COALESCE(SUM(item_qty), 0) FROM inventory_brand WHERE inventory_id = %s
+                        UPDATE inventory
+                        SET item_status_id = (
+                            SELECT status_id FROM static_status
+                            WHERE status_scope = 'INVENTORY_STATUS' AND status_code = 'OUT_OF_STOCK'
+                            LIMIT 1
+                        )
+                        WHERE inventory_id = %s
                     """, (inv_id,))
-                    new_qty = cur.fetchone()[0]
-                    # Automatically set status to "Out of Stock" if total drops to 0
-                    if new_qty <= 0:
-                        cur.execute("""
-                            UPDATE inventory
-                            SET item_status_id = (
-                                SELECT status_id FROM static_status
-                                WHERE status_scope = 'INVENTORY_STATUS' AND status_code = 'OUT_OF_STOCK'
-                                LIMIT 1
-                            )
-                            WHERE inventory_id = %s
-                        """, (inv_id,))
 
+        def insert_items_only():
+            """Insert items from the request payload without touching inventory stock."""
+            for item in data.get('items', []):
+                inv_brand_id = item.get('inventory_brand_id')
+                if not inv_brand_id or str(inv_brand_id).strip() == "":
+                    continue
+                try:
+                    qty = int(item.get('quantity') or item.get('qty') or item.get('order_quantity') or 1) or 1
+                except (ValueError, TypeError):
+                    qty = 1
+                try:
+                    amount = float(item.get('amount') or item.get('order_total') or 0)
+                except (ValueError, TypeError):
+                    amount = 0.0
+                unit_price = (amount / qty) if qty > 0 else 0.0
+                cur.execute("""
+                    INSERT INTO order_details (order_id, inventory_brand_id, order_quantity, unit_price, order_total)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (order_id, inv_brand_id, qty, unit_price, amount))
+
+        # --- State machine: apply the correct stock action ---
+        #
+        #  old \ new  | PENDING | ACTIVE (PREPARING/PACKED/SHIPPING) | CANCELLED
+        # ------------+---------+-------------------------------------+----------
+        #  PENDING    |  swap*  |  first deduction + swap            |  no-op
+        #  ACTIVE     |  —      |  restore old + swap + deduct new   |  RESTORE
+        #
+        # *swap = delete old order_details rows, insert new ones
+
+        if old_is_deducted and new_status_code == 'CANCELLED':
+            # RESTORE: give back stock for the items that were deducted
+            restore_current_items()
+            # Do NOT modify order_details — preserve the audit trail
+
+        elif old_is_deducted and new_is_active:
+            # SWAP while active: restock old items, replace with new items, deduct new
+            restore_current_items()
+            cur.execute("DELETE FROM order_details WHERE order_id = %s", (order_id,))
+            insert_and_deduct_items()
+
+        elif not old_is_deducted and new_is_active:
+            # FIRST DEDUCTION: order promoted from PENDING to an active state
+            cur.execute("DELETE FROM order_details WHERE order_id = %s", (order_id,))
+            insert_and_deduct_items()
+
+        else:
+            # No stock change (e.g. PENDING → PENDING, PENDING → CANCELLED).
+            # Allow item edits on non-active orders, but skip if cancelling.
+            if new_status_code != 'CANCELLED' and data.get('items') is not None:
+                cur.execute("DELETE FROM order_details WHERE order_id = %s", (order_id,))
+                insert_items_only()
+
+        # --- Apply status and payment updates ---
         if new_status_id:
             cur.execute("UPDATE order_transaction SET order_status_id = %s WHERE order_id = %s", (new_status_id, order_id))
 
         if new_pm_id:
             cur.execute("UPDATE order_transaction SET payment_method_id = %s WHERE order_id = %s", (new_pm_id, order_id))
 
-        # When status changes to RECEIVED, sync total_amount on order_transaction
-        # (sales_transaction is created automatically by trg_move_received_order trigger)
-        if status_name.upper() == 'RECEIVED':
-            cur.execute("""
-                UPDATE order_transaction
-                SET total_amount = (
-                    SELECT COALESCE(SUM(order_total), 0) FROM order_details WHERE order_id = %s
-                )
-                WHERE order_id = %s
-            """, (order_id, order_id))
+        # Always sync total_amount from order_details
+        # (sales_transaction is created automatically by trg_move_received_order trigger on RECEIVED)
+        cur.execute("""
+            UPDATE order_transaction
+            SET total_amount = (
+                SELECT COALESCE(SUM(order_total), 0) FROM order_details WHERE order_id = %s
+            )
+            WHERE order_id = %s
+        """, (order_id, order_id))
 
         conn.commit()
         return jsonify({"message": "Order updated successfully"}), 200
 
     except Exception as e:
-        conn.rollback() 
+        conn.rollback()
         print("Error updating order:", e)
         return jsonify({"error": str(e)}), 500
     finally:
@@ -498,77 +557,95 @@ def add_order():
         # 2. Get Status & Payment IDs
         items = data.get('items', [])
         first_item_status = items[0].get('orderStatus', 'Preparing').strip() if items else 'Preparing'
-        cur.execute("SELECT status_id FROM static_status WHERE status_scope = 'ORDER_STATUS' AND status_name ILIKE %s", (first_item_status,))
+        cur.execute("SELECT status_id, status_code FROM static_status WHERE status_scope = 'ORDER_STATUS' AND status_name ILIKE %s", (first_item_status,))
         status_row = cur.fetchone()
         status_id = status_row[0] if status_row else None
+        initial_status_code = status_row[1].upper() if status_row else 'PENDING'
 
         first_item_pm = items[0].get('paymentMethod', 'Cash').strip() if items else 'Cash'
         cur.execute("SELECT status_id FROM static_status WHERE status_scope = 'PAYMENT_METHOD' AND status_name ILIKE %s", (first_item_pm,))
         pm_row = cur.fetchone()
         pm_id = pm_row[0] if pm_row else None
 
+        # Resolve payment_status_id — default to UNPAID since new orders have no payment yet
+        payment_status_code = data.get('paymentStatus', 'UNPAID').strip().upper()
+        cur.execute("""
+            SELECT status_id FROM static_status
+            WHERE status_scope = 'PAYMENT_STATUS' AND status_code = %s
+        """, (payment_status_code,))
+        ps_row = cur.fetchone()
+        if not ps_row:
+            # Fallback: grab whichever PAYMENT_STATUS row exists for UNPAID
+            cur.execute("""
+                SELECT status_id FROM static_status
+                WHERE status_scope = 'PAYMENT_STATUS' AND status_code = 'UNPAID'
+                LIMIT 1
+            """)
+            ps_row = cur.fetchone()
+        payment_status_id = ps_row[0] if ps_row else None
+
         # 3. Create Order Transaction
         today = date.today()
         cur.execute("""
-            INSERT INTO order_transaction (customer_id, order_date, order_status_id, payment_method_id)
-            VALUES (%s, %s, %s, %s) RETURNING order_id
-        """, (customer_id, today, status_id, pm_id))
+            INSERT INTO order_transaction (customer_id, order_date, order_status_id, payment_method_id, payment_status_id)
+            VALUES (%s, %s, %s, %s, %s) RETURNING order_id
+        """, (customer_id, today, status_id, pm_id, payment_status_id))
         order_id = cur.fetchone()[0]
 
         # 4. Insert Items and UPDATE INVENTORY
         for item in items:
-            inv_id = item.get('inventory_id')
-            if inv_id and str(inv_id).strip() != "":
-                
-                # --- SECURITY CHECK: REJECT ARCHIVED ITEMS ---
-                cur.execute("""
-                    SELECT ss.status_code, i.item_name 
-                    FROM inventory i
-                    JOIN static_status ss ON i.item_status_id = ss.status_id
-                    WHERE i.inventory_id = %s
-                """, (inv_id,))
-                inv_check = cur.fetchone()
-                
-                if not inv_check:
-                    raise Exception(f"Item ID {inv_id} not found.")
-                if inv_check[0] == 'INACTIVE':
-                    raise Exception(f"Order failed: '{inv_check[1]}' is archived.")
-                # ---------------------------------------------
+            inv_brand_id = item.get('inventory_brand_id')
+            if not inv_brand_id or str(inv_brand_id).strip() == "":
+                continue
 
-                try:
-                    qty = int(item.get('quantity', 1)) or 1
-                except (ValueError, TypeError):
-                    qty = 1
-                    
-                try:
-                    amount = float(item.get('amount', 0))
-                except (ValueError, TypeError):
-                    amount = 0.0
-                    
-                unit_price = (amount / qty) if qty > 0 else 0.0
+            # Look up inventory_id and check for archived status in one query
+            cur.execute("""
+                SELECT ib.inventory_id, ss.status_code, i.item_name
+                FROM inventory_brand ib
+                JOIN inventory i ON i.inventory_id = ib.inventory_id
+                JOIN static_status ss ON i.item_status_id = ss.status_id
+                WHERE ib.inventory_brand_id = %s
+            """, (inv_brand_id,))
+            inv_check = cur.fetchone()
 
-                # Insert into order details
-                cur.execute("""
-                    INSERT INTO order_details (order_id, inventory_id, order_quantity, unit_price, order_total)
-                    VALUES (%s, %s, %s, %s, %s)
-                """, (order_id, inv_id, qty, unit_price, amount))
+            if not inv_check:
+                raise Exception(f"Variant ID {inv_brand_id} not found.")
+            inv_id, status_code, item_name = inv_check
+            if status_code == 'INACTIVE':
+                raise Exception(f"Order failed: '{item_name}' is archived.")
 
-                # Deduct from the first brand variant automatically
+            try:
+                qty = int(item.get('quantity', 1)) or 1
+            except (ValueError, TypeError):
+                qty = 1
+
+            try:
+                amount = float(item.get('amount', 0))
+            except (ValueError, TypeError):
+                amount = 0.0
+
+            unit_price = (amount / qty) if qty > 0 else 0.0
+
+            # Insert into order_details using inventory_brand_id
+            cur.execute("""
+                INSERT INTO order_details (order_id, inventory_brand_id, order_quantity, unit_price, order_total)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (order_id, inv_brand_id, qty, unit_price, amount))
+
+            # Only deduct stock when the order is created directly into an active state
+            # (e.g. POS creating an order already in PREPARING). PENDING orders do not
+            # touch inventory here — deduction happens on the PENDING → PREPARING transition.
+            if initial_status_code in {'PREPARING', 'PACKED', 'SHIPPING'}:
                 cur.execute("""
-                    UPDATE inventory_brand
-                    SET item_qty = item_qty - %s
-                    WHERE inventory_id = %s AND brand_id = (
-                        SELECT brand_id FROM inventory_brand
-                        WHERE inventory_id = %s ORDER BY brand_id LIMIT 1
-                    )
-                """, (qty, inv_id, inv_id))
+                    UPDATE inventory_brand SET total_quantity = total_quantity - %s
+                    WHERE inventory_brand_id = %s
+                """, (qty, inv_brand_id))
 
                 cur.execute("""
-                    SELECT COALESCE(SUM(item_qty), 0) FROM inventory_brand WHERE inventory_id = %s
+                    SELECT COALESCE(SUM(total_quantity), 0) FROM inventory_brand WHERE inventory_id = %s
                 """, (inv_id,))
                 new_qty = cur.fetchone()[0]
 
-                # Automatically set status to "Out of Stock" if total drops to 0
                 if new_qty <= 0:
                     cur.execute("""
                         UPDATE inventory
@@ -579,6 +656,15 @@ def add_order():
                         )
                         WHERE inventory_id = %s
                     """, (inv_id,))
+
+        # 5. Sync total_amount on order_transaction from inserted order_details
+        cur.execute("""
+            UPDATE order_transaction
+            SET total_amount = (
+                SELECT COALESCE(SUM(order_total), 0) FROM order_details WHERE order_id = %s
+            )
+            WHERE order_id = %s
+        """, (order_id, order_id))
 
         conn.commit()
         return jsonify({"message": "Order added successfully!", "order_id": order_id}), 201

@@ -217,6 +217,7 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
 
   const handleUpdateSave = async (updatedOrder: any) => {
     try {
+      console.log('[handleUpdateSave] payload:', JSON.stringify(updatedOrder, null, 2));
       const response = await fetch(`/api/orders/update/${updatedOrder.id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedOrder),
       });

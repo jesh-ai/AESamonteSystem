@@ -204,6 +204,69 @@ def update_uom(uom_id):
         conn.close()
 
 
+# ─────────────────────────── VARIANT SEARCH ───────────────────────────
+# Must be declared BEFORE /api/inventory/<id> to avoid route shadowing.
+
+@inventory_bp.route("/api/inventory/search", methods=["GET"])
+def search_inventory_variants():
+    q = request.args.get('q', '').strip()
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        like = f"%{q}%"
+        cur.execute("""
+            SELECT DISTINCT
+                ib.inventory_brand_id,
+                i.item_name,
+                COALESCE(b.brand_name, 'No Brand')  AS brand_name,
+                u.uom_name,
+                COALESCE(ib.item_description, '')   AS item_description,
+                COALESCE(ib.item_selling_price, 0)  AS item_selling_price,
+                ib.total_quantity
+            FROM inventory_brand ib
+            JOIN inventory        i    ON i.inventory_id    = ib.inventory_id
+            JOIN brand            b    ON b.brand_id        = ib.brand_id
+            JOIN unit_of_measure  u    ON u.uom_id          = ib.uom_id
+            JOIN static_status    s_i  ON s_i.status_id     = i.item_status_id
+                                      AND s_i.status_scope  = 'INVENTORY_STATUS'
+            LEFT JOIN static_status s_b ON s_b.status_id   = ib.item_status_id
+                                       AND s_b.status_scope = 'INVENTORY_STATUS'
+            WHERE ib.total_quantity > 0
+              AND COALESCE(s_b.status_code, '') != 'ARCHIVED'
+              AND s_i.status_code != 'ARCHIVED'
+              AND (
+                    i.item_name          ILIKE %s
+                 OR b.brand_name         ILIKE %s
+                 OR u.uom_name           ILIKE %s
+                 OR ib.item_description  ILIKE %s
+                 OR ib.item_sku          ILIKE %s
+              )
+            ORDER BY i.item_name, b.brand_name
+            LIMIT 40
+        """, (like, like, like, like, like))
+
+        rows = cur.fetchall()
+        results = [{
+            "inventory_brand_id":  row[0],
+            "item_name":           row[1],
+            "brand_name":          row[2],
+            "uom_name":            row[3],
+            "item_description":    row[4],
+            "item_selling_price":  float(row[5]),
+            "total_quantity":      int(row[6]),
+        } for row in rows]
+
+        print(f"[inventory/search] q='{q}' | found: {len(results)} variant(s)")
+        return jsonify(results), 200
+
+    except Exception as e:
+        print(f"[inventory/search] ERROR q='{q}': {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
 # ─────────────────────────── GET INVENTORY LIST ───────────────────────────
 
 @inventory_bp.route("/api/inventory", methods=["GET"])
@@ -256,7 +319,8 @@ def get_inventory():
                 ib.total_quantity,
                 COALESCE(ia.reorder_qty, 0)        AS reorder_qty,
                 COALESCE(ia.low_stock_qty, 0)      AS low_stock_qty,
-                u.uom_name
+                u.uom_name,
+                ib.inventory_brand_id
             FROM inventory_brand ib
             LEFT JOIN brand b ON ib.brand_id = b.brand_id
             LEFT JOIN inventory_action ia
@@ -302,6 +366,7 @@ def get_inventory():
             "selling_price": float(br[5] or 0),
             "qty": int(br[6] or 0),
             "uom": br[9] or "—",
+            "inventory_brand_id": br[10],
         })
 
     suppliers_map: dict = {}

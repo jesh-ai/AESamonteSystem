@@ -31,26 +31,9 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
   onSave,
   statuses = [],
   paymentMethods = [],
-  inventoryItems = []
+  // inventoryItems is accepted by the interface for caller compatibility but search now uses the API
 }) => {
   const s = styles as Record<string, string>;
-
-  const activeInventory = (inventoryItems || []).filter((inv: any) => !inv.is_archived);
-
-  const searchableItems = activeInventory.flatMap((inv: any) =>
-    (inv.brands || [])
-      .filter((b: any) => Number(b.qty) > 0)
-      .map((b: any) => ({
-        inventory_id: inv.id,
-        brand_id: b.brand_id,
-        brand_name: b.brand_name !== 'No Brand' ? b.brand_name : '—',
-        item_name: inv.item_name,
-        item_description: inv.item_description,
-        uom: inv.uom,
-        price: Number(b.selling_price ?? 0),
-        qty: Number(b.qty),
-      }))
-  );
 
   const getDefaultStatus = () => {
     if (!statuses || statuses.length === 0) return 'Preparing';
@@ -67,6 +50,12 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
   const [customerData, setCustomerData] = useState({ ...INITIAL_CUSTOMER });
   const [items, setItems] = useState<any[]>([]);
   const [activeSearchIndex, setActiveSearchIndex] = useState<number | null>(null);
+  const [searchResults, setSearchResults] = useState<Record<number, any[]>>({});
+  const [searchLoading, setSearchLoading] = useState<Record<number, boolean>>({});
+  const searchTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+  // Prevents the onChange that fires when React re-renders a controlled input after
+  // handleItemSelect writes the display string from being treated as a new search.
+  const justSelected = useRef<Record<number, boolean>>({});
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -76,16 +65,20 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
     if (isOpen) {
       setCustomerData({ ...INITIAL_CUSTOMER });
       setItems([{
-        inventory_id: '',
-        brand_id: '',
+        inventory_brand_id: '',
         brand_name: '—',
         item: '',
         itemDescription: '—',
+        uom_name: '',
+        price: 0,
+        total_quantity: 0,
         quantity: '1',
         amount: 0,
         orderStatus: getDefaultStatus(),
         paymentMethod: getDefaultPayment()
       }]);
+      setSearchResults({});
+      setSearchLoading({});
       setShowCancelConfirm(false);
       setSubmitAttempted(false);
       setSubmitError('');
@@ -128,54 +121,95 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
   };
 
   const handleItemSelect = (index: number, entry: any) => {
+    // Set the flag BEFORE the state update so the onChange that React fires
+    // when the controlled input re-renders with the new display string is ignored.
+    justSelected.current[index] = true;
+
     const newItems = [...items];
     const currentQty = Number(newItems[index].quantity) || 1;
+    const price = entry.item_selling_price ?? 0;
     newItems[index] = {
       ...newItems[index],
-      inventory_id: entry.inventory_id,
-      brand_id: entry.brand_id,
+      inventory_brand_id: entry.inventory_brand_id,
       brand_name: entry.brand_name,
-      item: entry.item_name,
-      itemDescription: entry.item_description || 'No Description',
-      uom: entry.uom || '',
+      item: `${entry.item_name} — ${entry.brand_name} (${entry.uom_name})`,
+      itemDescription: entry.item_description || '—',
+      uom_name: entry.uom_name,
+      price,
+      total_quantity: entry.total_quantity,
       quantity: currentQty,
-      amount: currentQty * entry.price
+      amount: currentQty * price,
     };
     setItems(newItems);
     setActiveSearchIndex(null);
+    setSearchResults(prev => ({ ...prev, [index]: [] }));
   };
 
   const handleItemTextChange = (index: number, text: string) => {
-    const newItems = [...items];
-    newItems[index].item = text;
-    const match = searchableItems.find((s: any) => s.item_name.toLowerCase().trim() === text.toLowerCase().trim());
-    if (match) {
-      newItems[index].inventory_id = match.inventory_id;
-      newItems[index].brand_id = match.brand_id;
-      newItems[index].brand_name = match.brand_name;
-      newItems[index].itemDescription = match.item_description || 'No Description';
-      newItems[index].uom = match.uom || '';
-      const qtyNum = Number(newItems[index].quantity) || 1;
-      newItems[index].amount = qtyNum * match.price;
-    } else {
-      newItems[index].inventory_id = '';
-      newItems[index].brand_id = '';
-      newItems[index].brand_name = '—';
-      newItems[index].itemDescription = '—';
-      newItems[index].amount = 0;
+    // If handleItemSelect just ran, this onChange is the React-controlled-input
+    // re-render echo — not a real keystroke. Skip it and reset the flag.
+    if (justSelected.current[index]) {
+      justSelected.current[index] = false;
+      return;
     }
+
+    // Real user keystroke — clear the locked selection so the row is searchable again.
+    const newItems = [...items];
+    newItems[index] = {
+      ...newItems[index],
+      item: text,
+      inventory_brand_id: '',
+      brand_name: '—',
+      itemDescription: '—',
+      uom_name: '',
+      price: 0,
+      amount: 0,
+    };
     setItems(newItems);
+
+    // Debounced fetch — fires 300 ms after the user stops typing
+    clearTimeout(searchTimers.current[index]);
+    if (text.trim().length >= 2) {
+      setSearchLoading(prev => ({ ...prev, [index]: true }));
+      searchTimers.current[index] = setTimeout(async () => {
+        try {
+          const res = await fetch(`/api/inventory/search?q=${encodeURIComponent(text.trim())}`);
+
+          // ── Step 1: log the HTTP status before touching the body ──────────
+          if (!res.ok) {
+            console.error(
+              `[inventory/search] HTTP ${res.status} ${res.statusText}`,
+              '— check: is the endpoint registered? Did Flask restart?'
+            );
+            // ── Step 2: safe JSON parse — Flask error pages return HTML ──────
+            let errBody: unknown = '(no body)';
+            try { errBody = await res.json(); } catch { /* HTML or empty body — ignore */ }
+            console.error('[inventory/search] Error body:', errBody);
+            setSearchResults(prev => ({ ...prev, [index]: [] }));
+            return;
+          }
+
+          const data = await res.json();
+          setSearchResults(prev => ({ ...prev, [index]: Array.isArray(data) ? data : [] }));
+        } catch (err) {
+          // Network failure (CORS, server down, DNS, etc.)
+          console.error('[inventory/search] Network error:', err);
+          setSearchResults(prev => ({ ...prev, [index]: [] }));
+        } finally {
+          setSearchLoading(prev => ({ ...prev, [index]: false }));
+        }
+      }, 300);
+    } else {
+      setSearchResults(prev => ({ ...prev, [index]: [] }));
+      setSearchLoading(prev => ({ ...prev, [index]: false }));
+    }
   };
 
   const handleQtyChange = (index: number, newQty: string) => {
     const newItems = [...items];
     const qtyNum = Number(newQty) || 0;
-    const entry = searchableItems.find((s: any) =>
-      String(s.inventory_id) === String(newItems[index].inventory_id) &&
-      String(s.brand_id) === String(newItems[index].brand_id)
-    );
-    const existingPrice = (Number(newItems[index].amount) / (Number(newItems[index].quantity) || 1)) || 0;
-    const price = entry ? entry.price : existingPrice;
+    // Use the unit price stored on selection — no searchableItems lookup needed
+    const price = newItems[index].price || 0;
     newItems[index] = { ...newItems[index], quantity: newQty, amount: price * qtyNum };
     setItems(newItems);
   };
@@ -188,11 +222,13 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
 
   const handleAddItem = () => {
     setItems([...items, {
-      inventory_id: '',
-      brand_id: '',
+      inventory_brand_id: '',
       brand_name: '—',
       item: '',
       itemDescription: '—',
+      uom_name: '',
+      price: 0,
+      total_quantity: 0,
       quantity: '1',
       amount: 0,
       orderStatus: getDefaultStatus(),
@@ -218,8 +254,7 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
       setSubmitError('Delivery address is required.');
       return;
     }
-    // Check at least one item has a valid inventory item selected
-    const hasValidItem = items.some(item => item.inventory_id && item.item?.trim());
+    const hasValidItem = items.some(item => item.inventory_brand_id && item.item?.trim());
     if (!hasValidItem) {
       setSubmitError('Please select at least one valid item before saving.');
       return;
@@ -241,7 +276,7 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
   // ── ERROR HELPERS ──
   const customerNameHasError = () => submitAttempted && !customerData.customerName.trim();
   const addressHasError = () => submitAttempted && !customerData.deliveryAddress.trim();
-  const itemHasError = (index: number) => submitAttempted && !items[index].inventory_id && items[index].item?.trim();
+  const itemHasError = (index: number) => submitAttempted && !items[index].inventory_brand_id && items[index].item?.trim();
 
   return (
     <div className={s.modalOverlay} style={{ zIndex: 1000 }}>
@@ -352,42 +387,41 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
                       onBlur={() => setTimeout(() => { if (activeSearchIndex === index) setActiveSearchIndex(null); }, 200)}
                       placeholder="Search items..."
                       autoComplete="off"
-                      className={(!item.inventory_id && item.item.length > 0) ? s.searchInputInvalid : s.searchInputValid}
+                      className={(!item.inventory_brand_id && item.item.length > 0) ? s.searchInputInvalid : s.searchInputValid}
                       style={itemHasError(index) ? { border: '1px solid #f87171', backgroundColor: '#fff5f5' } : {}}
                     />
                     {itemHasError(index) && (
                       <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Please select a valid item from the list.</p>
                     )}
 
-                    {activeSearchIndex === index && (
+                    {activeSearchIndex === index && item.item.trim().length >= 2 && (
                       <div className={s.searchDropdown}>
-                        {searchableItems
-                          .filter((entry: any) =>
-                            entry.item_name.toLowerCase().includes((item.item || '').toLowerCase()) ||
-                            (entry.item_description && entry.item_description.toLowerCase().includes((item.item || '').toLowerCase()))
-                          )
-                          .map((entry: any, i: number) => (
+                        {searchLoading[index] ? (
+                          <div className={s.outOfStockNotice}>Searching...</div>
+                        ) : (searchResults[index] || []).length > 0 ? (
+                          (searchResults[index] || []).map((entry: any) => (
                             <div
-                              key={`${entry.inventory_id}-${entry.brand_id}-${i}`}
+                              key={entry.inventory_brand_id}
                               onMouseDown={() => handleItemSelect(index, entry)}
                               className={s.searchDropdownItem}
                             >
                               <div className={s.searchDropdownItemLeft}>
-                                <div className={s.searchDropdownItemName}>{entry.item_name}</div>
+                                <div className={s.searchDropdownItemName}>
+                                  {entry.item_name} &mdash; {entry.brand_name} ({entry.uom_name})
+                                </div>
                                 <div className={s.searchDropdownItemDesc}>
-                                  {entry.brand_name !== '—' ? entry.brand_name : (entry.item_description || 'No desc')}
+                                  Desc: {entry.item_description || 'None'}
                                 </div>
                               </div>
                               <div className={s.searchDropdownItemRight}>
-                                <div className={s.searchDropdownItemPrice}>₱{entry.price.toLocaleString()}</div>
-                                <div className={s.searchDropdownItemQty}>Avail: {entry.qty} {entry.uom || ''}</div>
+                                <div className={s.searchDropdownItemPrice}>
+                                  ₱{(entry.item_selling_price || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                </div>
+                                <div className={s.searchDropdownItemQty}>Stock: {entry.total_quantity}</div>
                               </div>
                             </div>
                           ))
-                        }
-                        {searchableItems.filter((entry: any) =>
-                          entry.item_name.toLowerCase().includes((item.item || '').toLowerCase())
-                        ).length === 0 && item.item.length > 0 && (
+                        ) : (
                           <div className={s.outOfStockNotice}>No available items found.</div>
                         )}
                       </div>
@@ -403,7 +437,7 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
                   {/* Description */}
                   <div className={s.formGroup} style={{ minWidth: 0 }}>
                     <label style={{ ...LABEL_STYLE }}>Description</label>
-                    <div className={(!item.inventory_id && item.item.length > 0) ? s.descFieldInvalid : s.descFieldValid}>
+                    <div className={(!item.inventory_brand_id && item.item.length > 0) ? s.descFieldInvalid : s.descFieldValid}>
                       {item.itemDescription}
                     </div>
                   </div>
