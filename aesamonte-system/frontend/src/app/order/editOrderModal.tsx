@@ -40,6 +40,7 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
     (inv.brands || [])
       .filter((b: any) => Number(b.qty) > 0)
       .map((b: any) => ({
+        inventory_brand_id: b.inventory_brand_id,
         inventory_id: inv.id,
         brand_id: b.brand_id,
         brand_name: b.brand_name !== 'No Brand' ? b.brand_name : '—',
@@ -53,13 +54,14 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
 
   useEffect(() => {
     if (orderData) {
-      const initialItems = orderData.items && orderData.items.length > 0 
+      const initialItems = orderData.items && orderData.items.length > 0
         ? orderData.items.map((i: any) => ({
+            inventory_brand_id: i.inventory_brand_id,
             inventory_id: i.inventory_id,
             item: i.item_name || '',
-            itemDescription: i.description || '—', 
+            itemDescription: i.description || '—',
             quantity: i.order_quantity || '',
-            amount: i.amount || 0 
+            amount: i.amount || 0
           }))
         : [{ inventory_id: '', item: '', itemDescription: '—', quantity: '1', amount: 0 }];
 
@@ -97,10 +99,11 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
     const currentQty = Number(newItems[index].quantity) || 1;
     newItems[index] = {
       ...newItems[index],
+      inventory_brand_id: entry.inventory_brand_id,
       inventory_id: entry.inventory_id,
       brand_id: entry.brand_id,
       brand_name: entry.brand_name,
-      item: entry.item_name,
+      item: `${entry.item_name} — ${entry.brand_name} (${entry.uom})`,
       itemDescription: entry.item_description || 'No Description',
       uom: entry.uom || '',
       quantity: currentQty,
@@ -116,6 +119,7 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
     newItems[index].item = text;
     const match = searchableItems.find((s: any) => s.item_name.toLowerCase().trim() === text.toLowerCase().trim());
     if (match) {
+      newItems[index].inventory_brand_id = match.inventory_brand_id;
       newItems[index].inventory_id = match.inventory_id;
       newItems[index].brand_id = match.brand_id;
       newItems[index].brand_name = match.brand_name;
@@ -124,6 +128,7 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
       const qtyNum = Number(newItems[index].quantity) || 1;
       newItems[index].amount = qtyNum * match.price;
     } else {
+      newItems[index].inventory_brand_id = '';
       newItems[index].inventory_id = '';
       newItems[index].brand_id = '';
       newItems[index].brand_name = '—';
@@ -138,8 +143,7 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
     const newItems = [...safeItems];
     const qtyNum = Number(newQty) || 0;
     const entry = searchableItems.find((s: any) =>
-      String(s.inventory_id) === String(newItems[index].inventory_id) &&
-      String(s.brand_id) === String(newItems[index].brand_id)
+      String(s.inventory_brand_id) === String(newItems[index].inventory_brand_id)
     );
     const existingPrice = (Number(newItems[index].amount) / (Number(newItems[index].quantity) || 1)) || 0;
     const price = entry ? entry.price : existingPrice;
@@ -151,7 +155,7 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
     const safeItems = formData.items || [];
     setFormData({
       ...formData,
-      items: [...safeItems, { inventory_id: '', item: '', itemDescription: '—', quantity: '1', amount: 0 }]
+      items: [...safeItems, { inventory_brand_id: '', inventory_id: '', item: '', itemDescription: '—', quantity: '1', amount: 0 }]
     });
   };
 
@@ -317,8 +321,8 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
                       autoComplete="off"
                       style={{
                         height: '38px', padding: '8px 12px', fontSize: '0.9rem',
-                        border: (!item.inventory_id && item.item.length > 0) ? '1px solid #f87171' : '1px solid #d1d5db',
-                        backgroundColor: (!item.inventory_id && item.item.length > 0) ? '#fff5f5' : '#fff'
+                        border: (!item.inventory_brand_id && item.item.length > 0) ? '1px solid #f87171' : '1px solid #d1d5db',
+                        backgroundColor: (!item.inventory_brand_id && item.item.length > 0) ? '#fff5f5' : '#fff'
                       }}
                     />
                     {activeSearchIndex === index && isPreparing && (
@@ -330,21 +334,23 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
                           )
                           .map((entry: any, i: number) => (
                             <div
-                              key={`${entry.inventory_id}-${entry.brand_id}-${i}`}
+                              key={entry.inventory_brand_id ?? `${entry.inventory_id}-${entry.brand_id}-${i}`}
                               onMouseDown={() => handleItemSelect(index, entry)}
                               style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
                               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fff'}
                             >
                               <div style={{ overflow: 'hidden', paddingRight: '10px' }}>
-                                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{entry.item_name}</div>
+                                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {entry.item_name} &mdash; {entry.brand_name} ({entry.uom})
+                                </div>
                                 <div style={{ fontSize: '0.75rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {entry.brand_name !== '—' ? entry.brand_name : (entry.item_description || 'No desc')}
+                                  Desc: {entry.item_description || 'None'}
                                 </div>
                               </div>
                               <div style={{ textAlign: 'right', minWidth: '70px' }}>
                                 <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#059669' }}>₱{entry.price.toLocaleString()}</div>
-                                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Avail: {entry.qty} {entry.uom || ''}</div>
+                                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Stock: {entry.qty} {entry.uom || ''}</div>
                               </div>
                             </div>
                           ))
@@ -371,7 +377,7 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
                   {/* Description */}
                   <div className={s.formGroup} style={{ minWidth: 0 }}>
                     <label style={{ ...LABEL_STYLE }}>Description</label>
-                    <div style={{ padding: '0 12px', height: '38px', borderRadius: '6px', border: '1px solid #e5e7eb', fontSize: '0.9rem', display: 'block', lineHeight: '36px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', width: '100%', backgroundColor: (!item.inventory_id && item.item.length > 0) ? '#fff5f5' : '#f3f4f6', color: (!item.inventory_id && item.item.length > 0) ? '#ef4444' : '#6b7280' }}>
+                    <div style={{ padding: '0 12px', height: '38px', borderRadius: '6px', border: '1px solid #e5e7eb', fontSize: '0.9rem', display: 'block', lineHeight: '36px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', width: '100%', backgroundColor: (!item.inventory_brand_id && item.item.length > 0) ? '#fff5f5' : '#f3f4f6', color: (!item.inventory_brand_id && item.item.length > 0) ? '#ef4444' : '#6b7280' }}>
                       {item.itemDescription}
                     </div>
                   </div>
