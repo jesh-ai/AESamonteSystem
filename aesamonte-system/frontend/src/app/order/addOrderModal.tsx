@@ -168,12 +168,13 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
   };
 
   const handleSearchFocus = (index: number) => {
-    setActiveSearchIndex(index);
-    // Eager-load: if the field is empty and we have no cached results yet, fetch immediately
-    if (!items[index].item?.trim() && !(searchResults[index] || []).length) {
-      fetchSearchResults(index, '');
-    }
-  };
+  setActiveSearchIndex(index);
+  const fullText = items[index]?.item?.trim() || '';
+  const searchText = fullText.split('—')[0].trim(); // ✅ extract just item name
+  if (!(searchResults[index] || []).length) {
+    fetchSearchResults(index, searchText);
+  }
+};
 
   const handleItemTextChange = (index: number, text: string) => {
     // If handleItemSelect just ran, this onChange is the React-controlled-input
@@ -199,10 +200,10 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
 
     // Debounced fetch — fires 300 ms after the user stops typing
     clearTimeout(searchTimers.current[index]);
-    if (text.trim().length >= 2) {
-      searchTimers.current[index] = setTimeout(() => fetchSearchResults(index, text.trim()), 300);
-    } else if (text.trim().length === 0) {
-      // Field was cleared — re-show the default list immediately
+    const searchText = text.split('—')[0].trim(); // ✅ ADD THIS LINE
+    if (searchText.length >= 2) {
+      searchTimers.current[index] = setTimeout(() => fetchSearchResults(index, searchText), 300);
+    } else if (searchText.length === 0) {
       fetchSearchResults(index, '');
     } else {
       setSearchResults(prev => ({ ...prev, [index]: [] }));
@@ -399,12 +400,18 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
                       <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Please select a valid item from the list.</p>
                     )}
 
-                    {activeSearchIndex === index && (item.item.trim().length >= 2 || (searchResults[index] || []).length > 0 || searchLoading[index]) && (
+                    {activeSearchIndex === index && !item.inventory_brand_id && (item.item.trim().length >= 2 || (searchResults[index] || []).length > 0 || searchLoading[index]) && (
                       <div className={s.searchDropdown}>
                         {searchLoading[index] ? (
                           <div className={s.outOfStockNotice}>Searching...</div>
                         ) : (searchResults[index] || []).length > 0 ? (
-                          (searchResults[index] || []).map((entry: any) => (
+                          (searchResults[index] || [])
+                              .filter((entry: any) => 
+                                !items.some((item, i) => 
+                                  i !== index && item.inventory_brand_id === entry.inventory_brand_id
+                                )
+                              )
+                              .map((entry: any) => (
                             <div
                               key={entry.inventory_brand_id}
                               onMouseDown={() => handleItemSelect(index, entry)}
