@@ -241,7 +241,7 @@ def search_inventory_variants():
                  OR ib.item_description  ILIKE %s
                  OR ib.item_sku          ILIKE %s
               )
-            ORDER BY i.item_name, b.brand_name
+            ORDER BY item_name, brand_name
             LIMIT 40
         """, (like, like, like, like, like))
 
