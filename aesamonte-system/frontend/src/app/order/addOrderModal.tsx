@@ -376,7 +376,7 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
                   )}
                 </div>
 
-                <div className={s.itemTopGrid} style={{ gridTemplateColumns: '2fr 1fr 1.5fr' }}>
+                <div className={s.itemTopGrid} style={{ gridTemplateColumns: '2fr 1fr 1.5fr', gap: '12px', marginBottom: '15px' }}>
 
                   {/* Search field */}
                   <div className={s.searchFieldWrapper}>

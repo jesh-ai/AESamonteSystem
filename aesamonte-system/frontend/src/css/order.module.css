@@ -1851,15 +1851,15 @@ th.actionHeader .sortHeaderInner {
 
 .itemTopGrid {
   display: grid;
-  grid-template-columns: 1.2fr 2fr;
-  gap: 15px;
+  grid-template-columns: 2fr 1fr 1.5fr; 
+  gap: 12px;
   margin-bottom: 15px;
 }
 
 .itemBottomGrid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1.4fr 1.4fr;
-  gap: 15px;
+  grid-template-columns: 1fr 1fr 1fr 1fr;  
+  gap: 12px;
 }
 
 /* ── Search Field ── */
