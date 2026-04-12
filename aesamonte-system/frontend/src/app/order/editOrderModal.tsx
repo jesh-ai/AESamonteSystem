@@ -44,11 +44,15 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
         ? orderData.items.map((i: any) => {
             const qty = Number(i.order_quantity) || 1;
             const amount = Number(i.amount) || 0;
+            const displayName = i.item_name && i.brand_name && i.uom
+              ? `${i.item_name} — ${i.brand_name} (${i.uom})`
+              : i.item_name || '';
             return {
               inventory_brand_id: i.inventory_brand_id,
               inventory_id: i.inventory_id,
-              item: i.item_name || '',
-              itemDescription: i.description || '—',
+              item: displayName,
+              brand_name: i.brand_name || '',
+              itemDescription: i.item_description || '—',
               uom_name: i.uom || '',
               quantity: i.order_quantity || '',
               amount,
@@ -107,7 +111,10 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
   const handleSearchFocus = (index: number) => {
     setActiveSearchIndex(index);
     const currentItem = (formData?.items || [])[index];
-    if (!currentItem?.item?.trim() && !(searchResults[index] || []).length) {
+    if (currentItem?.inventory_brand_id) {
+      // Item already selected — eager-load default list so dropdown shows with highlight
+      fetchSearchResults(index, '');
+    } else if (!currentItem?.item?.trim() && !(searchResults[index] || []).length) {
       fetchSearchResults(index, '');
     }
   };
@@ -139,6 +146,11 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
       return;
     }
     const safeItems = formData.items || [];
+    const currentItem = safeItems[index];
+    // Bypass: text hasn't deviated from the already-selected item's display string
+    if (currentItem?.inventory_brand_id && text === currentItem.item) {
+      return;
+    }
     const newItems = [...safeItems];
     newItems[index] = {
       ...newItems[index],
@@ -352,13 +364,15 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
                         {searchLoading[index] ? (
                           <div style={{ padding: '10px 12px', fontSize: '0.8rem', color: '#64748b', textAlign: 'center' }}>Searching...</div>
                         ) : (searchResults[index] || []).length > 0 ? (
-                          (searchResults[index] || []).map((entry: any) => (
+                          (searchResults[index] || []).map((entry: any) => {
+                            const isActive = entry.inventory_brand_id === item.inventory_brand_id;
+                            return (
                             <div
                               key={entry.inventory_brand_id}
                               onMouseDown={() => handleItemSelect(index, entry)}
-                              style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fff'}
+                              style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: isActive ? '#eff6ff' : '#fff' }}
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isActive ? '#dbeafe' : '#f8fafc'}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isActive ? '#eff6ff' : '#fff'}
                             >
                               <div style={{ overflow: 'hidden', paddingRight: '10px' }}>
                                 <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -375,7 +389,8 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
                                 <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Stock: {entry.total_quantity} {entry.uom_name}</div>
                               </div>
                             </div>
-                          ))
+                          );
+                          })
                         ) : (
                           <div style={{ padding: '10px 12px', fontSize: '0.8rem', color: '#ef4444', textAlign: 'center', backgroundColor: '#fef2f2' }}>
                             No available items found.

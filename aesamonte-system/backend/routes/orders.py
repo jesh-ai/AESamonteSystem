@@ -121,6 +121,8 @@ def orders_list():
                             'available_quantity',  COALESCE(ib.total_quantity, 0),
                             'item_status_id',      ib.item_status_id,
                             'item_name',           i.item_name,
+                            'brand_name',          COALESCE(b.brand_name, 'No Brand'),
+                            'item_description',    COALESCE(ib.item_description, ''),
                             'amount',              od.order_total,
                             'uom',                 u.uom_name
                         )
@@ -136,6 +138,7 @@ def orders_list():
             LEFT JOIN order_details  od  ON od.order_id           = ot.order_id
             LEFT JOIN inventory_brand ib ON ib.inventory_brand_id = od.inventory_brand_id
             LEFT JOIN inventory       i  ON i.inventory_id        = ib.inventory_id
+            LEFT JOIN brand           b  ON b.brand_id            = ib.brand_id
             LEFT JOIN unit_of_measure u  ON u.uom_id              = ib.uom_id
             GROUP BY
                 ot.order_id,
