@@ -184,7 +184,7 @@ def sales_transactions():
     transactions = []
     for r in rows:
         status_code = r[6]
-        is_arch = (status_code == "INACTIVE") 
+        is_arch = (status_code == "ARCHIVED")
         
         transactions.append({
             "no": str(r[0]).strip(), 
@@ -258,45 +258,72 @@ def toggle_archive(sales_id):
     if request.method == "OPTIONS":
         return jsonify({"message": "CORS OK"}), 200
 
-    conn = get_connection()
-    cur = conn.cursor()
-    
+    conn = None
+    cur = None
     try:
+        conn = get_connection()
+        cur = conn.cursor()
         sales_id = str(sales_id).strip()
+
+        # 1. Get the current status_code for this sale
         cur.execute("""
-            SELECT ss.status_code 
+            SELECT ss.status_code
             FROM sales_transaction st
             JOIN static_status ss ON st.payment_status_id = ss.status_id
-            WHERE TRIM(st.sales_id) = %s
+            WHERE TRIM(CAST(st.sales_id AS TEXT)) = %s
         """, (sales_id,))
-        current_status = cur.fetchone()[0]
-        
-        if current_status == 'INACTIVE':
-            cur.execute("SELECT status_id FROM static_status WHERE status_scope = 'SALES_STATUS' AND status_code = 'PENDING'")
-            new_status_id = cur.fetchone()[0]
-            is_archived = False
-            new_status_code = 'PENDING' 
-        else:
-            cur.execute("SELECT status_id FROM static_status WHERE status_scope = 'SALES_STATUS' AND status_code = 'INACTIVE'")
-            new_status_id = cur.fetchone()[0]
-            is_archived = True
-            new_status_code = 'INACTIVE' 
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"error": f"Sale '{sales_id}' not found."}), 404
 
-        cur.execute("UPDATE sales_transaction SET payment_status_id = %s WHERE TRIM(sales_id) = %s", (new_status_id, sales_id))
+        current_status = row[0]
+
+        # 2. Decide target status (no show_in_ui filter)
+        if current_status == 'ARCHIVED':
+            target_code = 'PAID'
+            is_archived = False
+            message = "Sale restored from Archive"
+        else:
+            target_code = 'ARCHIVED'
+            is_archived = True
+            message = "Sale moved to Archive"
+
+        # 3. Look up the target status_id (no show_in_ui filter)
+        cur.execute("""
+            SELECT status_id FROM static_status
+            WHERE status_scope = 'SALES_STATUS'
+              AND status_code = %s
+        """, (target_code,))
+        status_row = cur.fetchone()
+        if not status_row:
+            return jsonify({"error": f"Status '{target_code}' not found in SALES_STATUS scope."}), 404
+
+        new_status_id = status_row[0]
+
+        # 4. Apply the update
+        cur.execute("""
+            UPDATE sales_transaction
+            SET payment_status_id = %s
+            WHERE TRIM(CAST(sales_id AS TEXT)) = %s
+        """, (new_status_id, sales_id))
         conn.commit()
 
         return jsonify({
-            "message": "Archive status updated",
+            "message": message,
             "is_archived": is_archived,
-            "new_status": new_status_code
+            "new_status": target_code
         }), 200
 
     except Exception as e:
-        conn.rollback()
+        if conn:
+            conn.rollback()
+        print("Sales archive error:", e, flush=True)
         return jsonify({"error": str(e)}), 500
     finally:
-        cur.close()
-        conn.close()
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
 
 
 # ===================== TOP CLIENTS =====================

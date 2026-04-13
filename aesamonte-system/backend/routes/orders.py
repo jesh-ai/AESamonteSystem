@@ -162,7 +162,7 @@ def orders_list():
              total_qty, total_amount, items_json) = row
 
             order_status_upper = (order_status or "").upper()
-            is_archived = order_status_upper == 'INACTIVE'
+            is_archived = order_status_upper == 'ARCHIVED'
 
             if isinstance(items_json, str):
                 try:
@@ -232,9 +232,9 @@ def toggle_order_archive(order_id):
 
         current_status = row[0]
 
-        if current_status == 'INACTIVE':
+        if current_status == 'ARCHIVED':
             cur.execute("""
-                SELECT status_id, status_name FROM static_status 
+                SELECT status_id, status_name FROM static_status
                 WHERE status_scope = 'ORDER_STATUS' AND status_code = 'PREPARING'
             """)
             res = cur.fetchone()
@@ -242,8 +242,8 @@ def toggle_order_archive(order_id):
             action_msg = "Order restored from Archive"
         else:
             cur.execute("""
-                SELECT status_id, status_name FROM static_status 
-                WHERE status_scope = 'ORDER_STATUS' AND status_code = 'INACTIVE'
+                SELECT status_id, status_name FROM static_status
+                WHERE status_scope = 'ORDER_STATUS' AND status_code = 'ARCHIVED'
             """)
             res = cur.fetchone()
             is_archived = True
