@@ -485,9 +485,6 @@ export default function ExportReportsModal({
 
         {/* Footer */}
         <div className={styles.footer}>
-          <button type="button" className={styles.cancelBtn} onClick={onClose} disabled={isExporting}>
-            Cancel
-          </button>
           <button
             type="button"
             className={styles.exportBtn}

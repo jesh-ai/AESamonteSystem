@@ -125,6 +125,10 @@ export default function ReportsPage({
   // ── Export modal ──
   const [showExport, setShowExport] = useState(false);
 
+  // ── Status filter ──
+  const [statusFilter, setStatusFilter] = useState<string>('All Status');
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+
   // ── Toast ──
   const [showToast, setShowToast] = useState(false);
   const [toastMsg,  setToastMsg]  = useState('');
@@ -169,6 +173,7 @@ export default function ReportsPage({
     if (!cfg.usesDateFilter && dataMap[activeTab] !== undefined) return;
     fetchTab(activeTab, startDate, endDate);
     setSearch('');
+    setStatusFilter('All Status');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, startDate, endDate]);
 
@@ -184,9 +189,17 @@ export default function ReportsPage({
     );
   }, [allRows, search]);
   
-
   const cfg      = TABS.find(t => t.key === activeTab)!;
-  const canExport = ['Admin', 'Manager'].includes(role ?? '');
+  const canExport = ['Super Admin','Admin', 'Manager'].includes(role ?? '');
+
+  const filteredRows = useMemo(() => {
+  if (statusFilter === 'All Status') return rows;
+  return rows.filter(r => {
+    if (activeTab === 'stock-on-hand') return r.stock_status === statusFilter;
+    if (activeTab === 'stock-ageing')  return r.ageing_status === statusFilter;
+    return true;
+  });
+}, [rows, statusFilter, activeTab]);
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -223,7 +236,7 @@ export default function ReportsPage({
         onSuccess={(msg, type) => { setShowExport(false); toast(msg, type === 'error'); }}
         activeTab={activeTab}
         tabLabel={cfg.label}
-        rows={rows}
+        rows={filteredRows}
         startDate={cfg.usesDateFilter ? startDate : ''}
         endDate={cfg.usesDateFilter ? endDate : ''}
       />
@@ -297,17 +310,100 @@ export default function ReportsPage({
             </div>
           )}
 
-          {/* Error banner */}
-          {errMsg && (
-            <div style={{ color: '#b91c1c', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: '0.875rem' }}>
-              <strong>Error:</strong> {errMsg}
-            </div>
-          )}
+              {/* Error banner */}
+              {errMsg && (
+                <div style={{ color: '#b91c1c', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: '0.875rem' }}>
+                  <strong>Error:</strong> {errMsg}
+                </div>
+              )}
 
-          {/* Table meta row: title + count + search */}
-          <div className={styles.tableMetaRow}>
-            <span className={styles.tableTitle}>{cfg.label}</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
+              {/* Table meta row: title + count + search */}
+              <div className={styles.tableMetaRow}>
+                <span className={styles.tableTitle}>{cfg.label}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
+                  
+              {/* Status filter — only for stock-on-hand and stock-ageing */}
+              {(activeTab === 'stock-on-hand' || activeTab === 'stock-ageing') && (
+                <div style={{ position: 'relative' }} data-filter="status">
+                  <button
+                    onClick={() => setIsStatusDropdownOpen(prev => !prev)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '8px',
+                      padding: '6px 12px', borderRadius: '8px',
+                      border: '1px solid #e2e8f0', background: '#fff',
+                      fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer',
+                      color: '#2d3748', minHeight: '36px'
+                    }}
+                  >
+                    <span style={{
+                      width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+                      backgroundColor: activeTab === 'stock-on-hand'
+                        ? statusFilter === 'Available' ? '#10b981'
+                        : statusFilter === 'Low Stock' ? '#f59e0b'
+                        : statusFilter === 'Out of Stock' ? '#ef4444'
+                        : '#9ca3af'
+                        : statusFilter === 'Active' ? '#10b981'
+                        : statusFilter === 'Slow-Moving' ? '#f59e0b'
+                        : statusFilter === 'At Risk' ? '#f97316'
+                        : statusFilter === 'Dead Stock' ? '#ef4444'
+                        : statusFilter === 'Never Sold' ? '#94a3b8'
+                        : '#9ca3af'
+                    }} />
+                    <span>{statusFilter}</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points={isStatusDropdownOpen ? "18 15 12 9 6 15" : "6 9 12 15 18 9"} />
+                    </svg>
+                  </button>
+
+                  {isStatusDropdownOpen && (
+                    <div style={{
+                      position: 'absolute', top: 'calc(100% + 6px)', left: 0,
+                      background: '#fff', border: '1px solid #e2e8f0',
+                      borderRadius: '10px', minWidth: '180px', zIndex: 50,
+                      boxShadow: '0 10px 28px rgba(0,0,0,0.12)', overflow: 'hidden'
+                    }}>
+                      {(activeTab === 'stock-on-hand'
+                        ? [
+                            { label: 'All Status',    color: '#9ca3af' },
+                            { label: 'Available',     color: '#10b981' },
+                            { label: 'Low Stock',     color: '#f59e0b' },
+                            { label: 'Out of Stock',  color: '#ef4444' },
+                          ]
+                        : [
+                            { label: 'All Status',   color: '#9ca3af' },
+                            { label: 'Active',       color: '#10b981' },
+                            { label: 'Slow-Moving',  color: '#f59e0b' },
+                            { label: 'At Risk',      color: '#f97316' },
+                            { label: 'Dead Stock',   color: '#ef4444' },
+                            { label: 'Never Sold',   color: '#94a3b8' },
+                          ]
+                      ).map(opt => (
+                        <button
+                          key={opt.label}
+                          onClick={() => { setStatusFilter(opt.label); setIsStatusDropdownOpen(false); }}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '10px',
+                            width: '100%', padding: '10px 14px', border: 'none',
+                            background: statusFilter === opt.label ? '#eff6ff' : '#fff',
+                            color: statusFilter === opt.label ? '#2563eb' : '#2d3748',
+                            fontSize: '0.875rem', fontWeight: 500, cursor: 'pointer',
+                            textAlign: 'left', borderBottom: '1px solid #f1f5f9'
+                          }}
+                        >
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: opt.color, flexShrink: 0 }} />
+                          <span style={{ flex: 1 }}>{opt.label}</span>
+                          {statusFilter === opt.label && (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="3">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Search box */}
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                 <LuSearch size={14} style={{ position: 'absolute', left: 9, color: '#94a3b8', pointerEvents: 'none' }} />
@@ -330,9 +426,9 @@ export default function ReportsPage({
                 )}
               </div>
               <span className={styles.tableCount}>
-                {rows.length !== allRows.length
-                  ? `${rows.length} of ${allRows.length} row${allRows.length !== 1 ? 's' : ''}`
-                  : `${rows.length} row${rows.length !== 1 ? 's' : ''}`
+                {filteredRows.length !== allRows.length
+                  ? `${filteredRows.length} of ${allRows.length} row${allRows.length !== 1 ? 's' : ''}`
+                  : `${filteredRows.length} row${filteredRows.length !== 1 ? 's' : ''}`
                 }
               </span>
             </div>
@@ -342,7 +438,7 @@ export default function ReportsPage({
           {/* REPORT 1 — STOCK ON HAND                                          */}
           {/* ══════════════════════════════════════════════════════════════════ */}
           {activeTab === 'stock-on-hand' && (() => {
-            const r = rows as unknown as StockOnHandRow[];
+            const r = filteredRows as unknown as StockOnHandRow[];
             return (
               <div className={styles.tableWrapper}>
                 <table className={styles.reportTable}>
@@ -557,7 +653,7 @@ export default function ReportsPage({
           {/* REPORT 5 — STOCK AGEING                                           */}
           {/* ══════════════════════════════════════════════════════════════════ */}
           {activeTab === 'stock-ageing' && (() => {
-            const r = rows as unknown as StockAgeingRow[];
+            const r = filteredRows as unknown as StockAgeingRow[];
             return (
               <div className={styles.tableWrapper}>
                 <table className={styles.reportTable}>

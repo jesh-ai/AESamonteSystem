@@ -13,7 +13,7 @@
 
 /* ─── MODAL CARD ────────────────────────────────────────────────────────── */
 .modal {
-  background-color: #f0e9cc;
+  background-color: #ffff;
   border-radius: 16px;
   width: 100%;
   max-width: 460px;
@@ -137,29 +137,29 @@
 .footer {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
 }
 
 .exportBtn {
-  background-color: #1e3a5f;
-  color: #fff;
+  background: #1a4263;
+  color: white;
   border: none;
+  padding: 10px 24px;
   border-radius: 8px;
-  padding: 13px 36px;
-  font-weight: 700;
-  font-size: 0.9rem;
-  letter-spacing: 0.08em;
   cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
+  font-weight: 600;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.exportBtn:hover:not(:disabled) {
-  background-color: #2a4f80;
+.exportBtn:hover {
+  opacity: 0.9;
 }
 
-.exportBtn:disabled {
-  background-color: #94a3b8;
-  cursor: not-allowed;
-}
 
 /* ─── TOAST BACKDROP ────────────────────────────────────────────────────── */
 .toastBackdrop {
@@ -243,3 +243,83 @@
 
 .toastOkBtnSuccess { background-color: #4aab60; }
 .toastOkBtnError   { background-color: #e53e3e; }
+
+
+/* ─── REPORT FORMAT SELECTION (in ReportPanel) ───────────────────────────── */
+.formatGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 12px 0 16px;
+}
+
+.formatCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 12px;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.formatCard:hover {
+  border-color: #1a4263;
+  background: #f0f6ff;
+}
+
+.formatCardActive {
+  border-color: #1a4263;
+  background: #eff6ff;
+}
+
+.formatIcon {
+  color: #1a4263;
+}
+
+.formatLabel {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.formatDesc {
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.reportBadge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+
+.reportBadgeLabel {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.reportBadgeName {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1e293b;
+  flex: 1;
+}
+
+.reportBadgeCount {
+  font-size: 0.8rem;
+  color: #64748b;
+  background: #e2e8f0;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
