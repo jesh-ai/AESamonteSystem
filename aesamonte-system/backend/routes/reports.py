@@ -4,10 +4,6 @@ from datetime import date, timedelta
 
 reports_bp = Blueprint("reports", __name__)
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# SHARED HELPERS
-# ═══════════════════════════════════════════════════════════════════════════════
-
 def parse_dates():
     """
     Pull start_date / end_date from query-string.
@@ -24,7 +20,6 @@ def parse_dates():
         end = date.fromisoformat(end_str) if end_str else today
     except ValueError:
         end = today
-    # Guard: start must never be after end
     if start > end:
         start, end = end, start
     return start, end
@@ -48,7 +43,6 @@ def _fetch_action_map(cur):
         if not cols:
             return {}
 
-        # Prefer 'inventory_brand_id', then 'inventory_id', then any column with 'inventory'
         fk_col = None
         for preferred in ('inventory_brand_id', 'inventory_id'):
             if preferred in cols:
@@ -84,11 +78,6 @@ def _fetch_action_map(cur):
 def err(msg, code=500):
     return jsonify({"error": str(msg)}), code
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# LEGACY DASHBOARD ENDPOINTS  (kept so Dashboard page continues to work)
-# ═══════════════════════════════════════════════════════════════════════════════
-
 @reports_bp.route("/api/reports/sales", methods=["GET"])
 def get_sales_report():
     conn = get_connection()
@@ -119,7 +108,6 @@ def get_sales_report():
         return err(e)
     finally:
         cur.close(); conn.close()
-
 
 @reports_bp.route("/api/reports/extra", methods=["GET"])
 def get_dashboard_extra():
@@ -153,7 +141,6 @@ def get_dashboard_extra():
             if prev_orders > 0 else (100.0 if curr_orders > 0 else 0.0)
         )
 
-        # ── Total Sales (paid) ──
         def paid_sales(start_d, end_d=None):
             if end_d:
                 cur.execute("""
@@ -189,7 +176,6 @@ def get_dashboard_extra():
             if prev_sales > 0 else (100.0 if curr_sales > 0 else 0.0)
         )
 
-        # ── Top Clients by order count ──
         cur.execute("""
             SELECT c.customer_name, COUNT(ot.order_id) AS total_orders
             FROM order_transaction ot
@@ -206,7 +192,6 @@ def get_dashboard_extra():
             for r in top_clients_db
         ]
 
-        # ── Most Stock Items ──
         cur.execute("""
             SELECT i.item_name, ib.total_quantity
             FROM inventory_brand ib
@@ -224,7 +209,6 @@ def get_dashboard_extra():
             for r in most_stock_db
         ]
 
-        # ── Yearly Sales History ──
         cur.execute("""
             SELECT EXTRACT(YEAR FROM st.sales_date) AS yr,
                    COALESCE(SUM(ot.total_amount), 0)
@@ -257,12 +241,6 @@ def get_dashboard_extra():
     finally:
         cur.close(); conn.close()
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# REPORT 1 — STOCK ON HAND
-# Shows total_quantity available, grouped by SKU, with low-stock flag.
-# ═══════════════════════════════════════════════════════════════════════════════
-
 @reports_bp.route("/api/reports/stock-on-hand", methods=["GET"])
 def report_stock_on_hand():
     conn = get_connection()
@@ -281,13 +259,16 @@ def report_stock_on_hand():
                 COALESCE(ib.item_selling_price, 0)       AS selling_price,
                 ss_i.status_code                          AS item_status,
                 i.inventory_id,
-                ib.inventory_brand_id
+                ib.inventory_brand_id,
+                ib.shelf_life
             FROM inventory_brand ib
             JOIN inventory         i    ON i.inventory_id   = ib.inventory_id
             LEFT JOIN brand        b    ON b.brand_id       = ib.brand_id
             LEFT JOIN unit_of_measure u ON u.uom_id         = ib.uom_id
             JOIN static_status     ss_i ON ss_i.status_id  = i.item_status_id
+            JOIN static_status     ss_b ON ss_b.status_id  = ib.item_status_id
             WHERE ss_i.status_code != 'INACTIVE'
+              AND ss_b.status_code != 'ARCHIVED'
             ORDER BY i.item_name, b.brand_name
         """)
         rows = cur.fetchall()
@@ -300,36 +281,42 @@ def report_stock_on_hand():
             brand_name = r[2] or ""
             sku        = r[0] or ""
 
-            # Optional server-side search filter
             if search and search not in item_name.lower() and search not in brand_name.lower() and search not in sku.lower():
                 continue
 
             qty         = int(r[4] or 0)
             status_code = r[7]
-            # Try inventory_brand_id first, fall back to inventory_id
             action = action_map.get(r[9]) or action_map.get(r[8]) or {}
             reorder_qty  = action.get("reorder_qty", 0)
             low_stock_qty = action.get("low_stock_qty", 0)
             threshold    = reorder_qty or low_stock_qty
 
+            shelf_life = r[10]
+            expiry_date = shelf_life.date() if shelf_life else None
+            days_to_expiry = (expiry_date - date.today()).days if expiry_date else None
+
             if status_code == 'INACTIVE':
                 stock_status = 'Archived'
             elif qty == 0:
                 stock_status = 'Out of Stock'
+            elif days_to_expiry is not None and days_to_expiry <= 30:
+                stock_status = 'Expiring Soon'
             elif threshold > 0 and qty <= threshold:
                 stock_status = 'Low Stock'
             else:
                 stock_status = 'Available'
 
             result.append({
-                "sku":           sku,
-                "item_name":     item_name,
-                "brand_name":    brand_name,
-                "uom":           r[3],
-                "qty_on_hand":   qty,
-                "unit_cost":     float(r[5] or 0),
-                "selling_price": float(r[6] or 0),
-                "stock_status":  stock_status,
+                "sku":            sku,
+                "item_name":      item_name,
+                "brand_name":     brand_name,
+                "uom":            r[3],
+                "qty_on_hand":    qty,
+                "unit_cost":      float(r[5] or 0),
+                "selling_price":  float(r[6] or 0),
+                "stock_status":   stock_status,
+                "shelf_life":     expiry_date.isoformat() if expiry_date else None,
+                "days_to_expiry": days_to_expiry,
             })
 
         return jsonify(result), 200
@@ -338,12 +325,6 @@ def report_stock_on_hand():
         return err(e)
     finally:
         cur.close(); conn.close()
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# REPORT 2 — PRODUCT PERFORMANCE
-# Top-selling items by units sold; includes revenue, COGS, gross-profit margin.
-# ═══════════════════════════════════════════════════════════════════════════════
 
 @reports_bp.route("/api/reports/product-performance", methods=["GET"])
 def report_product_performance():
@@ -403,13 +384,6 @@ def report_product_performance():
     finally:
         cur.close(); conn.close()
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# REPORT 3 — INVENTORY TURNOVER
-# Turnover = Units Sold ÷ Average Inventory  (avg ≈ (ending + sold) / 2)
-# Days to Sell = Period Days ÷ Turnover Rate
-# ═══════════════════════════════════════════════════════════════════════════════
-
 @reports_bp.route("/api/reports/inventory-turnover", methods=["GET"])
 def report_inventory_turnover():
     conn = get_connection()
@@ -433,6 +407,7 @@ def report_inventory_turnover():
             LEFT JOIN brand      b     ON b.brand_id     = ib.brand_id
             LEFT JOIN unit_of_measure u ON u.uom_id      = ib.uom_id
             JOIN static_status ss_i    ON ss_i.status_id = i.item_status_id
+            JOIN static_status ss_b    ON ss_b.status_id = ib.item_status_id
             LEFT JOIN order_details od ON od.inventory_brand_id = ib.inventory_brand_id
                 AND od.is_archived = FALSE
                 AND od.order_id IN (
@@ -444,6 +419,7 @@ def report_inventory_turnover():
                       AND st2.sales_date BETWEEN %s AND %s
                 )
             WHERE ss_i.status_code != 'INACTIVE'
+              AND ss_b.status_code != 'ARCHIVED'
             GROUP BY ib.inventory_brand_id, i.item_name, b.brand_name,
                      ib.item_sku, u.uom_name, ib.total_quantity
             ORDER BY units_sold DESC, i.item_name
@@ -476,12 +452,6 @@ def report_inventory_turnover():
     finally:
         cur.close(); conn.close()
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# REPORT 4 — INVENTORY VALUATION
-# Monetary value of on-hand stock: cost value vs. retail value vs. potential profit.
-# ═══════════════════════════════════════════════════════════════════════════════
-
 @reports_bp.route("/api/reports/inventory-valuation", methods=["GET"])
 def report_inventory_valuation():
     conn = get_connection()
@@ -505,7 +475,9 @@ def report_inventory_valuation():
             LEFT JOIN brand      b    ON b.brand_id       = ib.brand_id
             LEFT JOIN unit_of_measure u ON u.uom_id       = ib.uom_id
             JOIN static_status   ss_i ON ss_i.status_id  = i.item_status_id
+            JOIN static_status   ss_b ON ss_b.status_id  = ib.item_status_id
             WHERE ss_i.status_code != 'INACTIVE'
+              AND ss_b.status_code != 'ARCHIVED'
             ORDER BY total_cost_value DESC
         """)
         rows = cur.fetchall()
@@ -529,14 +501,6 @@ def report_inventory_valuation():
     finally:
         cur.close(); conn.close()
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# REPORT 5 — STOCK AGEING
-# Identifies slow-moving / dead stock by date of last paid sale.
-# Buckets: Active (≤30 d), Slow-Moving (31–90 d), At Risk (91–180 d),
-#          Dead Stock (>180 d), Never Sold (NULL).
-# ═══════════════════════════════════════════════════════════════════════════════
-
 @reports_bp.route("/api/reports/stock-ageing", methods=["GET"])
 def report_stock_ageing():
     conn = get_connection()
@@ -556,6 +520,7 @@ def report_stock_ageing():
             LEFT JOIN brand      b    ON b.brand_id       = ib.brand_id
             LEFT JOIN unit_of_measure u ON u.uom_id       = ib.uom_id
             JOIN static_status   ss_i ON ss_i.status_id  = i.item_status_id
+            JOIN static_status   ss_b ON ss_b.status_id  = ib.item_status_id
             LEFT JOIN order_details od ON od.inventory_brand_id = ib.inventory_brand_id
                                        AND od.is_archived = FALSE
             LEFT JOIN order_transaction ot ON ot.order_id = od.order_id
@@ -563,6 +528,7 @@ def report_stock_ageing():
             LEFT JOIN static_status ss_pay ON ss_pay.status_id = st.payment_status_id
                                           AND ss_pay.status_code = 'PAID'
             WHERE ss_i.status_code != 'INACTIVE'
+              AND ss_b.status_code != 'ARCHIVED'
             GROUP BY ib.inventory_brand_id, i.item_name, b.brand_name,
                      ib.item_sku, u.uom_name, ib.total_quantity
             ORDER BY last_sold_date ASC NULLS FIRST, i.item_name
@@ -601,13 +567,6 @@ def report_stock_ageing():
     finally:
         cur.close(); conn.close()
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# REPORT 6 — REORDER REPORT
-# Items where total_quantity ≤ reorder point (from inventory_action).
-# Sorted by urgency (most below reorder point first).
-# ═══════════════════════════════════════════════════════════════════════════════
-
 @reports_bp.route("/api/reports/reorder", methods=["GET"])
 def report_reorder():
     conn = get_connection()
@@ -640,6 +599,11 @@ def report_reorder():
                 LIMIT 1
             ) s ON TRUE
             WHERE ss_i.status_code != 'INACTIVE'
+              AND EXISTS (
+                SELECT 1 FROM static_status ss_b2
+                WHERE ss_b2.status_id = ib.item_status_id
+                  AND ss_b2.status_code != 'ARCHIVED'
+              )
             ORDER BY i.item_name, b.brand_name
         """)
         rows = cur.fetchall()
@@ -655,7 +619,6 @@ def report_reorder():
             min_order_qty = action.get("min_order_qty", 0)
             lead_time     = action.get("lead_time_days", 0)
 
-            # Use whichever threshold is set; skip items with no threshold
             threshold = reorder_qty or low_stock_qty
             if threshold <= 0 or qty > threshold:
                 continue
@@ -676,7 +639,6 @@ def report_reorder():
                 "supplier_contact":    r[8],
             })
 
-        # Most urgent (furthest below reorder point) first
         result.sort(key=lambda x: x["qty_on_hand"] - x["reorder_point"])
         return jsonify(result), 200
     except Exception as e:
@@ -684,12 +646,6 @@ def report_reorder():
         return err(e)
     finally:
         cur.close(); conn.close()
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# REPORT 7 — CUSTOMER SALES
-# Revenue, COGS, profit, and avg order value aggregated per customer (paid only).
-# ═══════════════════════════════════════════════════════════════════════════════
 
 @reports_bp.route("/api/reports/customer-sales", methods=["GET"])
 def report_customer_sales():

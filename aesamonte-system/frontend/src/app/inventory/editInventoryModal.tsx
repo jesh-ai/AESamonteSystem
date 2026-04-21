@@ -27,6 +27,7 @@ interface BrandVariant {
   reorderPoint: string;
   unitCost: string;
   sellingPrice: string;
+  shelfLife: string;
   isNew: boolean;
 }
 
@@ -83,6 +84,7 @@ const INITIAL_NEW_BRAND: BrandVariant = {
   reorderPoint: '20',
   unitCost: '',
   sellingPrice: '',
+  shelfLife: '',
   isNew: true,
 };
 
@@ -166,6 +168,7 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
         reorderPoint: String(b.reorder_point ?? '20'),
         unitCost: String(b.unit_price ?? ''),
         sellingPrice: String(b.selling_price ?? ''),
+        shelfLife: b.shelf_life ? b.shelf_life.split('T')[0] : '',
         isNew: false,
       }));
 
@@ -264,6 +267,13 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
       return;
     }
 
+    // Require qty > 0 for new brand variants
+    const missingQty = brandVariants.find(bv => bv.isNew && (!bv.qty || Number(bv.qty) <= 0));
+    if (missingQty) {
+      setDupError(`Quantity must be greater than 0 for new brand "${missingQty.brandName || 'unnamed brand'}".`);
+      return;
+    }
+
     const hasFormChanges = originalData && formData.itemName !== originalData.itemName;
     const hasSupplierChange = JSON.stringify(supplierEntries) !== JSON.stringify(originalSuppliers);
     const hasBrandChange = JSON.stringify(brandVariants) !== JSON.stringify(originalBrands);
@@ -307,6 +317,7 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
         selling_price: Number(bv.sellingPrice) || 0,
         itemDescription: bv.description,
         reorderPoint: Number(bv.reorderPoint) || 0,
+        shelf_life: bv.shelfLife || null,
       })),
     });
   };
@@ -565,6 +576,24 @@ const EditInventoryModal: React.FC<EditInventoryModalProps> = ({
                   </div>
                 );
               })()}
+
+              {/* ── Shelf Life / Expiry ── */}
+              <SubtleDivider />
+              <SectionHeading>Expiry Date (Shelf Life)</SectionHeading>
+              <div style={{ marginBottom: '8px' }}>
+                <input
+                  type="date"
+                  style={{ ...FIELD_STYLE }}
+                  value={brand.shelfLife}
+                  onChange={e => handleBrandChange(brandIdx, 'shelfLife', e.target.value)}
+                />
+                {brand.shelfLife && (() => {
+                  const days = Math.ceil((new Date(brand.shelfLife).getTime() - Date.now()) / 86400000);
+                  const color = days <= 0 ? '#dc2626' : days <= 30 ? '#d97706' : '#16a34a';
+                  const label = days <= 0 ? 'Expired' : days <= 30 ? `Expires in ${days} day${days !== 1 ? 's' : ''}` : `${days} days remaining`;
+                  return <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color, fontWeight: 600 }}>{label}</p>;
+                })()}
+              </div>
 
             </div>
           </div>

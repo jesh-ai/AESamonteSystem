@@ -29,6 +29,7 @@ interface BrandVariant {
   reorderPoint: string;
   unitCost: string;
   sellingPrice: string;
+  shelfLife: string;
 }
 
 interface ItemGroup {
@@ -59,6 +60,7 @@ const INITIAL_BRAND: BrandVariant = {
   reorderPoint: '20',
   unitCost: '',
   sellingPrice: '',
+  shelfLife: '',
 };
 
 const INITIAL_ITEM: ItemGroup = {
@@ -292,6 +294,11 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
         setDupError(`Selling Price is required for all brands under "${ig.itemName}".`);
         return;
       }
+      const missingQty = ig.brands.find(b => !b.qty || Number(b.qty) <= 0);
+      if (missingQty) {
+        setDupError(`Quantity must be greater than 0 for all brands under "${ig.itemName}".`);
+        return;
+      }
     }
 
     if (!supplierEntries[0]?.supplierName) {
@@ -313,6 +320,7 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
         selling_price: Number(b.sellingPrice) || 0,
         itemDescription: b.description,
         reorderPoint: Number(b.reorderPoint) || 0,
+        shelf_life: b.shelfLife || null,
       })),
       suppliers: validSuppliers.map((sup, i) => ({
         supplierName: sup.supplierName,
@@ -342,6 +350,9 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
 
   const sellingPriceHasError = (itemIdx: number, brandIdx: number) =>
     submitAttempted && (itemGroups[itemIdx].brands[brandIdx].sellingPrice === '' || itemGroups[itemIdx].brands[brandIdx].sellingPrice === null);
+
+  const qtyHasError = (itemIdx: number, brandIdx: number) =>
+    submitAttempted && (!itemGroups[itemIdx].brands[brandIdx].qty || Number(itemGroups[itemIdx].brands[brandIdx].qty) <= 0);
 
   const supplierHasError = (idx: number) =>
     submitAttempted && idx === 0 && !supplierEntries[0]?.supplierName;
@@ -472,14 +483,20 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
 
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '10px' }}>
                         <div>
-                          <label style={{ ...LABEL_STYLE }}>Quantity</label>
+                          <label style={{ ...LABEL_STYLE, color: qtyHasError(itemIdx, brandIdx) ? '#dc2626' : '#6b7280' }}>
+                            Quantity <span style={{ color: '#ef4444' }}>*</span>
+                          </label>
                           <input
-                            type="number" min="0"
-                            style={{ ...FIELD_STYLE }}
+                            type="number" min="1"
+                            style={qtyHasError(itemIdx, brandIdx) ? FIELD_ERROR_STYLE : FIELD_STYLE}
                             value={brand.qty}
+                            onKeyDown={e => ['-', 'e', 'E'].includes(e.key) && e.preventDefault()}
                             onChange={e => handleBrandChange(itemIdx, brandIdx, 'qty', e.target.value)}
                             placeholder="0"
                           />
+                          {qtyHasError(itemIdx, brandIdx) && (
+                            <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Quantity must be &gt; 0.</p>
+                          )}
                         </div>
                         <div>
                           <label style={{ ...LABEL_STYLE, color: uomHasError(itemIdx, brandIdx) ? '#dc2626' : '#6b7280' }}>
@@ -547,6 +564,16 @@ const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
                             placeholder="0.00"
                           />
                         </div>
+                      </div>
+
+                      <div style={{ marginTop: '10px' }}>
+                        <label style={{ ...LABEL_STYLE }}>Expiry Date (Shelf Life)</label>
+                        <input
+                          type="date"
+                          style={{ ...FIELD_STYLE }}
+                          value={brand.shelfLife}
+                          onChange={e => handleBrandChange(itemIdx, brandIdx, 'shelfLife', e.target.value)}
+                        />
                       </div>
                     </div>
                   ))}

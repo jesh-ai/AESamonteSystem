@@ -21,7 +21,12 @@ def get_roles():
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("""
+        # include_inactive=true → used for role-name lookups (e.g. user management display)
+        # default → only active roles, used for assignment dropdowns
+        include_inactive = request.args.get('include_inactive', 'false').lower() == 'true'
+        where = "" if include_inactive else "WHERE COALESCE(r.is_active, TRUE) = TRUE AND r.role_id != 1"
+
+        cur.execute(f"""
             SELECT r.role_id, r.role_name,
                    COALESCE(r.is_active, TRUE) AS is_active,
                    r.sales_permissions, r.inventory_permissions, r.order_permissions,
@@ -32,7 +37,7 @@ def get_roles():
             FROM employee_role r
             LEFT JOIN employee e ON e.role_id = r.role_id
             LEFT JOIN static_status s ON e.employee_status_id = s.status_id
-            WHERE COALESCE(r.is_active, TRUE) = TRUE
+            {where}
             GROUP BY r.role_id, r.role_name, r.is_active,
                      r.sales_permissions, r.inventory_permissions, r.order_permissions,
                      r.supplier_permissions, r.reports_permissions, r.settings_permissions

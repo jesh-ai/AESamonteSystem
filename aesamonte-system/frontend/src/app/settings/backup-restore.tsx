@@ -312,8 +312,9 @@ export default function BackupRestore({ onBack }: { onBack: () => void }) {
         {/* ── RESTORE DATA ── */}
         <h3 className={s.sectionLabel} style={{ marginTop: '36px' }}>Restore Data</h3>
         <p className={s.restoreHint}>
-          Upload a CSV backup file. The filename must start with the module name
-          (e.g. <em>Inventory_03-15-26.csv</em>, <em>Supplier_...</em>, <em>Orders_...</em>, <em>Sales_...</em>).
+          Upload a backup file to restore data. You can upload the full backup <em>.zip</em> to restore
+          all modules at once, or a single CSV (e.g. <em>Inventory_03-15-26.csv</em>, <em>Supplier_...</em>,{' '}
+          <em>Orders_...</em>, <em>Sales_...</em>) to restore one module.
         </p>
         <div className={s.restoreCard}>
           <div className={s.browseRow}>
@@ -322,7 +323,7 @@ export default function BackupRestore({ onBack }: { onBack: () => void }) {
             </span>
             <label className={s.browseBtn}>
               Browse
-              <input ref={fileInputRef} type="file" accept=".csv" style={{ display: 'none' }}
+              <input ref={fileInputRef} type="file" accept=".csv,.zip" style={{ display: 'none' }}
                 onChange={e => { if (e.target.files?.[0]) setRestoreFile(e.target.files[0]); }} />
             </label>
           </div>

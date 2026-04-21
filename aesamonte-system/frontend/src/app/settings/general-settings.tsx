@@ -247,13 +247,18 @@ export default function GeneralSettings({
     if (/\s/.test(newPw))                   { setPwError('Password cannot contain spaces.'); return; }
     if (newPw !== confirmPw)                { setPwError('New passwords do not match.'); return; }
     if (newPw.length < 8)                   { setPwError('Password must be at least 8 characters.'); return; }
+    if (newPw === currentPw)                { setPwError('New password must be different from the current password.'); return; }
 
     setPwLoading(true);
     setPwError('');
     try {
+      const token = localStorage.getItem('token') ?? '';
       const res = await fetch(`${API}/api/auth/change-password`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({
           employeeId:      employeeId,
           currentPassword: currentPw,

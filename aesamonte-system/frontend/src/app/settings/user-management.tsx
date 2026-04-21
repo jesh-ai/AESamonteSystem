@@ -22,7 +22,11 @@ interface User {
   is_archived: boolean;
 }
 
-export default function UserManagement({ onBack }: { onBack: () => void }) {
+export default function UserManagement({ onBack, currentRoleId, currentEmployeeId }: {
+  onBack: () => void;
+  currentRoleId?: number;
+  currentEmployeeId?: number;
+}) {
   const [users, setUsers] = useState<User[]>([]);
   const [archivedUsers, setArchivedUsers] = useState<User[]>([]);
   const [activeTab, setActiveTab] = useState<"active" | "archived">("active");
@@ -31,7 +35,7 @@ export default function UserManagement({ onBack }: { onBack: () => void }) {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [userToArchive, setUserToArchive] = useState<number | null>(null);
-  const [roleMap, setRoleMap] = useState<Record<number, string>>({});
+  const [orderedRoleIds, setOrderedRoleIds] = useState<number[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error') => {
@@ -39,48 +43,77 @@ export default function UserManagement({ onBack }: { onBack: () => void }) {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const fetchUsers = async (map: Record<number, string> = roleMap) => {
-  setLoading(true);
-  try {
-    const response = await fetch(`/api/employees`);
-    const data = await response.json();
+  // ── Inline permission check — uses current prop values directly at render time ──
+  const canEdit = (user: User): boolean => {
+    const myId      = Number(currentEmployeeId);
+    const theirId   = Number(user.id);
+    const theirRole = Number(user.role_id);
 
-    const active = data
-      .filter((emp: any) => !emp.is_archived)
-      .map((emp: any) => ({
-        ...emp,
-        role: map[emp.role_id] ?? `Role ${emp.role_id}`,
-        status: emp.status_code === 'ACTIVE' ? "Active" : "Inactive"
-      }));
+    if (myId && myId === theirId) return true;   // self-edit: always first, no other checks needed
+    if (theirRole === 1) return false;            // Super Admin: untouchable
+    const myRole = Number(currentRoleId);
+    if (!myRole || orderedRoleIds.length === 0) return false;
+    const myIdx    = orderedRoleIds.indexOf(myRole);
+    const theirIdx = orderedRoleIds.indexOf(theirRole);
+    if (myIdx === -1) return false;
+    if (myIdx >= orderedRoleIds.length - 2) return false; // Staff/Cashier: no others
+    return myIdx < theirIdx;
+  };
 
-    const archived = data
-      .filter((emp: any) => emp.is_archived)
-      .map((emp: any) => ({
-        ...emp,
-        role: map[emp.role_id] ?? `Role ${emp.role_id}`,
-        status: "Inactive"
-      }));
+  const canArchive = (user: User): boolean => {
+    const myId    = Number(currentEmployeeId);
+    const theirId = Number(user.id);
+    if (myId === theirId) return false;          // can't archive yourself
+    return canEdit(user);
+  };
 
-    setUsers(active);
-    setArchivedUsers(archived);
-  } catch (error) {
-    console.error("Error fetching users:", error);
-  } finally {
-    setLoading(false);
-  }
-};
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      let map: Record<number, string> = { 1: 'Super Admin' };
+      let ordered: number[] = [1];
+      try {
+        const rolesRes = await fetch('/api/roles?include_inactive=true');
+        const rolesData = await rolesRes.json();
+        if (Array.isArray(rolesData)) {
+          rolesData.forEach((r: any) => {
+            map[r.role_id] = r.role_name;
+            ordered.push(r.role_id);
+          });
+        }
+      } catch { /* keep seeds */ }
+      setOrderedRoleIds(ordered);
+
+      const response = await fetch(`/api/employees`);
+      const data = await response.json();
+
+      const active = data
+        .filter((emp: any) => !emp.is_archived)
+        .map((emp: any) => ({
+          ...emp,
+          role:   map[emp.role_id] ?? `Role ${emp.role_id}`,
+          status: emp.status_code === 'ACTIVE' ? "Active" : "Inactive",
+        }));
+
+      const archived = data
+        .filter((emp: any) => emp.is_archived)
+        .map((emp: any) => ({
+          ...emp,
+          role:   map[emp.role_id] ?? `Role ${emp.role_id}`,
+          status: "Inactive",
+        }));
+
+      setUsers(active);
+      setArchivedUsers(archived);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    fetch('/api/roles')
-      .then(r => r.json())
-      .then((data: any[]) => {
-        if (!Array.isArray(data)) return;
-        const map: Record<number, string> = {};
-        data.forEach(r => { map[r.role_id] = r.role_name; });
-        setRoleMap(map);
-        fetchUsers(map);
-      })
-      .catch(() => fetchUsers({}));
+    fetchUsers();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -92,12 +125,14 @@ export default function UserManagement({ onBack }: { onBack: () => void }) {
   const confirmArchive = async () => {
     if (!userToArchive) return;
     try {
-      const response = await fetch(`/api/employees/${userToArchive}`, { method: "DELETE" });
+      const url = `/api/employees/${userToArchive}?requester_role_id=${currentRoleId ?? 0}`;
+      const response = await fetch(url, { method: "DELETE" });
+      const data = await response.json();
       if (response.ok) {
         await fetchUsers();
         showToast('Employee archived successfully.', 'success');
       } else {
-        showToast('Failed to archive employee.', 'error');
+        showToast(data.error || 'Failed to archive employee.', 'error');
       }
     } catch (error) {
       console.error("Archive error:", error);
@@ -147,18 +182,11 @@ export default function UserManagement({ onBack }: { onBack: () => void }) {
         </div>
       </div>
 
-      {/* Tab Toggle */}
       <div className={styles.tabToggle}>
-        <button
-          className={`${styles.tabBtn} ${activeTab === "active" ? styles.tabActive : ""}`}
-          onClick={() => setActiveTab("active")}
-        >
+        <button className={`${styles.tabBtn} ${activeTab === "active" ? styles.tabActive : ""}`} onClick={() => setActiveTab("active")}>
           Users
         </button>
-        <button
-          className={`${styles.tabBtn} ${activeTab === "archived" ? styles.tabActive : ""}`}
-          onClick={() => setActiveTab("archived")}
-        >
+        <button className={`${styles.tabBtn} ${activeTab === "archived" ? styles.tabActive : ""}`} onClick={() => setActiveTab("archived")}>
           Archived Users
         </button>
       </div>
@@ -175,42 +203,41 @@ export default function UserManagement({ onBack }: { onBack: () => void }) {
           users.length === 0 ? (
             <div className={styles.loadingState}>No active users found.</div>
           ) : (
-            users.map((user) => (
-              <div key={user.id} className={styles.userPlaceholderRow}>
-                <span className={styles.userId}>{user.id}</span>
-                <span className={styles.userName}>{user.name}</span>
-                <span>{user.role}</span>
-                <span>{user.email}</span>
-                <span className={user.status === 'Active' ? styles.statusActive : styles.statusInactive}>
-                  {user.status}
-                </span>
-                <div className={styles.actionGroup}>
-                  <button
-                    className={styles.iconBtn}
-                    onClick={() => { setSelectedUser(user); setIsModalOpen(true); }}
-                    disabled={user.role_id === 1 || user.role_id === 2}
-                    title={user.role_id === 1 ? 'Super Admin cannot be edited' : user.role_id === 2 ? 'Admin cannot be edited' : undefined}
-                    style={user.role_id === 1 || user.role_id === 2 ? { opacity: 0.35, cursor: 'not-allowed' } : undefined}
-                  >
-                    <FiEdit3 />
-                  </button>
-                  <button
-                  className={styles.archBtn}
-                  onClick={() => initiateArchive(user.id)}
-                  disabled={user.role_id === 1 || user.role_id === 2 || user.status_code === 'ACTIVE'}
-                  title={
-                    user.role_id === 1 ? 'Super Admin cannot be archived' :
-                    user.role_id === 2 ? 'Admin cannot be archived' :
-                    user.status_code === 'ACTIVE' ? 'Set to Inactive before archiving' :
-                    undefined
-                  }
-                  style={user.role_id === 1 || user.role_id === 2 || user.status_code === 'ACTIVE' ? { opacity: 0.35, cursor: 'not-allowed' } : undefined}
-                >
-                  <LuArchive />
-                </button>
+            users.map((user) => {
+              const editable  = canEdit(user);
+              const archivable = canArchive(user);
+              return (
+                <div key={user.id} className={styles.userPlaceholderRow}>
+                  <span className={styles.userId}>{user.id}</span>
+                  <span className={styles.userName}>{user.name}</span>
+                  <span>{user.role}</span>
+                  <span>{user.email}</span>
+                  <span className={user.status === 'Active' ? styles.statusActive : styles.statusInactive}>
+                    {user.status}
+                  </span>
+                  <div className={styles.actionGroup}>
+                    <button
+                      className={styles.iconBtn}
+                      onClick={() => { setSelectedUser(user); setIsModalOpen(true); }}
+                      disabled={!editable}
+                      title={!editable ? (user.role_id === 1 ? 'Super Admin cannot be modified' : 'Insufficient permissions') : 'Edit employee'}
+                      style={!editable ? { opacity: 0.35, cursor: 'not-allowed' } : undefined}
+                    >
+                      <FiEdit3 />
+                    </button>
+                    <button
+                      className={styles.archBtn}
+                      onClick={() => initiateArchive(user.id)}
+                      disabled={!archivable}
+                      title={!archivable ? 'Insufficient permissions' : user.status_code === 'ACTIVE' ? 'Set to Inactive before archiving' : 'Archive employee'}
+                      style={!archivable ? { opacity: 0.35, cursor: 'not-allowed' } : undefined}
+                    >
+                      <LuArchive />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )
         ) : (
           archivedUsers.length === 0 ? (
@@ -224,11 +251,7 @@ export default function UserManagement({ onBack }: { onBack: () => void }) {
                 <span>{user.email}</span>
                 <span className={styles.statusInactive}>{user.status}</span>
                 <div className={styles.actionGroup}>
-                  <button
-                    className={styles.iconBtn}
-                    onClick={() => restoreUser(user.id)}
-                    title="Restore employee"
-                  >
+                  <button className={styles.iconBtn} onClick={() => restoreUser(user.id)} title="Restore employee">
                     <LuArchiveRestore />
                   </button>
                 </div>
@@ -245,7 +268,14 @@ export default function UserManagement({ onBack }: { onBack: () => void }) {
       )}
 
       {isModalOpen && (
-        <AddEmployeeModal onClose={() => setIsModalOpen(false)} onAdd={fetchUsers} employee={selectedUser} />
+        <AddEmployeeModal
+          onClose={() => setIsModalOpen(false)}
+          onAdd={fetchUsers}
+          employee={selectedUser}
+          requesterRoleId={currentRoleId}
+          requesterEmployeeId={currentEmployeeId}
+          isSelf={Number(selectedUser?.id) === Number(currentEmployeeId)}
+        />
       )}
 
       <ConfirmModal

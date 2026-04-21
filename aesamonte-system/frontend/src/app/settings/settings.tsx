@@ -102,7 +102,7 @@ export default function SettingsPage({ role = "Admin", roleId, employeeId, onLog
         )}
 
         {activeView === "users" && (
-          <UserManagement onBack={() => setActiveView("main")} />
+          <UserManagement onBack={() => setActiveView("main")} currentRoleId={roleId} currentEmployeeId={employeeId} />
         )}
 
         {activeView === "access" && (

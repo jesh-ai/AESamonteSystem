@@ -253,19 +253,66 @@ def restore_backup():
         return jsonify({"error": "No file provided"}), 400
 
     file = request.files['file']
-    filename = file.filename
-
-    if not filename.endswith('.csv'):
-        return jsonify({"error": "Only CSV files are supported"}), 400
-
+    filename = file.filename or ''
     name_lower = filename.lower()
-    if name_lower.startswith('inventory'):
+
+    # ── ZIP: extract each CSV inside and restore all of them ──────────────
+    if name_lower.endswith('.zip'):
+        try:
+            zip_bytes = io.BytesIO(file.read())
+            with zipfile.ZipFile(zip_bytes, 'r') as zf:
+                csv_names = [n for n in zf.namelist() if n.lower().endswith('.csv')]
+                if not csv_names:
+                    return jsonify({"error": "ZIP contains no CSV files"}), 400
+
+                conn = get_connection()
+                cur = conn.cursor()
+                total = 0
+                results = []
+                try:
+                    for csv_name in csv_names:
+                        base = os.path.basename(csv_name).lower()
+                        content = zf.read(csv_name).decode('utf-8')
+                        rows = list(csv.DictReader(io.StringIO(content)))
+                        if not rows:
+                            continue
+                        if base.startswith('inventory'):
+                            count = restore_inventory(cur, rows)
+                            results.append(f"{count} inventory records")
+                        elif base.startswith('supplier'):
+                            count = restore_supplier(cur, rows)
+                            results.append(f"{count} supplier records")
+                        elif base.startswith('orders'):
+                            count = restore_orders(cur, rows)
+                            results.append(f"{count} order records")
+                        elif base.startswith('sales'):
+                            count = restore_sales(cur, rows)
+                            results.append(f"{count} sales records")
+                        total += count
+                    conn.commit()
+                    return jsonify({"message": f"Restored {', '.join(results)} from ZIP"})
+                except Exception as e:
+                    conn.rollback()
+                    print("Restore error:", e)
+                    return jsonify({"error": str(e)}), 500
+                finally:
+                    cur.close()
+                    conn.close()
+        except zipfile.BadZipFile:
+            return jsonify({"error": "Invalid ZIP file"}), 400
+
+    # ── Single CSV ─────────────────────────────────────────────────────────
+    if not name_lower.endswith('.csv'):
+        return jsonify({"error": "Only CSV or ZIP files are supported"}), 400
+
+    base = os.path.basename(name_lower)
+    if base.startswith('inventory'):
         module = 'inventory'
-    elif name_lower.startswith('supplier'):
+    elif base.startswith('supplier'):
         module = 'supplier'
-    elif name_lower.startswith('orders'):
+    elif base.startswith('orders'):
         module = 'orders'
-    elif name_lower.startswith('sales'):
+    elif base.startswith('sales'):
         module = 'sales'
     else:
         return jsonify({"error": "Filename must start with: Inventory, Supplier, Orders, or Sales"}), 400
@@ -307,54 +354,57 @@ def restore_inventory(cur, rows):
         if not inv_id:
             continue
 
-        uom_name = row.get('uom', '')
-        cur.execute("SELECT uom_id FROM unit_of_measure WHERE uom_name = %s", (uom_name,))
-        uom_res = cur.fetchone()
-        uom_id = uom_res[0] if uom_res else None
-
         status_name = row.get('status', 'Available')
         cur.execute(
             "SELECT status_id FROM static_status WHERE status_name = %s AND status_scope = 'INVENTORY_STATUS'",
             (status_name,)
         )
         st_res = cur.fetchone()
-        status_id = st_res[0] if st_res else 1
+        status_id = st_res[0] if st_res else None
+        if not status_id:
+            # fallback: first AVAILABLE status
+            cur.execute(
+                "SELECT status_id FROM static_status WHERE status_code = 'AVAILABLE' AND status_scope = 'INVENTORY_STATUS' LIMIT 1"
+            )
+            fb = cur.fetchone()
+            status_id = fb[0] if fb else 1
 
-        # inventory table only holds item_name and item_status_id
         cur.execute("""
             INSERT INTO inventory (inventory_id, item_name, item_status_id)
             VALUES (%s, %s, %s)
             ON CONFLICT (inventory_id) DO UPDATE SET
-                item_name = EXCLUDED.item_name,
+                item_name      = EXCLUDED.item_name,
                 item_status_id = EXCLUDED.item_status_id
         """, (inv_id, row.get('item_name'), status_id))
 
-        # Restore brand variant if a matching brand exists
-        brand_name = row.get('brand', '').strip()
-        if brand_name and uom_id:
+        # Restore brand variant when brand + uom are present
+        brand_name = (row.get('brand') or '').strip()
+        uom_name   = (row.get('uom')   or '').strip()
+
+        if brand_name and uom_name:
+            cur.execute("SELECT uom_id FROM unit_of_measure WHERE uom_name = %s LIMIT 1", (uom_name,))
+            uom_res = cur.fetchone()
+            uom_id = uom_res[0] if uom_res else None
+
             cur.execute("SELECT brand_id FROM brand WHERE brand_name = %s LIMIT 1", (brand_name,))
             brand_res = cur.fetchone()
-            if brand_res:
-                brand_id = brand_res[0]
+            brand_id = brand_res[0] if brand_res else None
+
+            if uom_id and brand_id:
                 cur.execute("""
                     INSERT INTO inventory_brand
                         (inventory_id, brand_id, item_sku, item_unit_price, item_selling_price,
-                         item_qty, unit_of_measure, item_description, item_status)
+                         total_quantity, uom_id, item_description, item_status_id)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (inventory_id, brand_id) DO UPDATE SET
-                        item_unit_price = EXCLUDED.item_unit_price,
-                        item_selling_price = EXCLUDED.item_selling_price,
-                        item_qty = EXCLUDED.item_qty,
-                        unit_of_measure = EXCLUDED.unit_of_measure,
-                        item_description = EXCLUDED.item_description
+                    ON CONFLICT DO NOTHING
                 """, (
                     inv_id, brand_id,
                     row.get('item_sku') or None,
-                    float(row.get('item_unit_price', 0) or 0),
+                    float(row.get('item_unit_price',   0) or 0),
                     float(row.get('item_selling_price', 0) or 0),
                     int(row.get('item_quantity', 0) or 0),
                     uom_id,
-                    row.get('item_description', ''),
+                    row.get('item_description') or None,
                     status_id,
                 ))
         count += 1

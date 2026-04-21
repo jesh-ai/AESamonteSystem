@@ -26,7 +26,7 @@ const TABS: TabConfig[] = [
 
 // ─── Row type definitions ─────────────────────────────────────────────────────
 
-interface StockOnHandRow        { sku: string; item_name: string; brand_name: string; uom: string; qty_on_hand: number; unit_cost: number; selling_price: number; stock_status: string; }
+interface StockOnHandRow        { sku: string; item_name: string; brand_name: string; uom: string; qty_on_hand: number; unit_cost: number; selling_price: number; stock_status: string; shelf_life: string | null; days_to_expiry: number | null; }
 interface ProductPerfRow        { item_name: string; brand_name: string; sku: string; uom: string; units_sold: number; revenue: number; cogs: number; gross_profit: number; margin_pct: number; }
 interface InventoryTurnoverRow  { sku: string; item_name: string; brand_name: string; uom: string; units_sold: number; ending_qty: number; avg_inventory: number; turnover_rate: number; days_to_sell: number | null; }
 interface InventoryValuationRow { sku: string; item_name: string; brand_name: string; uom: string; qty_on_hand: number; unit_cost: number; total_cost_value: number; selling_price: number; total_retail_value: number; potential_profit: number; }
@@ -68,10 +68,11 @@ function SkuCell({ sku }: { sku: string }) {
 
 function StockStatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    Available:    styles.statusAvailable,
-    'Low Stock':  styles.statusLow,
-    'Out of Stock': styles.statusOut,
-    Archived:     styles.statusArchived,
+    Available:       styles.statusAvailable,
+    'Low Stock':     styles.statusLow,
+    'Out of Stock':  styles.statusOut,
+    'Expiring Soon': styles.statusExpiring ?? styles.statusLow,
+    Archived:        styles.statusArchived,
   };
   return <span className={`${styles.statusBadge} ${map[status] ?? ''}`}>{status}</span>;
 }
@@ -340,6 +341,7 @@ export default function ReportsPage({
                       backgroundColor: activeTab === 'stock-on-hand'
                         ? statusFilter === 'Available' ? '#10b981'
                         : statusFilter === 'Low Stock' ? '#f59e0b'
+                        : statusFilter === 'Expiring Soon' ? '#f97316'
                         : statusFilter === 'Out of Stock' ? '#ef4444'
                         : '#9ca3af'
                         : statusFilter === 'Active' ? '#10b981'
@@ -364,10 +366,11 @@ export default function ReportsPage({
                     }}>
                       {(activeTab === 'stock-on-hand'
                         ? [
-                            { label: 'All Status',    color: '#9ca3af' },
-                            { label: 'Available',     color: '#10b981' },
-                            { label: 'Low Stock',     color: '#f59e0b' },
-                            { label: 'Out of Stock',  color: '#ef4444' },
+                            { label: 'All Status',      color: '#9ca3af' },
+                            { label: 'Available',       color: '#10b981' },
+                            { label: 'Low Stock',       color: '#f59e0b' },
+                            { label: 'Expiring Soon',   color: '#f97316' },
+                            { label: 'Out of Stock',    color: '#ef4444' },
                           ]
                         : [
                             { label: 'All Status',   color: '#9ca3af' },
@@ -447,14 +450,14 @@ export default function ReportsPage({
                     <th className={styles.numCol}>Qty on Hand</th>
                     <th className={styles.numCol}>Unit Cost</th>
                     <th className={styles.numCol}>Selling Price</th>
+                    <th>Expiry Date</th>
+                    <th className={styles.numCol}>Days to Expiry</th>
                     <th>Status</th>
                   </tr></thead>
                   <tbody>
   {loading ? (
-    // Render 8 skeletal rows to fill the space
     [1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
       <tr key={`skeleton-${i}`}>
-        {/* We use a div inside the td to apply the skeleton styling */}
         <td><div className={styles.skeleton} style={{ width: '80%', height: '20px' }} /></td>
         <td><div className={styles.skeleton} style={{ width: '90%', height: '20px' }} /></td>
         <td><div className={styles.skeleton} style={{ width: '70%', height: '20px' }} /></td>
@@ -462,11 +465,13 @@ export default function ReportsPage({
         <td><div className={styles.skeleton} style={{ width: '40%', height: '20px', marginLeft: 'auto' }} /></td>
         <td><div className={styles.skeleton} style={{ width: '50%', height: '20px', marginLeft: 'auto' }} /></td>
         <td><div className={styles.skeleton} style={{ width: '50%', height: '20px', marginLeft: 'auto' }} /></td>
+        <td><div className={styles.skeleton} style={{ width: '60%', height: '20px' }} /></td>
+        <td><div className={styles.skeleton} style={{ width: '40%', height: '20px', marginLeft: 'auto' }} /></td>
         <td><div className={styles.skeleton} style={{ width: '80%', height: '24px', borderRadius: '12px' }} /></td>
       </tr>
     ))
   ) : rows.length === 0 ? (
-    <EmptyRow cols={8} />
+    <EmptyRow cols={10} />
   ) : (
     r.map((row, i) => (
       <tr key={i}>
@@ -477,6 +482,12 @@ export default function ReportsPage({
         <td className={styles.numCol}>{num(row.qty_on_hand)}</td>
         <td className={styles.numCol}>{peso(row.unit_cost)}</td>
         <td className={styles.numCol}>{peso(row.selling_price)}</td>
+        <td style={{ fontSize: '0.82rem', color: row.days_to_expiry != null && row.days_to_expiry <= 30 ? '#d97706' : '#374151' }}>
+          {row.shelf_life ?? <span style={{ color: '#94a3b8' }}>—</span>}
+        </td>
+        <td className={styles.numCol} style={{ color: row.days_to_expiry != null && row.days_to_expiry <= 0 ? '#dc2626' : row.days_to_expiry != null && row.days_to_expiry <= 30 ? '#d97706' : undefined }}>
+          {row.days_to_expiry != null ? row.days_to_expiry : <span style={{ color: '#94a3b8' }}>—</span>}
+        </td>
         <td><StockStatusBadge status={row.stock_status} /></td>
       </tr>
     ))
@@ -486,7 +497,7 @@ export default function ReportsPage({
                     <tfoot><tr>
                       <td colSpan={4} className={styles.totalLabel}>Totals</td>
                       <td className={`${styles.numCol} ${styles.totalValue}`}>{num(sumField(r, 'qty_on_hand'))}</td>
-                      <td className={styles.numCol} /><td className={styles.numCol} /><td />
+                      <td className={styles.numCol} /><td className={styles.numCol} /><td /><td /><td />
                     </tr></tfoot>
                   )}
                 </table>

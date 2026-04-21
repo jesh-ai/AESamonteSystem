@@ -1,4 +1,3 @@
-# backend/routes/auth.py
 from flask import Blueprint, request, jsonify
 from database.db_config import get_connection
 from psycopg2.extras import RealDictCursor
@@ -21,9 +20,7 @@ SEMAPHORE_SENDER  = os.environ.get("SEMAPHORE_SENDER_NAME", "AESAMONTE")
 GMAIL_USER        = os.environ.get("GMAIL_USER", "")
 GMAIL_PASSWORD    = os.environ.get("GMAIL_APP_PASSWORD", "")
 
-# In-memory OTP store: { username: { "otp": "123456", "expires_at": <timestamp> } }
 _otp_store: dict = {}
-
 
 def _build_permissions(role: dict) -> dict:
     """Map employee_role boolean columns to per-module permission objects."""
@@ -107,7 +104,6 @@ def profile():
                 "contact": row['employee_contact'],
             }), 200
 
-        # PATCH
         data    = request.json or {}
         contact = data.get('contact')
         if contact is not None:
@@ -175,6 +171,17 @@ def login():
 
 @auth_bp.route('/change-password', methods=['POST'])
 def change_password():
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+    token = auth_header.split(' ', 1)[1]
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+    except jwt.ExpiredSignatureError:
+        return jsonify({"status": "error", "message": "Token expired"}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({"status": "error", "message": "Invalid token"}), 401
+
     data             = request.json or {}
     employee_id      = data.get('employeeId')
     current_password = data.get('currentPassword', '')
@@ -182,8 +189,14 @@ def change_password():
 
     if not employee_id or not current_password or not new_password:
         return jsonify({"status": "error", "message": "All fields are required."}), 400
+
+    if int(employee_id) != int(payload.get('employee_id', -1)):
+        return jsonify({"status": "error", "message": "You can only change your own password."}), 403
+
     if len(new_password) < 8:
         return jsonify({"status": "error", "message": "New password must be at least 8 characters."}), 400
+    if new_password == current_password:
+        return jsonify({"status": "error", "message": "New password must be different from the current password."}), 400
 
     conn = get_connection()
     cur  = conn.cursor(cursor_factory=RealDictCursor)

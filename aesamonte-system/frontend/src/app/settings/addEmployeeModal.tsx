@@ -3,14 +3,14 @@
 'use client';
 import React, { useState, useEffect } from "react";
 import styles from "@/css/addEmployeeModal.module.css";
-import { LuUserPlus, LuX, LuSave } from "react-icons/lu";
+import { LuUserPlus, LuX, LuSave, LuEye, LuEyeOff } from "react-icons/lu";
 
 interface RoleOption {
   role_id: number;
   role_name: string;
 }
 
-export default function AddEmployeeModal({ onClose, onAdd, employee }: any) {
+export default function AddEmployeeModal({ onClose, onAdd, employee, requesterRoleId, requesterEmployeeId, isSelf }: any) {
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -22,6 +22,10 @@ export default function AddEmployeeModal({ onClose, onAdd, employee }: any) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [roleOptions, setRoleOptions] = useState<RoleOption[]>([]);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+
+  // Password visibility
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Error states
   const [usernameError, setUsernameError] = useState("");
@@ -46,7 +50,8 @@ export default function AddEmployeeModal({ onClose, onAdd, employee }: any) {
     fetch('/api/roles')
       .then(r => r.json())
       .then((data: RoleOption[]) => {
-        const filtered = Array.isArray(data) ? data : [];
+        // Super Admin (role_id 1) must never appear as a selectable option
+        const filtered = Array.isArray(data) ? data.filter(r => r.role_id !== 1) : [];
         setRoleOptions(filtered);
         if (!employee && filtered.length > 0) {
           setRole(filtered[filtered.length - 1].role_id.toString());
@@ -154,6 +159,8 @@ export default function AddEmployeeModal({ onClose, onAdd, employee }: any) {
       role_id: parseInt(role),
       status_id: parseInt(status),
       password: password || undefined,
+      requester_role_id: requesterRoleId ?? 0,
+      requester_employee_id: requesterEmployeeId ?? 0,
     };
 
     try {
@@ -283,12 +290,25 @@ export default function AddEmployeeModal({ onClose, onAdd, employee }: any) {
                 <label style={{ color: passwordHasError() ? '#dc2626' : undefined }}>
                   Password {!employee && <span style={{ color: '#ef4444' }}>*</span>}
                 </label>
-                <input
-                  type="password"
-                  placeholder={employee ? "Leave blank to keep current password" : ""}
-                  onChange={handlePasswordChange}
-                  style={passwordHasError() ? { border: '1px solid #f87171', backgroundColor: '#fff5f5' } : {}}
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder={employee ? "Leave blank to keep current password" : ""}
+                    onChange={handlePasswordChange}
+                    style={{
+                      width: '100%', paddingRight: '38px',
+                      ...(passwordHasError() ? { border: '1px solid #f87171', backgroundColor: '#fff5f5' } : {}),
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(v => !v)}
+                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 0, display: 'flex' }}
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <LuEyeOff size={16} /> : <LuEye size={16} />}
+                  </button>
+                </div>
                 {passwordError && <span style={{ color: '#dc2626', fontSize: '0.75rem' }}>{passwordError}</span>}
                 {passwordHasError() && !passwordError && <span style={{ color: '#dc2626', fontSize: '0.75rem' }}>Password is required.</span>}
               </div>
@@ -296,7 +316,21 @@ export default function AddEmployeeModal({ onClose, onAdd, employee }: any) {
               {/* Confirm Password */}
               <div className={styles.formGroup}>
                 <label>Confirm Password</label>
-                <input type="password" onChange={handleConfirmPasswordChange} />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    onChange={handleConfirmPasswordChange}
+                    style={{ width: '100%', paddingRight: '38px' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(v => !v)}
+                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 0, display: 'flex' }}
+                    tabIndex={-1}
+                  >
+                    {showConfirmPassword ? <LuEyeOff size={16} /> : <LuEye size={16} />}
+                  </button>
+                </div>
                 {confirmPasswordError && <span style={{ color: '#dc2626', fontSize: '0.75rem' }}>{confirmPasswordError}</span>}
               </div>
             </div>
@@ -308,20 +342,24 @@ export default function AddEmployeeModal({ onClose, onAdd, employee }: any) {
               {/* Role */}
               <div className={styles.formGroup}>
                 <label>Designated Role</label>
-                <select value={role} onChange={(e) => setRole(e.target.value)}>
+                <select value={role} onChange={(e) => setRole(e.target.value)} disabled={!!isSelf}
+                  style={isSelf ? { backgroundColor: '#f1f5f9', cursor: 'not-allowed', color: '#64748b' } : {}}>
                   {roleOptions.map(r => (
                     <option key={r.role_id} value={r.role_id.toString()}>{r.role_name}</option>
                   ))}
                 </select>
+                {isSelf && <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>You cannot change your own role.</span>}
               </div>
 
               {/* Status */}
               <div className={styles.formGroup}>
                 <label>Account Status</label>
-                <select value={status} onChange={(e) => setStatus(e.target.value)}>
+                <select value={status} onChange={(e) => setStatus(e.target.value)} disabled={!!isSelf}
+                  style={isSelf ? { backgroundColor: '#f1f5f9', cursor: 'not-allowed', color: '#64748b' } : {}}>
                   <option value="11">Active</option>
                   <option value="12">Inactive</option>
                 </select>
+                {isSelf && <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>You cannot change your own status.</span>}
               </div>
             </div>
           </div>
