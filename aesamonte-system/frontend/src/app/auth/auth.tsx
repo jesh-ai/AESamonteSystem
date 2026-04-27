@@ -34,9 +34,12 @@ export default function Login({ onLogin }: LoginProps) {
 
   useEffect(() => {
     const saved = localStorage.getItem("rememberedUsername");
+     const remembered = localStorage.getItem("rememberMe") === "true";
     if (saved) {
       setUsername(saved);
       setRememberMe(true);
+    } else {
+      setRememberMe(false);
     }
   }, []);
 
@@ -46,7 +49,7 @@ export default function Login({ onLogin }: LoginProps) {
       const res = await fetch('/api/auth/login', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ username, password }),
+        body:    JSON.stringify({ username, password, remember_me: rememberMe }),
       });
       const data = await res.json();
 
@@ -57,8 +60,10 @@ export default function Login({ onLogin }: LoginProps) {
 
       if (rememberMe) {
         localStorage.setItem("rememberedUsername", username);
+        localStorage.setItem("rememberMe", "true"); 
       } else {
         localStorage.removeItem("rememberedUsername");
+        localStorage.removeItem("rememberMe");  
       }
 
       localStorage.setItem("token", data.token);
@@ -127,6 +132,7 @@ export default function Login({ onLogin }: LoginProps) {
                 value={username}
                 onChange={handleUsernameChange}
                 className={styles.loginInput}
+                autoComplete="username"
                 required
                 suppressHydrationWarning={true}
               />
@@ -140,6 +146,7 @@ export default function Login({ onLogin }: LoginProps) {
                   type={showPassword ? "text" : "password"}
                   className={styles.loginInput}
                   onChange={handlePasswordChange}
+                  autoComplete="current-password"
                   required
                 />
                 <span className={styles.eyeIcon} onClick={() => setShowPassword(!showPassword)}>
@@ -154,7 +161,16 @@ export default function Login({ onLogin }: LoginProps) {
                 <input
                   type="checkbox"
                   checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
+                  onChange={(e) => {
+                  const checked = e.target.checked;
+                  setRememberMe(checked);
+                  if (checked) {
+                    localStorage.setItem("rememberMe", "true");
+                  } else {
+                    localStorage.removeItem("rememberMe");
+                    localStorage.removeItem("rememberedUsername"); // ✅ also clear username immediately
+                  }
+                }}
                 />
                 <span>Remember Me</span>
               </label>
