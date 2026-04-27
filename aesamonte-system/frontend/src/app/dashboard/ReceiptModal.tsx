@@ -291,11 +291,12 @@ const showToast = (message: string, type: "success" | "error") => {
                 <span>Amount</span>
               </div>
               <div className={styles.receiptItems}>
-                {receipt.items.map((item, i) => (
+                {(receipt.items ?? []).map((item, i) => (
                   <div key={i} className={styles.receiptItem}>
                     <span className={styles.receiptItemName}>{item.item_name}</span>
                     <span className={styles.receiptItemQty}>
-                      {item.quantity} {item.uom}
+                      <span className={styles.receiptQtyNum}>{item.quantity}</span>
+                      <span className={styles.receiptQtyUnit}>{item.uom}</span>
                     </span>
                     <span className={styles.receiptItemTotal}>{fmt(item.total)}</span>
                   </div>

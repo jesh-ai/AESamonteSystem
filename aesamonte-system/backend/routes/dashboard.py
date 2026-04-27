@@ -261,11 +261,15 @@ def get_dashboard_metrics():
         else:
             orders_change = 100.0 if pending_orders > 0 else 0.0
 
-        # Low Stock count — reorder_qty lives in inventory_action
+        # Low Stock count — reorder_qty lives in inventory_action (keyed by inventory_brand_id)
         cur.execute("""
             SELECT COUNT(*)
             FROM inventory i
-            LEFT JOIN inventory_action ia ON ia.inventory_id = i.inventory_id
+            LEFT JOIN LATERAL (
+                SELECT ia2.reorder_qty FROM inventory_brand ib2
+                JOIN inventory_action ia2 ON ia2.inventory_brand_id = ib2.inventory_brand_id
+                WHERE ib2.inventory_id = i.inventory_id LIMIT 1
+            ) ia ON true
             JOIN static_status ss ON i.item_status_id = ss.status_id
             WHERE ss.status_code != 'INACTIVE'
               AND COALESCE((SELECT SUM(ib3.total_quantity) FROM inventory_brand ib3 WHERE ib3.inventory_id = i.inventory_id), 0) <= COALESCE(ia.reorder_qty, 10)
@@ -579,7 +583,11 @@ def get_dashboard_insights():
                    COALESCE((SELECT u2.uom_name FROM inventory_brand ib2 JOIN unit_of_measure u2 ON ib2.uom_id = u2.uom_id WHERE ib2.inventory_id = i.inventory_id LIMIT 1), '') AS uom,
                    COALESCE((SELECT ib2.item_description FROM inventory_brand ib2 WHERE ib2.inventory_id = i.inventory_id LIMIT 1), '') AS item_description
             FROM inventory i
-            LEFT JOIN inventory_action ia ON ia.inventory_id = i.inventory_id
+            LEFT JOIN LATERAL (
+                SELECT ia2.reorder_qty FROM inventory_brand ib2
+                JOIN inventory_action ia2 ON ia2.inventory_brand_id = ib2.inventory_brand_id
+                WHERE ib2.inventory_id = i.inventory_id LIMIT 1
+            ) ia ON true
             LEFT JOIN sales_30d s ON s.inventory_id = i.inventory_id
             JOIN static_status ss ON i.item_status_id = ss.status_id
             WHERE ss.status_code != 'INACTIVE'
@@ -600,7 +608,11 @@ def get_dashboard_insights():
                    COALESCE((SELECT u2.uom_name FROM inventory_brand ib2 JOIN unit_of_measure u2 ON ib2.uom_id = u2.uom_id WHERE ib2.inventory_id = i.inventory_id LIMIT 1), '') AS uom,
                    COALESCE((SELECT ib2.item_description FROM inventory_brand ib2 WHERE ib2.inventory_id = i.inventory_id LIMIT 1), '') AS item_description
             FROM inventory i
-            LEFT JOIN inventory_action ia ON ia.inventory_id = i.inventory_id
+            LEFT JOIN LATERAL (
+                SELECT ia2.reorder_qty FROM inventory_brand ib2
+                JOIN inventory_action ia2 ON ia2.inventory_brand_id = ib2.inventory_brand_id
+                WHERE ib2.inventory_id = i.inventory_id LIMIT 1
+            ) ia ON true
             LEFT JOIN sales_30d s ON s.inventory_id = i.inventory_id
             JOIN static_status ss ON i.item_status_id = ss.status_id
             WHERE ss.status_code != 'INACTIVE'
@@ -749,7 +761,11 @@ def get_low_stock_items_data():
                 ss.status_code AS status,
                 COALESCE(s.supplier_name, '') AS supplier_name
             FROM inventory i
-            LEFT JOIN inventory_action ia ON ia.inventory_id = i.inventory_id
+            LEFT JOIN LATERAL (
+                SELECT ia2.reorder_qty FROM inventory_brand ib2
+                JOIN inventory_action ia2 ON ia2.inventory_brand_id = ib2.inventory_brand_id
+                WHERE ib2.inventory_id = i.inventory_id LIMIT 1
+            ) ia ON true
             LEFT JOIN static_status ss ON i.item_status_id = ss.status_id
             LEFT JOIN LATERAL (
                 SELECT ibs.supplier_id FROM inventory_brand ib
@@ -880,7 +896,7 @@ def get_order_receipt(order_id: str):
             JOIN customer c ON ot.customer_id = c.customer_id
             JOIN static_status ss ON ot.order_status_id = ss.status_id
             LEFT JOIN static_status pm ON ot.payment_method_id = pm.status_id
-            WHERE ot.order_id = %s
+            WHERE ot.order_id = %s::int
         """, (order_id,))
         order_row = cur.fetchone()
         if not order_row:
@@ -891,21 +907,18 @@ def get_order_receipt(order_id: str):
                    COALESCE(u.uom_name, '') AS uom,
                    CASE WHEN od.order_quantity > 0 THEN od.order_total / od.order_quantity ELSE 0 END AS unit_price
             FROM order_details od
-            JOIN inventory i ON i.inventory_id = od.inventory_id
-            LEFT JOIN LATERAL (
-                SELECT u2.uom_name FROM inventory_brand ib
-                JOIN unit_of_measure u2 ON ib.uom_id = u2.uom_id
-                WHERE ib.inventory_id = i.inventory_id LIMIT 1
-            ) u ON true
-            WHERE od.order_id = %s
+            JOIN inventory_brand ib ON ib.inventory_brand_id = od.inventory_brand_id
+            JOIN inventory i ON i.inventory_id = ib.inventory_id
+            LEFT JOIN unit_of_measure u ON u.uom_id = ib.uom_id
+            WHERE od.order_id = %s::int
         """, (order_id,))
         items = [
             {
-                "item_name": r[0],
-                "quantity": int(r[1]),
+                "item_name": r[0] or "",
+                "quantity": int(r[1] or 0),
                 "unit_price": float(r[4] or 0),
                 "total": float(r[2] or 0),
-                "uom": r[3],
+                "uom": r[3] or "",
             }
             for r in cur.fetchall()
         ]
@@ -920,6 +933,72 @@ def get_order_receipt(order_id: str):
             "items": items,
         }), 200
     except Exception as e:
+        import traceback
+        print("order-receipt error:", str(e), flush=True)
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
+# ── 8. SALES REVENUE (historical, monthly actuals) ───────────────────────────
+@dashboard_bp.route("/api/dashboard/sales-revenue", methods=["GET"])
+def get_sales_revenue():
+    # Default to the last complete calendar year so the chart always has 12 data points.
+    # Pass ?year=2026 to override.
+    year = request.args.get("year", type=int, default=date.today().year - 1)
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT
+                EXTRACT(MONTH FROM st.sales_date)::int AS month,
+                COALESCE(SUM(ot.total_amount), 0)      AS total
+            FROM sales_transaction st
+            JOIN order_transaction ot ON ot.order_id = st.order_id
+            JOIN static_status     ss ON ss.status_id = st.payment_status_id
+            WHERE ss.status_code = 'PAID'
+              AND EXTRACT(YEAR FROM st.sales_date) = %s
+            GROUP BY month
+            ORDER BY month
+        """, (year,))
+
+        month_map = {int(r[0]): float(r[1]) for r in cur.fetchall()}
+        labels = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"]
+        monthly_sales = [
+            {"month": labels[i], "sales": round(month_map.get(i + 1, 0.0), 2)}
+            for i in range(12)
+        ]
+        total = round(sum(m["sales"] for m in monthly_sales), 2)
+
+        # Year-over-year change vs the year before the requested year
+        cur.execute("""
+            SELECT COALESCE(SUM(ot.total_amount), 0)
+            FROM sales_transaction st
+            JOIN order_transaction ot ON ot.order_id = st.order_id
+            JOIN static_status     ss ON ss.status_id = st.payment_status_id
+            WHERE ss.status_code = 'PAID'
+              AND EXTRACT(YEAR FROM st.sales_date) = %s
+        """, (year - 1,))
+        prev_total = float(cur.fetchone()[0] or 0)
+
+        if prev_total > 0:
+            change = round(((total - prev_total) / prev_total) * 100, 1)
+        else:
+            change = 100.0 if total > 0 else 0.0
+
+        return jsonify({
+            "year": year,
+            "monthlySales": monthly_sales,
+            "total": total,
+            "change": change,
+        }), 200
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
     finally:
         cur.close()

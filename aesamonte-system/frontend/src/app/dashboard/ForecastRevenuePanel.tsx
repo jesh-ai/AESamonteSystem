@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   AreaChart,
   Area,
@@ -9,8 +10,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import styles from "@/css/dashboard.module.css";
-import { AiOutlineRise, AiOutlineFall } from "react-icons/ai";
-import { ChartsData, Metrics } from "./types";
+
+const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
 
 function fmt(n: number | undefined | null) {
   if (n == null || isNaN(n as number)) return "₱ 0";
@@ -23,36 +24,46 @@ function fmtK(n: number) {
   return String(n);
 }
 
-interface ForecastRevenuePanelProps {
-  charts: ChartsData | null;
-  metrics: Metrics | null;
-  loading: boolean;
+interface MonthPoint { month: string; sales: number; }
+
+interface SalesRevenueData {
+  year: number;
+  monthlySales: MonthPoint[];
+  total: number;
+  change: number;
 }
 
-export default function ForecastRevenuePanel({ charts, metrics, loading }: ForecastRevenuePanelProps) {
+export default function ForecastRevenuePanel() {
+  const [data, setData] = useState<SalesRevenueData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`${API}/api/dashboard/sales-revenue`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((json) => {
+        if (!json.error) setData(json);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const year = data?.year ?? new Date().getFullYear() - 1;
+  const isUp = (data?.change ?? 0) >= 0;
+
   return (
     <div className={styles.panel}>
       <div className={styles.panelHeader}>
         <div>
-          <h3 className={styles.panelTitle}>Forecast Revenue</h3>
+          <h3 className={styles.panelTitle}>Sales Revenue</h3>
           <p className={styles.panelSub}>
-            January 1 – December 31, {new Date().getFullYear()}
+            January 1 – December 31, {year}
           </p>
         </div>
-        {charts && (
+        {data && (
           <div className={styles.revenueSummary}>
-            <p className={styles.revenueTotal}>{fmt(charts.forecastTotal)}</p>
-            <span
-                className={`${styles.statBadge} ${
-                  metrics && metrics.salesChange >= 0 ? styles.badgeGreen : styles.badgeRed
-                }`}
-                >
-                {metrics ? (
-                  <>
-                    {metrics.salesChange >= 0 ? "↗ " : "↘ "}
-                    {Math.abs(metrics.salesChange)}%
-                  </>
-                ) : ""}
+            <p className={styles.revenueTotal}>{fmt(data.total)}</p>
+            <span className={`${styles.statBadge} ${isUp ? styles.badgeGreen : styles.badgeRed}`}>
+              {isUp ? "↗ " : "↘ "}{Math.abs(data.change)}%
             </span>
             <p className={styles.panelSub}>From last year</p>
           </div>
@@ -64,7 +75,7 @@ export default function ForecastRevenuePanel({ charts, metrics, loading }: Forec
       ) : (
         <ResponsiveContainer width="100%" height={150}>
           <AreaChart
-            data={charts?.monthlySales ?? []}
+            data={data?.monthlySales ?? []}
             margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
           >
             <defs>

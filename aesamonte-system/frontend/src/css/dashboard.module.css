@@ -1336,10 +1336,24 @@
 }
 
 .receiptItemQty {
+  display: flex;
+  justify-content: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+}
+
+.receiptQtyNum {
   font-size: 0.82rem;
   color: #6b7280;
   text-align: right;
-  white-space: nowrap;
+  min-width: 2.5ch;
+}
+
+.receiptQtyUnit {
+  font-size: 0.82rem;
+  color: #9ca3af;
+  text-align: left;
+  min-width: 3ch;
 }
 
 .receiptItemTotal {

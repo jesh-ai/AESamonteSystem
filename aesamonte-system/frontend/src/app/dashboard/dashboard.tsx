@@ -173,7 +173,7 @@ export default function Dashboard({ role = "Admin", onLogout, onNavigate }: Dash
           {/* Left column */}
           <div className={styles.column}>
             <ForecastingPanel charts={charts} insights={insights} loading={loading} />
-            <ForecastRevenuePanel charts={charts} metrics={metrics} loading={loading} />
+            <ForecastRevenuePanel />
           </div>
 
           {/* Right column */}
