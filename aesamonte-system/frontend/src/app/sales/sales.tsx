@@ -34,19 +34,18 @@ interface TransactionItem {
   description: string; qty: number; unit: string; unitCost: number; amount: number
 }
 
+// ✅ Fix
 interface SalesProps {
   role?: string; employeeId?: number
   onLogout: () => void; initialSearch?: string
+  permissions?: any
 }
 
-export default function SalesPage({ role = 'Admin', employeeId = 0, onLogout, initialSearch }: SalesProps) {
+export default function SalesPage({ role = 'Admin', employeeId = 0, onLogout, initialSearch, permissions }: SalesProps) {
   const s = styles as Record<string, string>
 
   // ── Permission Logic ──
-  const isSalesHead       = role === 'Sales Head'
-  const isInventoryHead   = role === 'Inventory Head'
-  const canExport         = ['Super Admin', 'Admin', 'Manager'].includes(role) || isSalesHead
-  const mustRequestExport = isInventoryHead || role === 'Staff' || role === 'Cashier' 
+const canExport = !!permissions?.can_export
 
   // ── State ──
   const [showExportRequestModal, setShowExportRequestModal] = useState(false)
@@ -226,7 +225,6 @@ export default function SalesPage({ role = 'Admin', employeeId = 0, onLogout, in
   const closeViewModal = () => { setShowViewModal(false); setSelectedTx(null) }
 
   const filteredTx = transactions.filter(tx => {
-    console.log('tx.date:', tx.date);
     const matchesArchiveView = isArchiveView ? tx.is_archived === true : !tx.is_archived
     const searchStr = `${tx.no} ${tx.name} ${tx.address} ${tx.paymentMethod || ''}`.toLowerCase()
     const matchesStatus = statusFilter === 'all' || 
@@ -391,19 +389,18 @@ if (isLoading === null) return (
             </p>
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            {canExport && (
-              <ExportButton onSelect={(type) => {
-                setExportType(type)
-                setShowExportModal(true)
-              }} />
-            )}
-            {mustRequestExport && (
-              <button
-                onClick={() => setShowExportRequestModal(true)}
-                className={s.requestExportBtn}
-              >
-                Request Export
-              </button>
+           {canExport ? (
+          <ExportButton onSelect={(type) => {
+            setExportType(type)
+            setShowExportModal(true)
+          }} />
+        ) : (
+          <button
+            onClick={() => setShowExportRequestModal(true)}
+            className={s.requestExportBtn}
+          >
+            Request Export
+          </button>
             )}
           </div>
         </div>{/* ── END HEADER ROW ── */}

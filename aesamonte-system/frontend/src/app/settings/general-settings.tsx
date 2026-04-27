@@ -58,7 +58,6 @@ const DEFAULT_STATE = {
   twoFA:      false,
   timezone:   'PHT',
   dateFormat: 'MM/DD/YYYY',
-  darkMode:   false,
 };
 
 export default function GeneralSettings({
@@ -87,8 +86,7 @@ export default function GeneralSettings({
   // System Settings
   const [timezone,   setTimezone]   = useState(DEFAULT_STATE.timezone);
   const [dateFormat, setDateFormat] = useState(DEFAULT_STATE.dateFormat);
-  const [darkMode,   setDarkMode]   = useState(DEFAULT_STATE.darkMode);
-
+ 
   // Notifications
   const [adminNotifs, setAdminNotifs] = useState({ ...DEFAULT_ADMIN_NOTIFS });
   const [staffNotifs, setStaffNotifs] = useState({ ...DEFAULT_STAFF_NOTIFS });
@@ -129,7 +127,6 @@ export default function GeneralSettings({
         if (p.twoFA      !== undefined) { setTwoFA(p.twoFA);          savedState.current.twoFA      = p.twoFA; }
         if (p.timezone)                 { setTimezone(p.timezone);    savedState.current.timezone    = p.timezone; }
         if (p.dateFormat)               { setDateFormat(p.dateFormat);savedState.current.dateFormat  = p.dateFormat; }
-        if (p.darkMode   !== undefined) { setDarkMode(p.darkMode);    savedState.current.darkMode    = p.darkMode; }
         if (p.adminNotifs) { setAdminNotifs(p.adminNotifs); savedState.current.adminNotifs = p.adminNotifs; }
         if (p.staffNotifs) { setStaffNotifs(p.staffNotifs); savedState.current.staffNotifs = p.staffNotifs; }
       }
@@ -202,7 +199,6 @@ export default function GeneralSettings({
     if (twoFA      !== prev.twoFA)      return true;
     if (timezone   !== prev.timezone)   return true;
     if (dateFormat !== prev.dateFormat) return true;
-    if (darkMode   !== prev.darkMode)   return true;
     if (pfpFile    !== prev.pfpFile)    return true;
     if ((Object.keys(adminNotifs) as (keyof typeof adminNotifs)[]).some(k => adminNotifs[k] !== prev.adminNotifs[k])) return true;
     if ((Object.keys(staffNotifs) as (keyof typeof staffNotifs)[]).some(k => staffNotifs[k] !== prev.staffNotifs[k])) return true;
@@ -233,7 +229,7 @@ export default function GeneralSettings({
     }
 
     // Save preferences to localStorage
-    const toSave = { twoFA, timezone, dateFormat, darkMode, adminNotifs: { ...adminNotifs }, staffNotifs: { ...staffNotifs } };
+    const toSave = { twoFA, timezone, dateFormat, adminNotifs: { ...adminNotifs }, staffNotifs: { ...staffNotifs } };
     localStorage.setItem('generalSettings', JSON.stringify(toSave));
     savedState.current = { ...toSave, phone, pfpFile };
 
@@ -382,25 +378,7 @@ export default function GeneralSettings({
             </button>
           </div>
         </div>
-        {/* ── SYSTEM SETTINGS ── */}
-        <h3 className={s.mainSectionLabel} style={{ marginTop: '2.5rem' }}>System Settings</h3>
-
-        <h4 className={s.subSectionLabel}>Display Preferences</h4>
-        <div className={s.notifForm} style={{ maxWidth: '450px' }}>
-          <div className={s.notifRow}>
-            <div>
-              <div className={s.notifLabel}>Dark Mode</div>
-              <div className={s.notifDescription}>Switch to a darker color theme</div>
-            </div>
-            <div className={s.notifToggleWrapper}>
-              <span className={s.notifStatus} style={{ color: darkMode ? '#1a4263' : '#9ca3af' }}>
-                {darkMode ? 'ON' : 'OFF'}
-              </span>
-              <Toggle enabled={darkMode} onToggle={() => setDarkMode(p => !p)} />
-            </div>
-          </div>
-        </div>
-
+        
         {/* ── NOTIFICATION SETTINGS ── */}
         <h3 className={s.mainSectionLabel} style={{ marginTop: '2.5rem' }}>Notification Settings</h3>
 

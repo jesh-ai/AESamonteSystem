@@ -184,12 +184,6 @@ const Help: React.FC<HelpProps> = ({ role, onLogout }) => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
             <h1 className={s['help-title']} style={{ margin: 0 }}>User Guide & System Help</h1>
           </div>
-          
-          <div className={s['video-container']}>
-            <div className={s['video-placeholder']}>
-              <div className={s['play-button']}>▶</div>
-            </div>
-          </div>
 
           <div className={s['help-list']}>
             {/* Map through the filtered list instead of the full array */}

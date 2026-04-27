@@ -22,33 +22,27 @@ GMAIL_PASSWORD    = os.environ.get("GMAIL_APP_PASSWORD", "")
 
 _otp_store: dict = {}
 
-def _build_permissions(role: dict) -> dict:
-    """Map employee_role boolean columns to per-module permission objects."""
-    export = bool(role.get('export_permissions'))
-
-    def m(flag: bool) -> dict:
-        v = bool(flag)
-        return {
-            "can_view":    v,
-            "can_create":  v,
-            "can_edit":    v,
-            "can_archive": v,
-            "can_export":  export,
-        }
-
-    return {
-        "dashboard": m(role.get('dashboard_permissions')),
-        "sales":     m(role.get('sales_permissions')),
-        "inventory": m(role.get('inventory_permissions')),
-        "orders":    m(role.get('order_permissions')),
-        "supplier":  m(role.get('supplier_permissions')),
-        "reports":   m(role.get('reports_permissions')),
-        "settings":  m(role.get('settings_permissions')),
-    }
+# ✅ Replace with these two functions
+def _build_permissions(role_id: int) -> dict:
+    """Fetch per-module permissions from role_permissions table."""
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT module_name, can_view, can_create, can_edit, can_archive,
+                   COALESCE(can_export, FALSE) AS can_export
+            FROM role_permissions
+            WHERE role_id = %s
+        """, (role_id,))
+        rows = cur.fetchall()
+        return {row['module_name']: dict(row) for row in rows}
+    finally:
+        cur.close()
+        conn.close()
 
 
 def _build_token_response(user: dict) -> dict:
-    permissions = _build_permissions(user)
+    permissions = _build_permissions(user['role_id'])  # ✅ uses role_id now
     payload = {
         "employee_id":       user['employee_id'],
         "employee_username": user['employee_username'],
@@ -69,7 +63,6 @@ def _build_token_response(user: dict) -> dict:
         "employee_username": user['employee_username'],
         "permissions":       permissions,
     }
-
 
 @auth_bp.route('/profile', methods=['GET', 'PATCH'])
 def profile():

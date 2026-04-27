@@ -109,11 +109,12 @@ export default function Home() {
             {activeTab === "Dashboard" ? (
               <Dashboard role={userInfo.roleName} onLogout={handleLogout} onNavigate={setActiveTabPersisted} />
             ) : activeTab === "Inventory" ? (
-              <Inventory role={userInfo.roleName} employeeId={userInfo.employeeId} onLogout={handleLogout} initialSearch={pendingSearch?.tab === 'Inventory' ? pendingSearch.term : ''} permissions={userInfo.permissions?.inventory} />
+              <Inventory role={userInfo.roleName} employeeId={userInfo.employeeId} onLogout={handleLogout} initialSearch={pendingSearch?.tab === 'inventory' ? pendingSearch.term : ''} permissions={userInfo.permissions?.inventory} />
             ) : activeTab === "Sales" ? (
-              <Sales role={userInfo.roleName}  employeeId={userInfo.employeeId} onLogout={handleLogout} initialSearch={pendingSearch?.tab === 'Sales' ? pendingSearch.term : ''} />
+              <Sales role={userInfo.roleName} employeeId={userInfo.employeeId} onLogout={handleLogout} initialSearch={pendingSearch?.tab === 'sales' ? pendingSearch.term : ''} permissions={userInfo.permissions?.sales} />
             ) : activeTab === "Orders" ? (
-              <Orders role={userInfo.roleName} onLogout={handleLogout} initialSearch={pendingSearch?.tab === 'Orders' ? pendingSearch.term : ''} />
+              // ✅ Fix — add permissions
+              <Orders role={userInfo.roleName} onLogout={handleLogout} initialSearch={pendingSearch?.tab === 'orders' ? pendingSearch.term : ''} permissions={userInfo.permissions?.orders} />
             ) : activeTab === "Reports" ? (
               <Reports role={userInfo.roleName} onLogout={handleLogout} />
             ) : activeTab === "Settings" ? (

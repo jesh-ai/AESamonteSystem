@@ -6,6 +6,7 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import styles from '@/css/order.module.css';
 import TopHeader from '@/components/layout/TopHeader';
 import ExportButton from '@/components/features/ExportButton';
+import ExportRequestModal from '@/components/features/ExportRequestModal';
 import ExportModal from './exportModal';
 import OrderEditModal from './editOrderModal';
 import AddOrderModal from './addOrderModal';
@@ -49,12 +50,14 @@ const getViewStatusClass = (status: string, s: Record<string, string>) => {
   }
 };
 
-export default function OrderPage({ role, onLogout, initialSearch }: { role: string; onLogout: () => void; initialSearch?: string }) {
+export default function OrderPage({ role, onLogout, initialSearch, permissions }: { 
+  role: string; onLogout: () => void; initialSearch?: string; permissions?: any
+}) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [searchTerm, setSearchTerm] = useState(initialSearch ?? '');
-
+ 
   useEffect(() => {
     if (initialSearch) setSearchTerm(initialSearch);
   }, [initialSearch]);
@@ -74,6 +77,7 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [inventoryItems, setInventoryItems] = useState<any[]>([]);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showExportRequestModal, setShowExportRequestModal] = useState(false);
   const [exportType, setExportType] = useState<'pdf' | 'xlsx' | 'csv' | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastTitle, setToastTitle] = useState('');
@@ -551,8 +555,15 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
             <p style={{ fontSize: '0.82rem', color: '#9ca3af', margin: '2px 0 0' }}>Track, manage, and process customer orders.</p>
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            {['Super Admin', 'Admin', 'Manager'].includes(role) && (
+            {permissions?.can_export ? (
               <ExportButton onSelect={(type) => { setExportType(type); setShowExportModal(true); }} />
+            ) : (
+              <button
+                onClick={() => setShowExportRequestModal(true)}  // ✅ actually opens the modal
+                className={s.requestExportBtn}
+              >
+                Request Export
+              </button>
             )}
           </div>
         </div>
@@ -745,7 +756,16 @@ export default function OrderPage({ role, onLogout, initialSearch }: { role: str
                     data={filtered}
                     summary={summary ?? { shippedToday: { current: 0, total: 0 }, cancelled: { current: 0 }, totalOrders: { count: 0 } }}
                     exportType={exportType} />
-
+      <ExportRequestModal isOpen={showExportRequestModal} onClose={() => setShowExportRequestModal(false)}
+                    targetModule="Orders"
+                    requesterId={/* pass employeeId if available, otherwise remove */undefined}
+                    onSuccess={(msg) => {
+                      setToastTitle('Request Sent!');
+                      setToastMessage(msg);
+                      setIsError(false);
+                      setShowToast(true);
+                    }}
+                  />
       <AddOrderModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} 
                       onSave={handleSave} statuses={orderStatuses} 
                       paymentMethods={paymentMethods} inventoryItems={inventoryItems} />

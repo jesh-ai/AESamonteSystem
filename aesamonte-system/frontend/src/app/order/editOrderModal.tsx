@@ -369,11 +369,19 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
                           <div style={{ padding: '10px 12px', fontSize: '0.8rem', color: '#64748b', textAlign: 'center' }}>Searching...</div>
                         ) : (searchResults[index] || []).length > 0 ? (
                           (searchResults[index] || []).map((entry: any) => {
-                            const isActive = entry.inventory_brand_id === item.inventory_brand_id;
-                            return (
+                          const isActive = entry.inventory_brand_id === item.inventory_brand_id;
+
+                          const isUsedElsewhere = safeItems.some(
+                            (other: any, otherIndex: number) =>
+                              otherIndex !== index &&
+                              other.inventory_brand_id === entry.inventory_brand_id
+                          );
+                          if (isUsedElsewhere) return null;
+
+                          return (
                             <div
                               key={entry.inventory_brand_id}
-                              onMouseDown={() => handleItemSelect(index, entry)}
+                              onMouseDown={() => { if (!isUsedElsewhere) handleItemSelect(index, entry); }}
                               style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: isActive ? '#eff6ff' : '#fff' }}
                               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isActive ? '#dbeafe' : '#f8fafc'}
                               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isActive ? '#eff6ff' : '#fff'}

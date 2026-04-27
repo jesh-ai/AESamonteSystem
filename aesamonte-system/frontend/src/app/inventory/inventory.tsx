@@ -498,20 +498,19 @@ const totalPages = Math.max(1, Math.ceil(sortedProducts.length / ROWS_PER_PAGE))
             </p>
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-        {['Super Admin', 'Admin', 'Manager', 'Head'].includes(role) && (
-          <ExportButton onSelect={(type) => {
-            setExportType(type);
-            setShowExportModal(true);
-          }} />
-        )}
-       {(role === 'Staff' || role === 'Cashier') && (
-        <button
-          onClick={() => setShowExportRequestModal(true)}
-          className={s.requestExportBtn}
-        >
-          Request Export
-        </button>
-      )}
+          {permissions?.can_export ? (
+            <ExportButton onSelect={(type) => {
+              setExportType(type);
+              setShowExportModal(true);
+            }} />
+          ) : (
+            <button
+              onClick={() => setShowExportRequestModal(true)}
+              className={s.requestExportBtn}
+            >
+              Request Export
+            </button>
+          )}
          </div>
         </div>
 
