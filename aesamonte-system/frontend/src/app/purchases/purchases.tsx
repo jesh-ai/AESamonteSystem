@@ -5,12 +5,20 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import TopHeader from '@/components/layout/TopHeader';
 import PageHeader from '@/components/layout/PageHeader';
 import AddPOModal from './addPOModal';
+import EditPOModal from './editPOModal';
 import s from '@/css/purchase.module.css';
 import {
   Search, CalendarDays, ChevronUp, ChevronDown,
-  Archive, ArrowLeft, ChevronLeft, ChevronRight, MoreVertical,
-  Edit, X,
+  ArrowLeft, ChevronLeft, ChevronRight, X,
 } from 'lucide-react';
+import { LuEllipsisVertical, LuPencil, LuArchive } from 'react-icons/lu';
+
+// ── Auth helper ───────────────────────────────────────────────────────────────
+
+function authHeader(): Record<string, string> {
+  const token = typeof window !== 'undefined' ? (localStorage.getItem('token') ?? '') : '';
+  return { Authorization: `Bearer ${token}` };
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -66,17 +74,6 @@ const MOCK_ORDERS: PurchaseOrder[] = [
     total_cost:       98750,
   },
   {
-    purchase_order_id: 4,
-    po_number:        'PO-2026-004',
-    supplier_name:    'Samonte Goods Distribution',
-    status:           'RECEIVED',
-    order_date:       '2026-04-05',
-    expected_delivery:'2026-04-15',
-    notes:            null,
-    total_items:      60,
-    total_cost:       31200,
-  },
-  {
     purchase_order_id: 5,
     po_number:        'PO-2026-005',
     supplier_name:    'Luntian Fresh Farms',
@@ -93,17 +90,16 @@ const MOCK_ORDERS: PurchaseOrder[] = [
 
 const ROWS_PER_PAGE = 10;
 
-const ALL_STATUSES = ['All Status', 'DRAFT', 'SENT', 'APPROVED', 'RECEIVED', 'COMPLETED', 'CANCELLED'];
+const ALL_STATUSES = ['All Status', 'DRAFT', 'SENT', 'APPROVED', 'COMPLETED', 'CANCELLED'];
 
 const STATUS_ORDER: Record<string, number> = {
-  DRAFT: 0, SENT: 1, APPROVED: 2, RECEIVED: 3, COMPLETED: 4, CANCELLED: 5, ARCHIVED: 6,
+  DRAFT: 0, SENT: 1, APPROVED: 2, COMPLETED: 3, CANCELLED: 4, ARCHIVED: 5,
 };
 
 const STATUS_STYLE: Record<string, { badge: string }> = {
   DRAFT:     { badge: 'border border-gray-300   bg-gray-50   text-gray-600'   },
   SENT:      { badge: 'border border-blue-300   bg-blue-50   text-blue-700'   },
   APPROVED:  { badge: 'border border-indigo-300 bg-indigo-50 text-indigo-700' },
-  RECEIVED:  { badge: 'border border-amber-300  bg-amber-50  text-amber-700'  },
   COMPLETED: { badge: 'border border-green-300  bg-green-50  text-green-700'  },
   CANCELLED: { badge: 'border border-red-300    bg-red-50    text-red-600'    },
   ARCHIVED:  { badge: 'border border-slate-300  bg-slate-50  text-slate-500'  },
@@ -113,7 +109,6 @@ const STATUS_DOT: Record<string, string> = {
   DRAFT:     '#9ca3af',
   SENT:      '#3b82f6',
   APPROVED:  '#6366f1',
-  RECEIVED:  '#f59e0b',
   COMPLETED: '#22c55e',
   CANCELLED: '#f87171',
   ARCHIVED:  '#94a3b8',
@@ -196,7 +191,9 @@ export default function PurchasesPage({
   const [sortKey, setSortKey]           = useState<SortKey | null>(null);
   const [sortDir, setSortDir]           = useState<SortDir>(null);
   const [openMenuId, setOpenMenuId]     = useState<number | null>(null);
-  const [showAddModal, setShowAddModal]   = useState(false);
+  const [statusChanging, setStatusChanging] = useState(false);
+  const [showAddModal, setShowAddModal]     = useState(false);
+  const [editingPO, setEditingPO]           = useState<PurchaseOrder | null>(null);
   const [reorderPrefill, setReorderPrefill] = useState<typeof reorderItem>(null);
 
   // Auto-open modal when navigated from reorder report
@@ -206,6 +203,7 @@ export default function PurchasesPage({
       setShowAddModal(true);
     }
   }, [reorderItem]);
+
   const [isArchiveView, setIsArchiveView] = useState(false);
   const [selectedPO, setSelectedPO]       = useState<PurchaseOrder | null>(null);
   const [poItems, setPoItems]             = useState<any[]>([]);
@@ -235,7 +233,7 @@ export default function PurchasesPage({
   useEffect(() => {
     if (!selectedPO) { setPoItems([]); return; }
     setIsLoadingItems(true);
-    fetch(`/api/purchases/${selectedPO.purchase_order_id}/items`)
+    fetch(`/api/purchases/${selectedPO.purchase_order_id}/items`, { headers: authHeader() })
       .then(r => r.json())
       .then(data => setPoItems(Array.isArray(data) ? data : []))
       .catch(() => setPoItems([]))
@@ -254,7 +252,7 @@ export default function PurchasesPage({
   async function fetchOrders() {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/purchases');
+      const res = await fetch('/api/purchases', { headers: authHeader() });
       if (res.ok) {
         const data = await res.json();
         setOrders(Array.isArray(data) && data.length > 0 ? data : MOCK_ORDERS);
@@ -284,11 +282,34 @@ export default function PurchasesPage({
       : <ChevronDown size={14} color="#1a4263" />;
   }
 
+  // ── Status change ─────────────────────────────────────────────────────────
+
+  const NEXT_STATUSES: Record<string, string[]> = {
+    DRAFT:    ['SENT', 'CANCELLED'],
+    SENT:     ['APPROVED', 'CANCELLED'],
+    APPROVED: ['COMPLETED', 'CANCELLED'],
+  };
+
+  async function handleStatusChange(poId: number, newStatus: string) {
+    try {
+      const res = await fetch(`/api/purchases/${poId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeader() },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) {
+        setOrders(prev => prev.map(o =>
+          o.purchase_order_id === poId ? { ...o, status: newStatus } : o
+        ));
+      }
+    } catch { /* silent */ }
+  }
+
   // ── Archive ────────────────────────────────────────────────────────────────
 
   async function handleArchive(poId: number) {
     try {
-      const res = await fetch(`/api/purchases/${poId}/archive`, { method: 'PATCH' });
+      const res = await fetch(`/api/purchases/${poId}/archive`, { method: 'PATCH', headers: authHeader() });
       if (res.ok) {
         setOrders(prev => prev.map(o =>
           o.purchase_order_id === poId ? { ...o, status: 'ARCHIVED' } : o
@@ -305,7 +326,9 @@ export default function PurchasesPage({
   const filtered = useMemo(() => {
     const term = searchTerm.toLowerCase();
     let list = orders.filter(o => {
-      const isArchived = o.status.toUpperCase() === 'ARCHIVED';
+      const upperStatus = o.status.toUpperCase();
+      if (upperStatus === 'RECEIVED') return false;           // treat as COMPLETED, hide
+      const isArchived = upperStatus === 'ARCHIVED';
       if (!isArchiveView &&  isArchived) return false;
       if ( isArchiveView && !isArchived) return false;
       const matchSearch =
@@ -361,6 +384,12 @@ export default function PurchasesPage({
         onClose={() => { setShowAddModal(false); setReorderPrefill(null); }}
         onSaved={() => { setShowAddModal(false); setReorderPrefill(null); fetchOrders(); }}
         initialItems={reorderPrefill ? [reorderPrefill] : undefined}
+      />
+
+      <EditPOModal
+        purchaseOrder={editingPO}
+        onClose={() => setEditingPO(null)}
+        onSaved={() => { setEditingPO(null); fetchOrders(); }}
       />
 
       <main className={s.main}>
@@ -458,7 +487,7 @@ export default function PurchasesPage({
                     onClick={() => { setIsArchiveView(true); setSearchTerm(''); setCurrentPage(1); }}
                     className="bg-white border border-[#ddd] text-slate-500 hover:bg-[#3e73b1] hover:text-white hover:border-[#3e73b1] p-[8px] rounded-lg flex items-center justify-center transition-all cursor-pointer"
                   >
-                    <Archive size={20} />
+                    <LuArchive size={20} />
                   </button>
 
                   {/* Search */}
@@ -529,30 +558,26 @@ export default function PurchasesPage({
                     <td><StatusBadge status={po.status} /></td>
                     <td
                       className={s.actionCell}
-                      ref={openMenuId === po.purchase_order_id ? menuRef : null}
                       onClick={e => e.stopPropagation()}
                     >
-                      <button
+                      <LuEllipsisVertical
                         className={s.moreIcon}
                         onClick={() => setOpenMenuId(prev =>
                           prev === po.purchase_order_id ? null : po.purchase_order_id
                         )}
-                      >
-                        <MoreVertical size={16} />
-                      </button>
+                      />
                       {openMenuId === po.purchase_order_id && (
-                        <div className={s.popupMenu}>
-                          <button className={s.popBtnEdit} onClick={() => setOpenMenuId(null)}>
-                            <Edit size={13} />
-                            Edit
-                          </button>
-                          <button className={s.popBtnArchive} onClick={() => handleArchive(po.purchase_order_id)}>
-                            <Archive size={13} />
-                            Archive
-                          </button>
-                          <button className={s.popBtnClose} onClick={() => setOpenMenuId(null)}>
-                            <X size={14} />
-                          </button>
+                        <div className={s.popupMenu} ref={openMenuId === po.purchase_order_id ? menuRef : null}>
+                          {po.status.toUpperCase() === 'DRAFT' && (
+                            <button className={s.popBtnEdit} onClick={e => { e.stopPropagation(); setEditingPO(po); setOpenMenuId(null); }}>
+                              <LuPencil size={12} /> Edit
+                            </button>
+                          )}
+                          {(['COMPLETED', 'CANCELLED'].includes(po.status.toUpperCase())) && (
+                            <button className={s.popBtnArchive} onClick={e => { e.stopPropagation(); handleArchive(po.purchase_order_id); }}>
+                              <LuArchive size={12} /> Archive
+                            </button>
+                          )}
                         </div>
                       )}
                     </td>
@@ -629,7 +654,6 @@ export default function PurchasesPage({
                 </p>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <StatusBadge status={selectedPO.status} />
                 <button
                   onClick={() => setSelectedPO(null)}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '4px', display: 'flex', borderRadius: '6px' }}
@@ -641,6 +665,34 @@ export default function PurchasesPage({
 
             {/* Body */}
             <div className="overflow-y-auto p-6" style={{ flex: 1 }}>
+
+              {/* Status select */}
+              <div style={{ marginBottom: '1.25rem' }}>
+                <p style={{ margin: '0 0 6px', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8' }}>Status</p>
+                <select
+                  value={selectedPO.status.toUpperCase()}
+                  disabled={statusChanging || !NEXT_STATUSES[selectedPO.status.toUpperCase()]?.length}
+                  onChange={async e => {
+                    const newStatus = e.target.value;
+                    setStatusChanging(true);
+                    await handleStatusChange(selectedPO.purchase_order_id, newStatus);
+                    setSelectedPO(prev => prev ? { ...prev, status: newStatus } : prev);
+                    setStatusChanging(false);
+                  }}
+                  style={{
+                    width: '100%', height: '42px', padding: '0 12px',
+                    borderRadius: '8px', border: '1.5px solid #e2e8f0',
+                    fontSize: '0.9rem', fontWeight: 600, color: '#1e293b',
+                    background: '#fff', cursor: NEXT_STATUSES[selectedPO.status.toUpperCase()]?.length ? 'pointer' : 'not-allowed',
+                    outline: 'none', appearance: 'auto',
+                  }}
+                >
+                  <option value={selectedPO.status.toUpperCase()}>{selectedPO.status}</option>
+                  {(NEXT_STATUSES[selectedPO.status.toUpperCase()] ?? []).map(st => (
+                    <option key={st} value={st}>{st}</option>
+                  ))}
+                </select>
+              </div>
 
               {/* Supplier / Dates info box */}
               <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '1rem 1.25rem', marginBottom: '1.5rem' }}>
