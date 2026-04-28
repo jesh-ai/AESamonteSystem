@@ -36,6 +36,7 @@ interface UOM {
 }
 
 interface ItemRow {
+  po_item_id:         number | null;   // null = new row, number = existing row
   inventory_brand_id: number | '';
   brand_name:         string;
   item_name:          string;
@@ -69,6 +70,7 @@ const FIELD: React.CSSProperties = {
 // ── Blank row factory ──────────────────────────────────────────────────────────
 
 const BLANK = (): ItemRow => ({
+  po_item_id:         null,
   inventory_brand_id: '',
   brand_name:         '',
   item_name:          '',
@@ -137,6 +139,7 @@ export default function EditPOModal({ purchaseOrder, onClose, onSaved }: EditPOM
 
       if (Array.isArray(existingItems) && existingItems.length > 0) {
         const rows: ItemRow[] = existingItems.map((it: any) => ({
+          po_item_id:         it.po_item_id ?? null,
           inventory_brand_id: it.inventory_brand_id,
           brand_name:         it.brand_name,
           item_name:          it.item_name,
@@ -236,6 +239,7 @@ export default function EditPOModal({ purchaseOrder, onClose, onSaved }: EditPOM
           expected_delivery: expectedDelivery,
           notes:             notes.trim() || null,
           items: items.map(r => ({
+            po_item_id:         r.po_item_id ?? undefined,
             inventory_brand_id: r.inventory_brand_id,
             quantity_ordered:   Number(r.quantity_ordered),
             unit_cost:          Number(r.unit_cost),

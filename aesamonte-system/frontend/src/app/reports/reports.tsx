@@ -3,8 +3,9 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import styles from '@/css/reports.module.css';
 import exportStyles from '../../css/exportReports.module.css';
 import TopHeader from '@/components/layout/TopHeader';
-import { LuDownload, LuSearch, LuX } from 'react-icons/lu';
-import ExportReportsModal, { type TabKey } from './exportReports';
+import { LuSearch, LuX } from 'react-icons/lu';
+import { type TabKey, exportCSV, exportExcel, exportPDF } from './exportReports';
+import ExportButton from '@/components/features/ExportButton';
 import RestrictedAccessModal from '@/components/features/RestrictedAccessModal';
 import type { ModulePerms } from '@/types/user';
 
@@ -80,7 +81,7 @@ export default function ReportsPage({
   const [loading,   setLoading]   = useState(false);
   const [errMsg,    setErrMsg]    = useState<string | null>(null);
   const [search,    setSearch]    = useState('');
-  const [showExport, setShowExport] = useState(false);
+
 
   // ── Status / category filter ──
   const [statusFilter, setStatusFilter] = useState('All');
@@ -279,12 +280,7 @@ export default function ReportsPage({
         </div>
       )}
 
-      <ExportReportsModal
-        isOpen={showExport} onClose={() => setShowExport(false)}
-        onSuccess={(msg, type) => { setShowExport(false); toast(msg, type === 'error'); }}
-        activeTab={activeTab} tabLabel={cfg.label} rows={filteredRows}
-        startDate={cfg.usesDateFilter ? startDate : ''} endDate={cfg.usesDateFilter ? endDate : ''}
-      />
+
 
       <main className={styles.mainContent}>
         {/* Header */}
@@ -296,12 +292,21 @@ export default function ReportsPage({
             </p>
           </div>
           {canExport && (
-            <button className={styles.exportCsvBtn} onClick={() => {
-              if (!allRows.length) { toast('No data to export.', true); return; }
-              setShowExport(true);
-            }}>
-              <LuDownload size={15} /> Export Report
-            </button>
+            <ExportButton onSelect={async (type) => {
+              if (!filteredRows.length) { toast('No data to export.', true); return; }
+              const fileDate  = new Date().toISOString().slice(0, 10);
+              const dateRange = cfg.usesDateFilter && startDate && endDate
+                ? `${startDate} → ${endDate}`
+                : 'Snapshot';
+              try {
+                if (type === 'csv')  exportCSV(activeTab, filteredRows, cfg.label, dateRange, fileDate);
+                if (type === 'xlsx') await exportExcel(activeTab, filteredRows, cfg.label, dateRange, fileDate);
+                if (type === 'pdf')  await exportPDF(activeTab, filteredRows, cfg.label, dateRange, fileDate);
+                toast(`${cfg.label} exported as ${type.toUpperCase()} successfully!`);
+              } catch {
+                toast('Export failed. Please try again.', true);
+              }
+            }} />
           )}
         </div>
 
