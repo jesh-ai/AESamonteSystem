@@ -63,9 +63,10 @@ export default function QuickPOSPanel({
                     className={`${styles.posBadge} ${
                       o.status === "PAID" || o.status === "RECEIVED" ? styles.posBadgePaid :
                       o.status === "PREPARING" ? styles.posBadgePreparing :
-                      o.status === "TO SHIP" ? styles.posBadgeToShip :   
+                      o.status === "PACKED"    ? styles.posBadgePacked :
+                      o.status === "SHIPPING"  ? styles.posBadgeShipping :
                       o.status === "CANCELLED" ? styles.posBadgeCancelled :
-                      o.status === "PENDING" ? styles.posBadgePending :
+                      o.status === "PENDING"   ? styles.posBadgePending :
                       styles.posBadgePending
                     }`}
                   >

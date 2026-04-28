@@ -199,9 +199,9 @@ export default function TopHeader({ role }: TopHeaderProps) {
                 {visibleNotifications.length === 0 ? (
                   <div className={styles.notifEmpty}>No notifications</div>
                 ) : (
-                  visibleNotifications.map((notif) => (
+                  visibleNotifications.map((notif, index) => (
                     <div
-                      key={notif.key}
+                      key={`${notif.key}-${index}`}
                       className={styles.notifItem}
                       onClick={() => handleNotifClick(notif)}
                     >

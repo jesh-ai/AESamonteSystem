@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import styles from "@/css/dashboard.module.css";
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+const API = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 function fmt(n: number | undefined | null) {
   if (n == null || isNaN(n as number)) return "₱ 0";
@@ -38,7 +38,7 @@ export default function ForecastRevenuePanel() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API}/api/dashboard/sales-revenue`, { credentials: "include" })
+    fetch(`${API}/api/dashboard/sales-revenue`)
       .then((r) => r.json())
       .then((json) => {
         if (!json.error) setData(json);

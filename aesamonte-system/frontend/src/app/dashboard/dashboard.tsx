@@ -40,7 +40,7 @@ interface DashboardProps {
   onNavigate?: (tab: string) => void;
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+const API = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export default function Dashboard({ role = "Admin", onLogout, onNavigate }: DashboardProps) {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
@@ -55,8 +55,8 @@ export default function Dashboard({ role = "Admin", onLogout, onNavigate }: Dash
   useEffect(() => {
     const fetchData = () => {
       Promise.all([
-        fetch(`${API}/api/dashboard/all`, { credentials: "include" }).then((r) => r.json()),
-        fetch(`/api/inventory`, { headers: { "Cache-Control": "no-cache" } }).then((r) => r.json()),
+        fetch(`${API}/api/dashboard/all`, { headers: { "Cache-Control": "no-cache" } }).then((r) => { if (!r.ok) throw new Error(`Dashboard API ${r.status}`); return r.json(); }),
+        fetch(`${API}/api/inventory`, { headers: { "Cache-Control": "no-cache" } }).then((r) => { if (!r.ok) throw new Error(`Inventory API ${r.status}`); return r.json(); }),
       ])
         .then(([dashData, inventoryData]) => {
           const { metrics: m, recentOrders: ro, charts: ch, insights: ins, lowStockItems: dashLowStock } = dashData;
@@ -142,9 +142,7 @@ export default function Dashboard({ role = "Admin", onLogout, onNavigate }: Dash
       items: [],
     });
     try {
-      const res = await fetch(`${API}/api/dashboard/order-receipt/${orderId}`, {
-        credentials: "include",
-      });
+      const res = await fetch(`${API}/api/dashboard/order-receipt/${orderId}`);
       const data = JSON.parse(await res.text());
       setReceipt(data);
     } catch (err) {

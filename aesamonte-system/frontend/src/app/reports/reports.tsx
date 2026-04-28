@@ -13,7 +13,6 @@ interface TabConfig { key: TabKey; label: string; usesDateFilter: boolean; endpo
 const TABS: TabConfig[] = [
   { key: 'stock-on-hand',       label: 'Stock on Hand',       usesDateFilter: false, endpoint: '/api/reports/stock-on-hand'       },
   { key: 'product-performance', label: 'Product Performance', usesDateFilter: false, endpoint: '/api/reports/product-performance' },
-  { key: 'inventory-turnover',  label: 'Inventory Turnover',  usesDateFilter: false, endpoint: '/api/reports/inventory-turnover'  },
   { key: 'inventory-valuation', label: 'Inventory Valuation', usesDateFilter: false, endpoint: '/api/reports/inventory-valuation' },
   { key: 'stock-ageing',        label: 'Stock Ageing',        usesDateFilter: false, endpoint: '/api/reports/stock-ageing'        },
   { key: 'reorder',             label: 'Reorder Report',      usesDateFilter: false, endpoint: '/api/reports/reorder'             },
@@ -23,7 +22,6 @@ const TABS: TabConfig[] = [
 // ─── Row types ────────────────────────────────────────────────────────────────
 interface StockOnHandRow        { sku: string; item_name: string; brand_name: string; uom: string; qty_on_hand: number; unit_cost: number; selling_price: number; stock_status: string; shelf_life: string | null; days_to_expiry: number | null; }
 interface ProductPerfRow        { item_name: string; brand_name: string; sku: string; uom: string; units_sold: number; revenue: number; cogs: number; gross_profit: number; margin_pct: number; }
-interface InventoryTurnoverRow  { sku: string; item_name: string; brand_name: string; uom: string; beginning_qty: number; ending_qty: number; cogs: number; avg_inventory: number; turnover_rate: number; }
 interface InventoryValuationRow { sku: string; item_name: string; brand_name: string; uom: string; qty_on_hand: number; unit_cost: number; total_cost_value: number; selling_price: number; total_retail_value: number; potential_profit: number; profit_status: string; }
 interface StockAgeingRow        { item_name: string; brand_name: string; uom: string; qty_on_hand: number; last_received_date: string | null; days_in_inventory: number | null; ageing_category: string; value_of_aged_stock: number; ageing_status: string; }
 interface ReorderRow            { sku: string; item_name: string; brand_name: string; uom: string; qty_on_hand: number; reorder_point: number; min_order_qty: number; lead_time_days: number; suggested_order_qty: number; primary_supplier: string; supplier_contact: string; inventory_brand_id: number; }
@@ -124,12 +122,11 @@ export default function ReportsPage({
     // Always re-fetch; don't use stale cache
     fetchTab(activeTab, startDate, endDate);
     setSearch(''); setStatusFilter('All'); setFromDate(''); setToDate('');
-    if (activeTab === 'inventory-turnover') { setSortKey('turnover_rate'); setSortDir('desc'); }
-    else { setSortKey(''); setSortDir('asc'); }
+    setSortKey(''); setSortDir('asc');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, startDate, endDate]);
 
-  const allRows: Record<string, unknown>[] = dataMap[activeTab] ?? [];
+  const allRows = useMemo<Record<string, unknown>[]>(() => dataMap[activeTab] ?? [], [dataMap, activeTab]);
   const rows = useMemo(() => {
     if (!search.trim()) return allRows;
     const q = search.toLowerCase();
@@ -499,44 +496,6 @@ export default function ReportsPage({
                   </tr></tfoot>}
                 </table>
               </div>
-            );
-          })()}
-
-          {/* INVENTORY TURNOVER */}
-          {activeTab === 'inventory-turnover' && (() => {
-            const r    = filteredRows as unknown as InventoryTurnoverRow[];
-            return (
-              <>
-                <div className={styles.tableWrapper}>
-                  <table className={styles.reportTable}>
-                    <thead><tr>
-                      <th>Item Name</th><th>Brand</th><th>SKU</th><th>UOM</th>
-                      <th className={styles.numCol} style={{ cursor:'pointer' }} onClick={() => toggleSort('beginning_qty')}>Beginning Inventory <SortIcon col="beginning_qty" /></th>
-                      <th className={styles.numCol} style={{ cursor:'pointer' }} onClick={() => toggleSort('ending_qty')}>Ending Inventory <SortIcon col="ending_qty" /></th>
-                      <th className={styles.numCol} style={{ cursor:'pointer' }} onClick={() => toggleSort('cogs')}>COGS <SortIcon col="cogs" /></th>
-                      <th className={styles.numCol} style={{ cursor:'pointer' }} onClick={() => toggleSort('avg_inventory')}>Avg Inventory <SortIcon col="avg_inventory" /></th>
-                      <th className={styles.numCol} style={{ cursor:'pointer' }} onClick={() => toggleSort('turnover_rate')}>Turnover Ratio <SortIcon col="turnover_rate" /></th>
-                    </tr></thead>
-                    <tbody>
-                      {loading ? <LoadingRow cols={9} /> : r.length === 0 ? <EmptyRow cols={9} /> : r.map((row, i) => (
-                        <tr key={i}>
-                          <td>{row.item_name}</td>
-                          <td>{row.brand_name}</td>
-                          <td><SkuCell sku={row.sku} /></td>
-                          <td>{row.uom}</td>
-                          <td className={styles.numCol}>{num(row.beginning_qty)}</td>
-                          <td className={styles.numCol}>{num(row.ending_qty)}</td>
-                          <td className={`${styles.numCol} ${styles.soldVal}`}>{peso(row.cogs)}</td>
-                          <td className={styles.numCol}>{(row.avg_inventory ?? 0).toFixed(1)}</td>
-                          <td className={`${styles.numCol} ${(row.turnover_rate ?? 0) >= 4 ? styles.addedVal : (row.turnover_rate ?? 0) < 1 ? styles.soldVal : ''}`}>
-                            {(row.turnover_rate ?? 0).toFixed(2)}x
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
             );
           })()}
 

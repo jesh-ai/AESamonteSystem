@@ -53,6 +53,9 @@ class _PooledConnection:
         self._broken = False
 
     def cursor(self, *args, **kwargs):
+        if self._conn is None or self._conn.closed != 0:
+            self._broken = True
+            raise psycopg2.InterfaceError("connection already closed")
         return self._conn.cursor(*args, **kwargs)
 
     def commit(self):
@@ -91,8 +94,11 @@ def get_connection() -> _PooledConnection:
         try:
             pool = _get_pool()
             conn = pool.getconn()
-            # Verify the connection is alive before returning it
-            conn.cursor().execute("SELECT 1")
+            # Verify the connection is alive; clean up cursor and reset transaction state
+            _cur = conn.cursor()
+            _cur.execute("SELECT 1")
+            _cur.close()
+            conn.rollback()
             return _PooledConnection(conn, pool)
         except (psycopg2.pool.PoolError, psycopg2.OperationalError, psycopg2.InterfaceError) as e:
             last_err = e

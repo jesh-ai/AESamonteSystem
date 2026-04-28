@@ -26,7 +26,6 @@ import styles from '../../css/exportReports.module.css';
 export type TabKey =
   | 'stock-on-hand'
   | 'product-performance'
-  | 'inventory-turnover'
   | 'inventory-valuation'
   | 'stock-ageing'
   | 'reorder'
@@ -86,15 +85,6 @@ const COL_DEFS: Record<TabKey, ColDef> = {
     mapRow: r => [
       fmt.s(r.item_name), fmt.s(r.brand_name), fmt.s(r.sku), fmt.s(r.uom),
       fmt.n(r.units_sold), fmt.f(r.revenue), fmt.f(r.cogs), fmt.f(r.gross_profit), fmt.f(r.margin_pct),
-    ],
-  },
-  'inventory-turnover': {
-    filename: 'inventory_turnover',
-    headers:  ['SKU', 'Item Name', 'Brand', 'UOM', 'Units Sold', 'Ending Qty', 'Avg Inventory', 'Turnover Rate', 'Days to Sell'],
-    mapRow: r => [
-      fmt.s(r.sku), fmt.s(r.item_name), fmt.s(r.brand_name), fmt.s(r.uom),
-      fmt.n(r.units_sold), fmt.n(r.ending_qty), fmt.f(r.avg_inventory, 1),
-      fmt.f(r.turnover_rate), r.days_to_sell != null ? fmt.f(r.days_to_sell, 1) : 'N/A',
     ],
   },
   'inventory-valuation': {

@@ -805,36 +805,44 @@ def get_low_stock_items_data():
         print("Low stock items error:", str(e))
         return []
     finally:
-        cur.close()
+        try:
+            cur.close()
+        except Exception:
+            pass
         conn.close()
 
 # ── 5. ALL-IN-ONE DASHBOARD ──────────────────────────────────────────────────
 @dashboard_bp.route("/api/dashboard/all", methods=["GET"])
 def get_dashboard_all():
-    metrics_data    = _get("metrics")
-    orders_data     = _get("recent_orders")
-    charts_data     = _get("charts")
-    insights_data   = _get("insights")
-    low_stock_data  = _get("low_stock_items")  # ← add this
+    try:
+        metrics_data    = _get("metrics")
+        orders_data     = _get("recent_orders")
+        charts_data     = _get("charts")
+        insights_data   = _get("insights")
+        low_stock_data  = _get("low_stock_items")
 
-    if metrics_data is None:
-        metrics_data = get_dashboard_metrics()[0].get_json()
-    if orders_data is None:
-        orders_data = get_recent_orders()[0].get_json()
-    if charts_data is None:
-        charts_data = get_dashboard_charts()[0].get_json()
-    if insights_data is None:
-        insights_data = get_dashboard_insights()[0].get_json()
-    if low_stock_data is None:
-        low_stock_data = get_low_stock_items_data()  # ← add this
+        if metrics_data is None:
+            metrics_data = get_dashboard_metrics()[0].get_json()
+        if orders_data is None:
+            orders_data = get_recent_orders()[0].get_json()
+        if charts_data is None:
+            charts_data = get_dashboard_charts()[0].get_json()
+        if insights_data is None:
+            insights_data = get_dashboard_insights()[0].get_json()
+        if low_stock_data is None:
+            low_stock_data = get_low_stock_items_data()
 
-    return jsonify({
-        "metrics":       metrics_data,
-        "recentOrders":  orders_data,
-        "charts":        charts_data,
-        "insights":      insights_data,
-        "lowStockItems": low_stock_data,  # ← add this
-    }), 200
+        return jsonify({
+            "metrics":       metrics_data,
+            "recentOrders":  orders_data,
+            "charts":        charts_data,
+            "insights":      insights_data,
+            "lowStockItems": low_stock_data,
+        }), 200
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 
 # ── 6. QUICK STATUS TOGGLE ───────────────────────────────────────────────────
@@ -1010,7 +1018,7 @@ def get_sales_revenue():
         conn.close()
 
 
-# ── 9. INVENTORY FORECAST (ADC-based, 14–30 day window) ──────────────────────
+# ── 9. INVENTORY FORECAST (low-stock + velocity-based stockout) ───────────────
 @dashboard_bp.route("/api/dashboard/inventory-forecast", methods=["GET"])
 def get_inventory_forecast():
     conn = get_connection()
@@ -1022,10 +1030,10 @@ def get_inventory_forecast():
                     ib.inventory_brand_id,
                     COALESCE(SUM(od.order_quantity), 0)::float AS units_sold
                 FROM order_details od
-                JOIN inventory_batch bat ON bat.batch_id = od.batch_id
-                JOIN inventory_brand ib  ON ib.inventory_brand_id = bat.inventory_brand_id
-                JOIN sales_transaction st ON st.order_id = od.order_id
-                JOIN static_status     ss ON ss.status_id = st.payment_status_id
+                JOIN inventory_batch   bat ON bat.batch_id           = od.batch_id
+                JOIN inventory_brand   ib  ON ib.inventory_brand_id  = bat.inventory_brand_id
+                JOIN sales_transaction st  ON st.order_id            = od.order_id
+                JOIN static_status     ss  ON ss.status_id           = st.payment_status_id
                 WHERE ss.status_code = 'PAID'
                   AND st.sales_date >= CURRENT_DATE - INTERVAL '30 days'
                 GROUP BY ib.inventory_brand_id
@@ -1034,44 +1042,76 @@ def get_inventory_forecast():
                 SELECT
                     i.inventory_id,
                     i.item_name,
-                    COALESCE(MIN(u.uom_name), 'pcs')           AS uom,
-                    COALESCE(MIN(ib.item_sku), '')             AS sku,
-                    COALESCE(MIN(b.brand_name), '')            AS brand,
+                    COALESCE(MIN(u.uom_name), 'pcs')              AS uom,
+                    COALESCE(MIN(ib.item_sku), '')                AS sku,
+                    COALESCE(MIN(b.brand_name), '')               AS brand,
                     COALESCE(SUM(bat.quantity_on_hand), 0)::float AS current_stock,
-                    COALESCE(SUM(s.units_sold), 0)::float      AS units_sold_30d
+                    COALESCE(SUM(s.units_sold), 0)::float         AS units_sold_30d,
+                    COALESCE(MIN(ia.low_stock_qty), 10)::float    AS low_stock_qty
                 FROM inventory i
-                JOIN inventory_brand    ib  ON ib.inventory_id      = i.inventory_id
-                LEFT JOIN brand          b   ON b.brand_id          = ib.brand_id
-                LEFT JOIN sales_30d      s   ON s.inventory_brand_id = ib.inventory_brand_id
-                LEFT JOIN unit_of_measure u  ON u.uom_id            = ib.uom_id
-                LEFT JOIN inventory_batch bat ON bat.inventory_brand_id = ib.inventory_brand_id
-                    AND bat.expiry_date > CURRENT_DATE
-                JOIN static_status      ss ON ss.status_id          = i.item_status_id
+                JOIN inventory_brand    ib  ON ib.inventory_id       = i.inventory_id
+                LEFT JOIN inventory_action  ia  ON ia.inventory_brand_id = ib.inventory_brand_id
+                LEFT JOIN brand             b   ON b.brand_id         = ib.brand_id
+                LEFT JOIN sales_30d         s   ON s.inventory_brand_id = ib.inventory_brand_id
+                LEFT JOIN unit_of_measure   u   ON u.uom_id           = ib.uom_id
+                LEFT JOIN inventory_batch   bat ON bat.inventory_brand_id = ib.inventory_brand_id
+                                               AND bat.expiry_date > CURRENT_DATE
+                JOIN static_status          ss  ON ss.status_id       = i.item_status_id
                 WHERE ss.status_code != 'INACTIVE'
                 GROUP BY i.inventory_id, i.item_name
-                HAVING COALESCE(SUM(s.units_sold), 0) > 0
-                   AND COALESCE(SUM(bat.quantity_on_hand), 0) > 0
+                HAVING
+                    -- Out of stock
+                    COALESCE(SUM(bat.quantity_on_hand), 0) = 0
+                    OR
+                    -- At or below the low_stock_qty threshold
+                    COALESCE(SUM(bat.quantity_on_hand), 0) <= COALESCE(MIN(ia.low_stock_qty), 10)
+                    OR
+                    -- Velocity-predicted stockout within 30 days
+                    (
+                        COALESCE(SUM(s.units_sold), 0) > 0
+                        AND COALESCE(SUM(bat.quantity_on_hand), 0) > 0
+                        AND (COALESCE(SUM(bat.quantity_on_hand), 0)
+                             / (COALESCE(SUM(s.units_sold), 0) / 30.0)) <= 30
+                    )
             )
             SELECT
                 item_name,
                 uom,
                 sku,
                 brand,
-                current_stock::int                                            AS current_stock,
-                ROUND((units_sold_30d / 30.0)::numeric, 1)::float            AS daily_rate,
-                (current_stock / (units_sold_30d / 30.0))::int               AS days_until_stockout,
-                GREATEST(0, CEIL((units_sold_30d / 30.0) * 30 - current_stock))::int
-                                                                              AS suggested_reorder_qty
+                current_stock::int                                              AS current_stock,
+                CASE WHEN units_sold_30d > 0
+                     THEN ROUND((units_sold_30d / 30.0)::numeric, 1)::float
+                     ELSE 0.0 END                                               AS daily_rate,
+                CASE
+                    WHEN current_stock = 0      THEN 0
+                    WHEN units_sold_30d > 0     THEN (current_stock / (units_sold_30d / 30.0))::int
+                    ELSE 9999 END                                               AS days_until_stockout,
+                GREATEST(0, CEIL(
+                    CASE WHEN units_sold_30d > 0
+                         THEN (units_sold_30d / 30.0) * 30 - current_stock
+                         ELSE low_stock_qty - current_stock END
+                ))::int                                                         AS suggested_reorder_qty
             FROM item_stats
-            WHERE (current_stock / (units_sold_30d / 30.0)) BETWEEN 14 AND 30
-            ORDER BY days_until_stockout ASC
+            ORDER BY
+                CASE WHEN current_stock = 0 THEN 0 ELSE 1 END ASC,
+                CASE WHEN units_sold_30d > 0 AND current_stock > 0
+                     THEN current_stock / (units_sold_30d / 30.0)
+                     ELSE 9999.0 END ASC
+            LIMIT 10
         """)
 
         rows = cur.fetchall()
         items = []
         for r in rows:
             days = int(r[6])
-            stockout_date = (date.today() + timedelta(days=days)).strftime("%B %d, %Y")
+            # 9999 means no velocity data — show "No sales data" instead of a far-future date
+            if days >= 9999:
+                stockout_date = "No sales data"
+            elif days == 0:
+                stockout_date = "Out of stock"
+            else:
+                stockout_date = (date.today() + timedelta(days=days)).strftime("%B %d, %Y")
             items.append({
                 "item_name":             r[0],
                 "uom":                   r[1] or "pcs",

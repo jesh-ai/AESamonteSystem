@@ -157,7 +157,6 @@ const Inventory: React.FC<InventoryProps> = ({ role, employeeId = 0, onLogout, i
   const [showExportModal, setShowExportModal] = useState(false);
   const [showExportRequestModal, setShowExportRequestModal] = useState(false);
   const [showUomModal, setShowUomModal] = useState(false);
-  const [showStagnantInventory, setShowStagnantInventory] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewProduct, setViewProduct] = useState<Product | null>(null);
   const [viewModalLoading, setViewModalLoading] = useState(false);
@@ -678,7 +677,6 @@ const totalPages = Math.max(1, Math.ceil(sortedProducts.length / ROWS_PER_PAGE))
                 </div>
 
                 <button className={s.archiveIconBtn} onClick={() => setIsArchiveView(true)} title="View Archives"><LuArchive size={20} /></button>
-                <button className={s.archiveIconBtn} onClick={() => setShowStagnantInventory(true)} title="View Stagnant Inventory"><LuPackage size={20} /></button>
                 <div className={s.searchWrapper}>
                   <LuSearch size={18} className={s.searchIcon} />
                   <input className={s.searchInput} placeholder="Search by ID, Item, or Brand" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
