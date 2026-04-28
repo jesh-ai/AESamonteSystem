@@ -225,12 +225,28 @@ const canExport = !!permissions?.can_export
   const closeViewModal = () => { setShowViewModal(false); setSelectedTx(null) }
 
   const filteredTx = transactions.filter(tx => {
-    const matchesArchiveView = isArchiveView ? tx.is_archived === true : !tx.is_archived
-    const searchStr = `${tx.no} ${tx.name} ${tx.address} ${tx.paymentMethod || ''}`.toLowerCase()
+    const matchesArchiveView = isArchiveView ? tx.is_archived === true : !tx.is_archived;
     const matchesStatus = statusFilter === 'all' || 
-    tx.paymentMethod?.toLowerCase().includes(statusFilter.toLowerCase())
-    const matchesDateRange = isDateInRange(tx.date)
-    return matchesArchiveView && searchStr.includes(searchTerm.toLowerCase()) && matchesStatus && matchesDateRange
+      tx.paymentMethod?.toLowerCase().includes(statusFilter.toLowerCase());
+    const matchesDateRange = isDateInRange(tx.date);
+    
+    const term = searchTerm.trim().toLowerCase();
+    const isNumericSearch = !isNaN(Number(term)) && term !== '';
+    
+    // If searchTerm is a pure number, prioritize strict ID matching
+    if (isNumericSearch) {
+      const matchesSearch = 
+        tx.no.toString() === term || // Strict ID match first
+        tx.no.toString().toLowerCase().includes(term) ||
+        tx.name.toLowerCase().includes(term) ||
+        (tx.address ?? '').toLowerCase().includes(term) ||
+        (tx.paymentMethod ?? '').toLowerCase().includes(term);
+      return matchesArchiveView && matchesSearch && matchesStatus && matchesDateRange;
+    }
+    
+    // For text search, use standard includes check
+    const searchStr = `${tx.no} ${tx.name} ${tx.address} ${tx.paymentMethod || ''}`.toLowerCase();
+    return matchesArchiveView && searchStr.includes(term) && matchesStatus && matchesDateRange;
   })
 
 const requestSort = (key: keyof Transaction, direction: 'asc' | 'desc') => {

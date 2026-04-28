@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from database.db_config import get_connection
 from datetime import datetime, date, timedelta
+from utils.auth import require_purchase_access
 
 inventory_bp = Blueprint("inventory", __name__)
 
@@ -1565,6 +1566,131 @@ def get_expired_warning():
         ]), 200
 
     except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
+@inventory_bp.route("/api/inventory/stagnant", methods=["GET"])
+def get_stagnant_inventory():
+    """
+    Get stagnant (dead stock) items:
+    - Items with 0 quantity on hand
+    - Haven't been sold in the last 6 months (or never sold)
+    - Haven't been ordered (PO) in the last 6 months (or never ordered)
+    - Current status is NOT archived
+    
+    Returns JSON array with: inventory_brand_id, item_name, item_description,
+                             last_sold_date, last_ordered_date
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        # Get the ARCHIVED status ID to filter it out
+        archived_status = _get_status_id(cur, "ARCHIVED", "INVENTORY_STATUS")
+        
+        six_months_ago = (date.today() - timedelta(days=180)).isoformat()
+        
+        cur.execute("""
+            SELECT 
+                ib.inventory_brand_id,
+                i.item_name,
+                COALESCE(ib.item_description, '') AS item_description,
+                MAX(st.sales_date) AS last_sold_date,
+                MAX(poi.date_created) AS last_ordered_date
+            FROM inventory_brand ib
+            JOIN inventory i ON i.inventory_id = ib.inventory_id
+            
+            -- LEFT JOIN to get total quantity on hand
+            LEFT JOIN (
+                SELECT inventory_brand_id, SUM(quantity_on_hand) as total_qty
+                FROM inventory_batch
+                GROUP BY inventory_brand_id
+            ) bat ON bat.inventory_brand_id = ib.inventory_brand_id
+            
+            -- LEFT JOIN to get last sales date via order_details
+            LEFT JOIN order_details od ON od.inventory_brand_id = ib.inventory_brand_id
+            LEFT JOIN sales_transaction st ON st.order_id = od.order_id
+            
+            -- LEFT JOIN to get last purchase order date
+            LEFT JOIN purchase_order_item poi ON poi.inventory_brand_id = ib.inventory_brand_id
+            
+            WHERE 
+                -- Not archived
+                ib.item_status_id != %s
+                -- Has zero stock
+                AND (bat.total_qty IS NULL OR bat.total_qty = 0)
+                -- No sales in last 6 months (or never sold)
+                AND (st.sales_date IS NULL OR st.sales_date < %s)
+                -- No purchase orders in last 6 months (or never ordered)
+                AND (poi.date_created IS NULL OR poi.date_created < %s)
+            
+            GROUP BY 
+                ib.inventory_brand_id,
+                i.item_name,
+                ib.item_description
+            ORDER BY i.item_name ASC
+        """, (archived_status, six_months_ago, six_months_ago))
+        
+        rows = cur.fetchall()
+        return jsonify([
+            {
+                "inventory_brand_id": row[0],
+                "item_name": row[1],
+                "item_description": row[2],
+                "last_sold_date": row[3].isoformat() if row[3] else None,
+                "last_ordered_date": row[4].isoformat() if row[4] else None,
+            }
+            for row in rows
+        ]), 200
+    
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
+@inventory_bp.route("/api/inventory/<int:brand_id>/archive", methods=["PATCH"])
+@require_purchase_access
+def archive_stagnant_item(brand_id):
+    """
+    Archive a stagnant inventory item by setting its item_status_id to ARCHIVED.
+    Requires purchase access (Super Admin, Manager, or Inventory Head).
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        # Get the ARCHIVED status ID
+        archived_status = _get_status_id(cur, "ARCHIVED", "INVENTORY_STATUS")
+        
+        # Update the item status to ARCHIVED
+        cur.execute(
+            """
+            UPDATE inventory_brand
+            SET item_status_id = %s
+            WHERE inventory_brand_id = %s
+            RETURNING inventory_brand_id, item_status_id
+            """,
+            (archived_status, brand_id)
+        )
+        
+        result = cur.fetchone()
+        if not result:
+            return jsonify({"error": "Item not found"}), 404
+        
+        conn.commit()
+        return jsonify({
+            "message": "Item archived successfully",
+            "inventory_brand_id": result[0],
+            "new_status_id": result[1]
+        }), 200
+    
+    except Exception as e:
+        conn.rollback()
         import traceback; traceback.print_exc()
         return jsonify({"error": str(e)}), 500
     finally:

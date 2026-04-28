@@ -171,10 +171,14 @@ function SkeletonRow({ cols }: { cols: number }) {
 export default function PurchasesPage({
   role,
   onLogout,
+  initialViewId,
+  onViewOpened,
 }: {
   role: string;
   onLogout: () => void;
   permissions?: any;
+  initialViewId?: string;
+  onViewOpened?: () => void;
 }) {
   const [orders, setOrders]             = useState<PurchaseOrder[]>([]);
   const [isLoading, setIsLoading]       = useState(true);
@@ -193,6 +197,18 @@ export default function PurchasesPage({
 
   const menuRef   = useRef<HTMLTableCellElement>(null);
   const statusRef = useRef<HTMLDivElement>(null);
+
+  // ── Notification deep-link: auto-filter + open modal when prop arrives ───────
+
+  useEffect(() => {
+    if (!initialViewId || orders.length === 0) return;
+    const po = orders.find(o => o.purchase_order_id === Number(initialViewId));
+    if (!po) return;
+    setSearchTerm(po.po_number);
+    setCurrentPage(1);
+    setSelectedPO(po);
+    onViewOpened?.();
+  }, [orders, initialViewId]);
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 

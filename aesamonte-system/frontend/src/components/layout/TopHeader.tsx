@@ -149,6 +149,8 @@ export default function TopHeader({ role }: TopHeaderProps) {
   const unreadCount = visibleNotifications.length;
 
   function getSearchTerm(notif: Notification): string {
+    // For inventory alerts, search by item name so the table text-filter matches
+    if (['low_stock', 'out_of_stock', 'item_added'].includes(notif.type)) return notif.name ?? notif.reference;
     if (notif.type === 'paid') return notif.sales_id ?? notif.reference;
     return notif.reference;
   }
@@ -159,11 +161,16 @@ export default function TopHeader({ role }: TopHeaderProps) {
     saveSet('notifDismissed', next);
     setOpen(false);
     const tab = TYPE_NAV_MAP[notif.type];
-    if (tab) {
-      window.dispatchEvent(new CustomEvent('app:navigate', {
-        detail: { tab, search: getSearchTerm(notif) },
-      }));
+    if (!tab) return;
+
+    const detail: Record<string, unknown> = { tab, search: getSearchTerm(notif) };
+
+    if (['low_stock', 'out_of_stock', 'item_added'].includes(notif.type)) {
+      // reference is inventory_id — destination page will auto-open the view modal
+      detail.view_inventory_id = notif.reference;
     }
+
+    window.dispatchEvent(new CustomEvent('app:navigate', { detail }));
   }
 
   return (

@@ -38,6 +38,8 @@ interface InventoryProps {
   onLogout: () => void;
   initialSearch?: string;
   permissions?: ModulePerms;
+  initialViewId?: string;
+  onViewOpened?: () => void;
 }
 
 interface Supplier {
@@ -126,7 +128,7 @@ function getBatchExpiryBadge(dateStr: string | null | undefined): React.ReactNod
   return <span>{label}</span>;
 }
 
-const Inventory: React.FC<InventoryProps> = ({ role, employeeId = 0, onLogout, initialSearch, permissions }) => {
+const Inventory: React.FC<InventoryProps> = ({ role, employeeId = 0, onLogout, initialSearch, permissions, initialViewId, onViewOpened }) => {
   const s = styles as Record<string, string>;
   const { guard, denied, dismiss } = usePermissionGuard();
 
@@ -155,6 +157,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, employeeId = 0, onLogout, i
   const [showExportModal, setShowExportModal] = useState(false);
   const [showExportRequestModal, setShowExportRequestModal] = useState(false);
   const [showUomModal, setShowUomModal] = useState(false);
+  const [showStagnantInventory, setShowStagnantInventory] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewProduct, setViewProduct] = useState<Product | null>(null);
   const [viewModalLoading, setViewModalLoading] = useState(false);
@@ -259,6 +262,24 @@ const Inventory: React.FC<InventoryProps> = ({ role, employeeId = 0, onLogout, i
     } catch (err) { console.error("Failed to fetch UOMs", err); }
   };
 
+
+  // ── Notification deep-link: auto-filter + open modal when prop arrives ───────
+
+  useEffect(() => {
+    if (!initialViewId || products.length === 0) return;
+    const numId = Number(initialViewId);
+    // Match by inventory_id OR by any brand's inventory_brand_id (backend may send either)
+    const product = products.find(p =>
+      Number(p.id) === numId ||
+      (p.brands || []).some((b: any) => Number(b.inventory_brand_id) === numId)
+    );
+    if (!product) return;
+    setSearchTerm(product.item_name);
+    setCurrentPage(1);
+    handleViewClick(product);
+    onViewOpened?.();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, initialViewId]);
 
   useEffect(() => {
     fetchInventory();
@@ -657,6 +678,7 @@ const totalPages = Math.max(1, Math.ceil(sortedProducts.length / ROWS_PER_PAGE))
                 </div>
 
                 <button className={s.archiveIconBtn} onClick={() => setIsArchiveView(true)} title="View Archives"><LuArchive size={20} /></button>
+                <button className={s.archiveIconBtn} onClick={() => setShowStagnantInventory(true)} title="View Stagnant Inventory"><LuPackage size={20} /></button>
                 <div className={s.searchWrapper}>
                   <LuSearch size={18} className={s.searchIcon} />
                   <input className={s.searchInput} placeholder="Search by ID, Item, or Brand" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />

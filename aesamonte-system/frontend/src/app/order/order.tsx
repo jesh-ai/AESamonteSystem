@@ -373,10 +373,28 @@ export default function OrderPage({ role, onLogout, initialSearch, permissions }
 
   const filtered = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
+    const isNumericSearch = !isNaN(Number(term)) && term !== '';
+    
     return orders.filter(o => {
       const matchesArchiveView = isArchiveView ? Boolean(o.is_archived) : !o.is_archived;
       const matchesStatus = statusFilter === 'All Status' || o.status?.toUpperCase() === statusFilter;
       const matchesDate = isDateInRange(o.date);
+      
+      // If searchTerm is a pure number, prioritize strict ID matching
+      if (isNumericSearch) {
+        return matchesArchiveView && matchesStatus && matchesDate && (
+          o.id.toString() === term || // Strict ID match first
+          o.id.toString().toLowerCase().includes(term) ||
+          o.customer.toLowerCase().includes(term) ||
+          (o.address ?? '').toLowerCase().includes(term) ||
+          (o.contact ?? '').toLowerCase().includes(term) ||
+          (o.paymentMethod ?? '').toLowerCase().includes(term) ||
+          o.date.toLowerCase().includes(term) ||
+          o.status.toLowerCase().includes(term)
+        );
+      }
+      
+      // For text search, use standard includes check
       return matchesArchiveView && matchesStatus && matchesDate && (
         o.id.toString().toLowerCase().includes(term) ||
         o.customer.toLowerCase().includes(term) ||
