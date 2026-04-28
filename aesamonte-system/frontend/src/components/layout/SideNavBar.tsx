@@ -107,6 +107,7 @@ export default function Sidebar({
               className={`${styles.navItem} ${collapsed ? styles.collapsedItem : ""} ${
                 activeTab === item.name ? styles.activeNavItem : ""
               }`}
+              title={collapsed ? item.name : ''}
             >
               <span className={styles.navIcon}>{item.icon}</span>
               {!collapsed && <span className={styles.navText}>{item.name}</span>}
@@ -118,12 +119,12 @@ export default function Sidebar({
       <div className={styles.bottomMenu}>
         <hr className={styles.divider} />
         <div className={styles.bottomNav}>
-          <button className={styles.bottomButton} onClick={() => onTabChange("Help")}>
+          <button className={styles.bottomButton} onClick={() => onTabChange("Help")} title="Help">
             <span className={styles.navIcon}><AiOutlineQuestionCircle size={20} /></span>
             {!collapsed && <span className={styles.navText}>Help</span>}
           </button>
 
-          <button className={styles.bottomButton} onClick={() => setIsModalOpen(true)}>
+          <button className={styles.bottomButton} onClick={() => setIsModalOpen(true)} title="Logout">
             <span className={styles.navIcon}><RiLogoutBoxRLine size={20} /></span>
             {!collapsed && <span className={styles.navText}>Logout</span>}
           </button>

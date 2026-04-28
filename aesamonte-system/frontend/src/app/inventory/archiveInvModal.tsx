@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import { useState } from 'react'
 import styles from '@/css/inventory.module.css'
 import {
   LuSearch,
@@ -51,6 +51,11 @@ export default function ArchiveTable({ products, onRestore, onBack }: ArchiveTab
 
   const sortedProducts = [...filteredProducts].sort((a, b) => {
     if (!sortConfig.key || !sortConfig.direction) return 0
+    if (sortConfig.key === 'id') {
+      return sortConfig.direction === 'asc'
+        ? (Number(a.id) || 0) - (Number(b.id) || 0)
+        : (Number(b.id) || 0) - (Number(a.id) || 0)
+    }
     const aVal = a[sortConfig.key] ?? ''
     const bVal = b[sortConfig.key] ?? ''
     if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1
@@ -58,10 +63,8 @@ export default function ArchiveTable({ products, onRestore, onBack }: ArchiveTab
     return 0
   })
 
-  const requestSort = (key: keyof Product) => {
-    let direction: 'asc' | 'desc' = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
-    setSortConfig({ key, direction });
+  const requestSort = (key: keyof Product, direction: 'asc' | 'desc') => {
+    setSortConfig({ key, direction })
   }
 
   // Pagination Logic
@@ -97,11 +100,7 @@ export default function ArchiveTable({ products, onRestore, onBack }: ArchiveTab
       <div className={s.header}>
         <h1 className={s.title} style={{ color: '#64748b' }}>Archived Inventory</h1>
         <div className={s.controls}>
-          <button
-            className={s.archiveIconBtn}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#64748b', color: '#fff', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 600 }}
-            onClick={onBack}
-          >
+          <button className={s.backArchiveIconBtn} onClick={onBack}>
             <LuArrowLeft size={18} /> Back to Active
           </button>
           <div className={s.searchWrapper}>
@@ -130,13 +129,27 @@ export default function ArchiveTable({ products, onRestore, onBack }: ArchiveTab
                 { label: 'TOTAL QTY', key: 'qty' },
                 { label: 'UOM', key: 'uom' },
               ].map(col => (
-                <th key={col.key} onClick={() => requestSort(col.key as keyof Product)} style={{ cursor: 'pointer' }}>
+                <th key={col.key}>
                   <div className={s.sortableHeader}>
                     <span>{col.label}</span>
-                    <div className={s.sortIconsStack}>
-                      <LuChevronUp className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''} />
-                      <LuChevronDown className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''} />
-                    </div>
+                    {col.key === 'id' && (
+                      <div className={s.sortIconsStack}>
+                        <span
+                          className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''}
+                          onClick={() => requestSort(col.key as keyof Product, 'asc')}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <LuChevronUp size={12} />
+                        </span>
+                        <span
+                          className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''}
+                          onClick={() => requestSort(col.key as keyof Product, 'desc')}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <LuChevronDown size={12} />
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </th>
               ))}

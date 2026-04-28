@@ -269,9 +269,7 @@ const Inventory: React.FC<InventoryProps> = ({ role, employeeId = 0, onLogout, i
     }
   };
 
-  const requestSort = (key: keyof Product) => {
-    let direction: 'asc' | 'desc' = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+  const requestSort = (key: keyof Product, direction: 'asc' | 'desc') => {
     setSortConfig({ key, direction });
   };
 
@@ -368,24 +366,25 @@ const Inventory: React.FC<InventoryProps> = ({ role, employeeId = 0, onLogout, i
   };
 
   const sortedProducts = useMemo(() => {
-    const arr = [...filteredProducts];
-    const baseSort = !sortConfig.key || !sortConfig.direction
-      ? (a: Product, b: Product) => Number(a.id) - Number(b.id)
-      : (a: Product, b: Product) => {
-          const key = sortConfig.key as keyof Product;
-          const A = a[key]; const B = b[key];
-          if (typeof A === 'number' && typeof B === 'number') return sortConfig.direction === 'asc' ? A - B : B - A;
-          const strA = String(A).toLowerCase(); const strB = String(B).toLowerCase();
-          if (strA < strB) return sortConfig.direction === 'asc' ? -1 : 1;
-          if (strA > strB) return sortConfig.direction === 'asc' ? 1 : -1;
-          return 0;
-        };
-    return arr.sort((a, b) => {
+  const arr = [...filteredProducts];
+  return arr.sort((a, b) => {
+    // Only pin status groups when NO sort is active
+    if (!sortConfig.key || !sortConfig.direction) {
       const priorityDiff = getStatusPriority(a.status) - getStatusPriority(b.status);
-      if (priorityDiff !== 0) return priorityDiff; // pin alert rows first
-      return baseSort(a, b);                        // then apply normal sort within each group
-    });
-  }, [filteredProducts, sortConfig]);
+      if (priorityDiff !== 0) return priorityDiff;
+      return Number(a.id) - Number(b.id);
+    }
+    // When sorting is active, just sort by the chosen key
+    const key = sortConfig.key as keyof Product;
+    const A = a[key]; const B = b[key];
+    if (key === 'id') return sortConfig.direction === 'asc' ? (Number(A) || 0) - (Number(B) || 0) : (Number(B) || 0) - (Number(A) || 0);
+    if (typeof A === 'number' && typeof B === 'number') return sortConfig.direction === 'asc' ? A - B : B - A;
+    const strA = String(A).toLowerCase(); const strB = String(B).toLowerCase();
+    if (strA < strB) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (strA > strB) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+}, [filteredProducts, sortConfig]);
 
 const totalPages = Math.max(1, Math.ceil(sortedProducts.length / ROWS_PER_PAGE));
   const paginatedProducts = sortedProducts.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
@@ -646,23 +645,34 @@ const totalPages = Math.max(1, Math.ceil(sortedProducts.length / ROWS_PER_PAGE))
                       { label: 'TOTAL QTY', key: 'qty' },
                       { label: 'UOM', key: 'uom' },
                       { label: 'STATUS', key: 'status' },
-                    ].map(col => (
-                      <th
-                        key={col.label}
-                        onClick={() => col.key && requestSort(col.key as keyof Product)}
-                        style={{ cursor: col.key ? 'pointer' : 'default', whiteSpace: 'nowrap' }}
-                      >
-                        <div className={s.sortableHeader}>
-                          <span>{col.label}</span>
-                          {col.key && (
-                            <div className={s.sortIconsStack}>
-                              <LuChevronUp className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''} />
-                              <LuChevronDown className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''} />
-                            </div>
-                          )}
-                        </div>
-                      </th>
-                    ))}
+                    ].map(col => {
+                      const isSortable = col.key === 'id'
+                      return (
+                        <th key={col.label}>
+                          <div className={isSortable ? s.sortableHeader : s.nonSortableHeader}>
+                            <span>{col.label}</span>
+                            {isSortable && (
+                              <div className={s.sortIconsStack}>
+                                <span
+                                  className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''}
+                                  onClick={() => requestSort(col.key as keyof Product, 'asc')}
+                                  style={{ cursor: 'pointer' }}
+                                >
+                                  <LuChevronUp size={12} />
+                                </span>
+                                <span
+                                  className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''}
+                                  onClick={() => requestSort(col.key as keyof Product, 'desc')}
+                                  style={{ cursor: 'pointer' }}
+                                >
+                                  <LuChevronDown size={12} />
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </th>
+                      )
+                    })}
                     <th className={s.actionHeader}>Action</th>
                   </tr>
                 </thead>

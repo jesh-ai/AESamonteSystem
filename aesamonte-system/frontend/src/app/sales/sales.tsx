@@ -233,11 +233,9 @@ const canExport = !!permissions?.can_export
     return matchesArchiveView && searchStr.includes(searchTerm.toLowerCase()) && matchesStatus && matchesDateRange
   })
 
-  const requestSort = (key: keyof Transaction) => {
-    let direction: 'asc' | 'desc' = 'asc'
-    if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc'
-    setSortConfig({ key, direction })
-  }
+const requestSort = (key: keyof Transaction, direction: 'asc' | 'desc') => {
+  setSortConfig({ key, direction })
+}
 
   const sortedTx = useMemo(() => {
     const arr = [...filteredTx]
@@ -245,7 +243,7 @@ const canExport = !!permissions?.can_export
     const key = sortConfig.key as keyof Transaction
     return arr.sort((a, b) => {
       const A = a[key]; const B = b[key]
-      if (key === 'qty' || key === 'amount') {
+      if (key === 'no' ||key === 'qty' || key === 'amount') {
         return sortConfig.direction === 'asc' ? (Number(A) || 0) - (Number(B) || 0) : (Number(B) || 0) - (Number(A) || 0)
       }
       const strA = String(A ?? '').toLowerCase(); const strB = String(B ?? '').toLowerCase()
@@ -539,31 +537,47 @@ if (isLoading === null) return (
             <div className={s.tableResponsive}>
               <table className={s.table}>
                 <thead>
-                  <tr>
-                    {[
-                      { label: 'No.', key: 'no' }, { label: 'NAME', key: 'name' },
-                      { label: 'ADDRESS', key: 'address' }, { label: 'DATE', key: 'date' },
-                      { label: 'QTY', key: 'qty' }, { label: 'AMOUNT', key: 'amount' },
-                      { label: 'PAYMENT', key: 'paymentMethod' }, { label: 'STATUS', key: 'status' }
-                    ].map(col => {
-                      const isSortable = col.key === 'no' || col.key === 'name'
-                      return (
-                        <th key={col.key} onClick={() => isSortable && requestSort(col.key as keyof Transaction)} style={{ cursor: isSortable ? 'pointer' : 'default' }}>
-                          <div className={isSortable ? s.sortableHeader : s.nonSortableHeader}>
-                            <span>{col.label}</span>
-                            {isSortable && (
-                              <div className={s.sortIconsStack}>
-                                <LuChevronUp className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''} />
-                                <LuChevronDown className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''} />
-                              </div>
-                            )}
-                          </div>
-                        </th>
-                      )
-                    })}
-                    <th className={s.actionHeader}>Action</th>
-                  </tr>
-                </thead>
+  <tr>
+    {[
+      { label: 'No.', key: 'no' },
+      { label: 'NAME', key: 'name' },
+      { label: 'ADDRESS', key: 'address' },
+      { label: 'DATE', key: 'date' },
+      { label: 'QTY', key: 'qty' },
+      { label: 'AMOUNT', key: 'amount' },
+      { label: 'PAYMENT', key: 'paymentMethod' },
+      { label: 'STATUS', key: 'status' }
+    ].map(col => {
+      const isSortable = col.key === 'no'
+      return (
+        <th key={col.key}>
+          <div className={isSortable ? s.sortableHeader : s.nonSortableHeader}>
+            <span>{col.label}</span>
+            {isSortable && (
+              <div className={s.sortIconsStack}>
+                <span
+                className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''}
+                onClick={() => requestSort(col.key as keyof Transaction, 'asc')}
+                style={{ cursor: 'pointer' }}
+              >
+                <LuChevronUp size={12} />
+              </span>
+              <span
+                className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''}
+                onClick={() => requestSort(col.key as keyof Transaction, 'desc')}
+                style={{ cursor: 'pointer' }}
+              >
+                <LuChevronDown size={12} />
+              </span>
+              </div>
+            )}
+          </div>
+        </th>
+      )
+    })}
+    <th className={s.actionHeader}>Action</th>
+  </tr>
+</thead>
                 <tbody>
                 {isLoading ? (
                   <>

@@ -53,6 +53,14 @@ export default function ArchiveTable({ transactions, onRestore, onBack }: Archiv
     if (!sortConfig.key || !sortConfig.direction) return 0
     const aVal = a[sortConfig.key] ?? ''
     const bVal = b[sortConfig.key] ?? ''
+
+    // Numeric sort for 'no'
+    if (sortConfig.key === 'no') {
+      return sortConfig.direction === 'asc'
+        ? Number(aVal) - Number(bVal)
+        : Number(bVal) - Number(aVal)
+    }
+
     if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1
     if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1
     return 0
@@ -97,14 +105,13 @@ export default function ArchiveTable({ transactions, onRestore, onBack }: Archiv
 
         <div className={s.controls}>
           {/* Back Button */}
-          <button 
-            className={s.archiveIconBtn} 
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#64748b', color: '#fff', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 600 }}
-            onClick={onBack}
-          >
-            <LuArrowLeft size={18} /> Back to Active
-          </button>
-
+          <button
+          className={s.backArchiveIconBtn}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#64748b', color: '#fff', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+          onClick={onBack}
+         >
+          <LuArrowLeft size={18} /> Back to Active
+                    </button>
           <div className={s.searchWrapper}>
             <input
               className={s.searchInput}
@@ -122,7 +129,7 @@ export default function ArchiveTable({ transactions, onRestore, onBack }: Archiv
 
       <div className={s.tableResponsive}>
         <table className={s.table}>
-          <thead>
+            <thead>
             <tr>
               {[
                 { label: 'No.', key: 'no' },
@@ -136,29 +143,30 @@ export default function ArchiveTable({ transactions, onRestore, onBack }: Archiv
                 <th key={col.key}>
                   <div className={s.sortableHeader}>
                     <span>{col.label}</span>
-                    <div className={s.sortIconsStack}>
-                      <span 
+                    {col.key === 'no' && (
+                      <div className={s.sortIconsStack}>
+                        <span
                         className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''}
                         onClick={() => requestSort(col.key as keyof Transaction, 'asc')}
                         style={{ cursor: 'pointer' }}
                       >
                         <LuChevronUp size={12} />
                       </span>
-                      <span 
+                      <span
                         className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''}
                         onClick={() => requestSort(col.key as keyof Transaction, 'desc')}
                         style={{ cursor: 'pointer' }}
                       >
                         <LuChevronDown size={12} />
                       </span>
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </th>
               ))}
               <th className={s.actionHeader}>Action</th>
             </tr>
           </thead>
-
           <tbody>
             {paginatedTx.length ? (
               paginatedTx.map((tx, i) => (
