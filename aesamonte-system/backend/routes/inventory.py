@@ -4,16 +4,16 @@ from datetime import datetime, date, timedelta
 
 inventory_bp = Blueprint("inventory", __name__)
 
-def _get_status_id(cur, code):
-    """Resolve status_id for INVENTORY_STATUS scope."""
+def _get_status_id(cur, code, scope='INVENTORY_STATUS'):
+    """Resolve status_id for the given scope (default: INVENTORY_STATUS)."""
     cur.execute(
         "SELECT status_id FROM static_status "
-        "WHERE status_scope = 'INVENTORY_STATUS' AND status_code = %s LIMIT 1",
-        (code,)
+        "WHERE status_scope = %s AND status_code = %s LIMIT 1",
+        (scope, code)
     )
     row = cur.fetchone()
     if not row:
-        raise Exception(f"Status code '{code}' not found in static_status.")
+        raise Exception(f"Status code '{code}' not found in static_status (scope={scope}).")
     return row[0]
 
 
@@ -117,6 +117,78 @@ def _remove_variants(cur, id_list: list) -> tuple[int, int]:
         )
 
     return len(to_hard_delete), len(to_soft_delete)
+
+
+# Batch status IDs from static_status table (avoids repeated lookups)
+BATCH_STATUS_ACTIVE   = 15
+BATCH_STATUS_DEPLETED = 17
+
+
+class InsufficientStockError(Exception):
+    pass
+
+
+def process_fefo_depletion(cur, inventory_brand_id, required_qty):
+    """
+    Deplete stock for inventory_brand_id by required_qty using FEFO ordering
+    (oldest expiry date consumed first).
+
+    Returns a list of {"batch_id": int, "qty_deducted": int} for each batch
+    touched — callers can persist this into order_details.
+
+    Raises InsufficientStockError if total active stock < required_qty.
+    Caller is responsible for committing the transaction.
+    """
+    cur.execute("""
+        SELECT COALESCE(SUM(quantity_on_hand), 0)
+        FROM   inventory_batch
+        WHERE  inventory_brand_id = %s
+          AND  batch_status_id    = %s
+    """, (inventory_brand_id, BATCH_STATUS_ACTIVE))
+    total_available = cur.fetchone()[0]
+
+    if total_available < required_qty:
+        raise InsufficientStockError(
+            f"Insufficient stock: requested {required_qty}, available {total_available}."
+        )
+
+    cur.execute("""
+        SELECT batch_id, quantity_on_hand
+        FROM   inventory_batch
+        WHERE  inventory_brand_id = %s
+          AND  batch_status_id    = %s
+          AND  quantity_on_hand   > 0
+        ORDER BY expiry_date ASC NULLS LAST, batch_id ASC
+    """, (inventory_brand_id, BATCH_STATUS_ACTIVE))
+    batches = cur.fetchall()
+
+    deductions = []
+    remaining  = required_qty
+    for batch_id, qty_on_hand in batches:
+        if remaining <= 0:
+            break
+        deduct  = min(qty_on_hand, remaining)
+        new_qty = qty_on_hand - deduct
+        remaining -= deduct
+
+        if new_qty == 0:
+            cur.execute("""
+                UPDATE inventory_batch
+                SET    quantity_on_hand = 0,
+                       batch_status_id  = %s
+                WHERE  batch_id = %s
+            """, (BATCH_STATUS_DEPLETED, batch_id))
+        else:
+            cur.execute("""
+                UPDATE inventory_batch
+                SET    quantity_on_hand = %s
+                WHERE  batch_id = %s
+            """, (new_qty, batch_id))
+
+        deductions.append({"batch_id": batch_id, "qty_deducted": deduct})
+
+    return deductions
+
 
 @inventory_bp.route("/api/brands", methods=["GET"])
 def get_brands():
@@ -224,7 +296,12 @@ def search_inventory_variants():
             u.uom_name,
             COALESCE(ib.item_description, '')   AS item_description,
             COALESCE(ib.item_selling_price, 0)  AS item_selling_price,
-            ib.total_quantity
+            COALESCE((
+                SELECT SUM(bat.quantity_on_hand)
+                FROM   inventory_batch bat
+                WHERE  bat.inventory_brand_id = ib.inventory_brand_id
+                  AND  bat.batch_status_id    = 15
+            ), 0) AS total_quantity
         FROM inventory_brand ib
         JOIN inventory        i    ON i.inventory_id    = ib.inventory_id
         JOIN brand            b    ON b.brand_id        = ib.brand_id
@@ -233,7 +310,12 @@ def search_inventory_variants():
                                   AND s_i.status_scope  = 'INVENTORY_STATUS'
         LEFT JOIN static_status s_b ON s_b.status_id   = ib.item_status_id
                                    AND s_b.status_scope = 'INVENTORY_STATUS'
-        WHERE ib.total_quantity > 0
+        WHERE COALESCE((
+                SELECT SUM(bat2.quantity_on_hand)
+                FROM   inventory_batch bat2
+                WHERE  bat2.inventory_brand_id = ib.inventory_brand_id
+                  AND  bat2.batch_status_id    = 15
+              ), 0) > 0
           AND COALESCE(s_b.status_code, '') != 'ARCHIVED'
           AND s_i.status_code != 'ARCHIVED'
     """
@@ -288,7 +370,7 @@ def get_inventory():
             SELECT
                 i.inventory_id,
                 i.item_name,
-                COALESCE(SUM(ib.total_quantity), 0)       AS total_quantity,
+                COALESCE(SUM(bat_agg.qty_on_hand), 0)     AS total_quantity,
                 COALESCE(
                     (SELECT u2.uom_name
                      FROM inventory_brand ib2
@@ -309,6 +391,12 @@ def get_inventory():
                 ON ib.inventory_id = i.inventory_id
             LEFT JOIN inventory_action ia
                 ON ia.inventory_brand_id = ib.inventory_brand_id
+            LEFT JOIN (
+                SELECT inventory_brand_id, SUM(quantity_on_hand) AS qty_on_hand
+                FROM   inventory_batch
+                WHERE  batch_status_id = 15
+                GROUP BY inventory_brand_id
+            ) bat_agg ON bat_agg.inventory_brand_id = ib.inventory_brand_id
             GROUP BY
                 i.inventory_id, i.item_name,
                 s.status_name, s.status_code, i.item_status_id
@@ -322,9 +410,13 @@ def get_inventory():
                 b.brand_id,
                 COALESCE(b.brand_name, 'Generic')  AS brand_name,
                 ib.item_sku,
-                ib.item_unit_price,
                 ib.item_selling_price,
-                ib.total_quantity,
+                COALESCE((
+                    SELECT SUM(bat.quantity_on_hand)
+                    FROM   inventory_batch bat
+                    WHERE  bat.inventory_brand_id = ib.inventory_brand_id
+                      AND  bat.batch_status_id    = 15
+                ), 0)                              AS qty_on_hand,
                 COALESCE(ia.reorder_qty, 0)        AS reorder_qty,
                 COALESCE(ia.low_stock_qty, 0)      AS low_stock_qty,
                 u.uom_name,
@@ -365,14 +457,14 @@ def get_inventory():
     for br in brand_rows:
         inv_id = str(br[0])
         brands_map.setdefault(inv_id, []).append({
-            "brand_id": br[1],
-            "brand_name": br[2],
-            "sku": br[3] or "—",
-            "unit_price": float(br[4] or 0),
-            "selling_price": float(br[5] or 0),
-            "qty": int(br[6] or 0),
-            "uom": br[9] or "—",
-            "inventory_brand_id": br[10],
+            "brand_id":          br[1],
+            "brand_name":        br[2],
+            "sku":               br[3] or "—",
+            "unit_price":        0.0,                   # removed from schema
+            "selling_price":     float(br[4] or 0),    # index 4
+            "qty":               int(br[5] or 0),       # index 5 — from inventory_batch
+            "uom":               br[8] or "—",          # index 8
+            "inventory_brand_id": br[9],                # index 9
         })
 
     suppliers_map: dict = {}
@@ -452,14 +544,17 @@ def get_inventory_item(id):
                 b.brand_id,
                 COALESCE(b.brand_name, 'Generic')  AS brand_name,
                 ib.item_sku,
-                ib.item_unit_price,
                 ib.item_selling_price,
-                ib.total_quantity,
+                COALESCE((
+                    SELECT SUM(bat.quantity_on_hand)
+                    FROM   inventory_batch bat
+                    WHERE  bat.inventory_brand_id = ib.inventory_brand_id
+                      AND  bat.batch_status_id    = 15
+                ), 0)                              AS qty_on_hand,
                 ib.item_description,
                 u.uom_name,
                 COALESCE(ia.reorder_qty, 0)        AS reorder_qty,
-                ib.inventory_brand_id,
-                ib.shelf_life
+                ib.inventory_brand_id
             FROM inventory_brand ib
             LEFT JOIN brand b ON ib.brand_id = b.brand_id
             LEFT JOIN unit_of_measure u ON ib.uom_id = u.uom_id
@@ -470,17 +565,17 @@ def get_inventory_item(id):
         """, (id,))
         brands_list = [
             {
-                "inventory_brand_id": row[9],
+                "inventory_brand_id": row[8],
                 "brand_id":           row[0],
                 "brand_name":         row[1],
                 "sku":                row[2] or "",
-                "unit_price":         float(row[3] or 0),
-                "selling_price":      float(row[4] or 0),
-                "qty":                int(row[5] or 0),
-                "description":        row[6] or "",
-                "uom":                row[7] or "Select",
-                "reorder_point":      int(row[8] or 0),
-                "shelf_life":         row[10].isoformat() if row[10] else None,
+                "unit_price":         0.0,                   # removed from schema
+                "selling_price":      float(row[3] or 0),   # index 3
+                "qty":                int(row[4] or 0),      # index 4 — from inventory_batch
+                "description":        row[5] or "",          # index 5
+                "uom":                row[6] or "Select",    # index 6
+                "reorder_point":      int(row[7] or 0),      # index 7
+                "shelf_life":         None,                  # removed from schema
             }
             for row in cur.fetchall()
         ]
@@ -576,24 +671,39 @@ def add_inventory_batch():
 
                 cur.execute("""
                     INSERT INTO inventory_brand
-                        (inventory_id, brand_id, item_sku, item_unit_price,
-                         item_selling_price, total_quantity, uom_id,
-                         item_status_id, item_description, shelf_life)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        (inventory_id, brand_id, item_sku,
+                         item_selling_price, uom_id,
+                         item_status_id, item_description)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
                     RETURNING inventory_brand_id
                 """, (
                     new_inventory_id,
                     brand_id,
                     bv.get('sku') or None,
-                    float(bv.get('unit_price', 0)),
                     float(bv.get('selling_price', 0)),
-                    int(bv.get('qty', 0)),
                     uom_id,
                     available_status_id,
                     description,
-                    _parse_shelf_life(bv.get('shelf_life')),
                 ))
                 new_brand_id = cur.fetchone()[0]
+
+                # Create the initial batch record (unit_price → unit_cost, shelf_life → expiry_date)
+                active_batch_status_id = _get_status_id(cur, 'ACTIVE', 'BATCH_STATUS')
+                qty_received = int(bv.get('qty', 0))
+                cur.execute("""
+                    INSERT INTO inventory_batch
+                        (inventory_brand_id, batch_number, quantity_received,
+                         quantity_on_hand, unit_cost, expiry_date, batch_status_id)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    new_brand_id,
+                    bv.get('sku') or None,
+                    qty_received,
+                    qty_received,
+                    float(bv.get('unit_price', 0)),
+                    _parse_shelf_life(bv.get('shelf_life')),
+                    active_batch_status_id,
+                ))
 
                 for sup in resolved_suppliers:
                     cur.execute("""
@@ -732,22 +842,16 @@ def update_inventory_item(inventory_id):
                 cur.execute("""
                     UPDATE inventory_brand SET
                         brand_id           = %s,
-                        item_unit_price    = %s,
                         item_selling_price = %s,
-                        total_quantity     = %s,
                         uom_id             = %s,
-                        item_description   = %s,
-                        shelf_life         = %s
+                        item_description   = %s
                     WHERE inventory_brand_id = %s
                       AND inventory_id = %s
                 """, (
                     brand_id,
-                    float(bv.get('unit_price', 0)),
                     float(bv.get('selling_price', 0)),
-                    new_qty,
                     uom_id,
                     description,
-                    _parse_shelf_life(bv.get('shelf_life')),
                     ibid,
                     id,
                 ))
@@ -793,14 +897,9 @@ def update_inventory_item(inventory_id):
                         cur.execute("""
                             UPDATE inventory_brand SET
                                 item_status_id     = %s,
-                                item_unit_price    = %s,
-                                item_selling_price = %s,
-                                total_quantity     = %s,
-                                shelf_life         = %s
+                                item_selling_price = %s
                             WHERE inventory_brand_id = %s
-                        """, (available_status_id, float(bv.get('unit_price', 0)),
-                              float(bv.get('selling_price', 0)), new_qty,
-                              _parse_shelf_life(bv.get('shelf_life')), existing_ibid))
+                        """, (available_status_id, float(bv.get('selling_price', 0)), existing_ibid))
 
                         cur.execute("""
                             UPDATE inventory_action SET
@@ -830,15 +929,12 @@ def update_inventory_item(inventory_id):
                 else:
                     cur.execute("""
                         INSERT INTO inventory_brand
-                            (inventory_id, brand_id, item_unit_price,
-                             item_selling_price, total_quantity, uom_id,
-                             item_status_id, item_description, shelf_life)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            (inventory_id, brand_id, item_selling_price,
+                             uom_id, item_status_id, item_description)
+                        VALUES (%s, %s, %s, %s, %s, %s)
                         RETURNING inventory_brand_id
-                    """, (id, brand_id, float(bv.get('unit_price', 0)),
-                          float(bv.get('selling_price', 0)), new_qty, uom_id,
-                          available_status_id, description,
-                          _parse_shelf_life(bv.get('shelf_life'))))
+                    """, (id, brand_id, float(bv.get('selling_price', 0)),
+                          uom_id, available_status_id, description))
                     new_ibid = cur.fetchone()[0]
 
                     for sup in resolved_suppliers:
@@ -918,11 +1014,9 @@ def upsert_inventory(inventory_id):
         available_status_id = _get_status_id(cur, "AVAILABLE")
 
         for v in variants:
-            uom_id      = v.get("uom_id")
-            reorder_pt  = max(0, int(v.get("reorder_point") or 0))
-            new_stock   = max(0, int(v.get("new_total_stock") or 0))
-            price        = float(v.get("price") or 0)
-            unit_price   = float(v.get("unit_price")   if v.get("unit_price")   is not None else price)
+            uom_id        = v.get("uom_id")
+            reorder_pt    = max(0, int(v.get("reorder_point") or 0))
+            price         = float(v.get("price") or 0)
             selling_price = float(v.get("selling_price") if v.get("selling_price") is not None else price)
 
             if not uom_id:
@@ -967,11 +1061,9 @@ def upsert_inventory(inventory_id):
                 cur.execute("""
                     UPDATE inventory_brand
                     SET    uom_id             = %s,
-                           item_unit_price    = %s,
-                           item_selling_price = %s,
-                           total_quantity     = %s
+                           item_selling_price = %s
                     WHERE  inventory_brand_id = %s
-                """, (int(uom_id), unit_price, selling_price, new_stock, ibid))
+                """, (int(uom_id), selling_price, ibid))
 
                 cur.execute("""
                     UPDATE inventory_action
@@ -1012,12 +1104,9 @@ def upsert_inventory(inventory_id):
                         cur.execute("""
                             UPDATE inventory_brand
                             SET    item_status_id     = %s,
-                                   item_unit_price    = %s,
-                                   item_selling_price = %s,
-                                   total_quantity     = %s
+                                   item_selling_price = %s
                             WHERE  inventory_brand_id = %s
-                        """, (available_status_id, unit_price, selling_price,
-                              new_stock, existing_ibid))
+                        """, (available_status_id, selling_price, existing_ibid))
 
                         cur.execute("""
                             UPDATE inventory_action
@@ -1039,17 +1128,14 @@ def upsert_inventory(inventory_id):
                     cur.execute("""
                         INSERT INTO inventory_brand
                                (inventory_id, brand_id, uom_id,
-                                item_unit_price, item_selling_price,
-                                total_quantity, item_status_id)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                                item_selling_price, item_status_id)
+                        VALUES (%s, %s, %s, %s, %s)
                         RETURNING inventory_brand_id
                     """, (
                         inventory_id,
                         int(brand_id),
                         int(uom_id),
-                        unit_price,
                         selling_price,
-                        new_stock,
                         available_status_id,
                     ))
                     new_ibid = cur.fetchone()[0]
@@ -1091,16 +1177,13 @@ def toggle_inventory_archive(inventory_id):
     cur = conn.cursor()
     try:
         cur.execute("""
-            SELECT
-                ss.status_code,
-                COALESCE(SUM(ib.total_quantity), 0) AS total_qty
+            SELECT ss.status_code
             FROM inventory i
             JOIN static_status ss
                 ON i.item_status_id = ss.status_id
                AND ss.status_scope = 'INVENTORY_STATUS'
-            LEFT JOIN inventory_brand ib ON ib.inventory_id = i.inventory_id
             WHERE i.inventory_id = %s
-            GROUP BY ss.status_code
+            LIMIT 1
         """, (inventory_id,))
         row = cur.fetchone()
         if not row:
@@ -1209,6 +1292,163 @@ def get_inventory_summary():
     except Exception as e:
         import traceback; traceback.print_exc()
         return jsonify({"weekly": 0, "monthly": 0, "yearly": 0, "totalProductsChange": 0.0}), 200
+    finally:
+        cur.close()
+        conn.close()
+
+
+@inventory_bp.route("/api/inventory/batches/receive", methods=["POST"])
+def receive_inventory_batch():
+    """
+    Record a new stock receipt into inventory_batch.
+    Batch number is auto-generated as BTCH-[YYMM]-[batch_id].
+    batch_status_id defaults to 15 (Active).
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        data               = request.get_json()
+        inventory_brand_id = data.get("inventory_brand_id")
+        quantity_received  = int(data.get("quantity_received") or 0)
+        unit_cost          = float(data.get("unit_cost") or 0)
+        expiry_date        = data.get("expiry_date") or None
+
+        if not inventory_brand_id:
+            return jsonify({"error": "inventory_brand_id is required."}), 400
+        if quantity_received <= 0:
+            return jsonify({"error": "quantity_received must be greater than 0."}), 400
+
+        # Insert without batch_number first so we have the PK for the pattern
+        cur.execute("""
+            INSERT INTO inventory_batch
+                (inventory_brand_id, quantity_received,
+                 quantity_on_hand, unit_cost, expiry_date, batch_status_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING batch_id
+        """, (
+            int(inventory_brand_id),
+            quantity_received,
+            quantity_received,
+            unit_cost,
+            expiry_date,
+            BATCH_STATUS_ACTIVE,
+        ))
+        batch_id     = cur.fetchone()[0]
+        yymm         = datetime.now().strftime('%y%m')
+        batch_number = f"BTCH-{yymm}-{batch_id:04d}"
+
+        cur.execute(
+            "UPDATE inventory_batch SET batch_number = %s WHERE batch_id = %s",
+            (batch_number, batch_id)
+        )
+        conn.commit()
+        return jsonify({
+            "message":      "Batch received successfully.",
+            "batch_id":     batch_id,
+            "batch_number": batch_number,
+        }), 201
+
+    except Exception as e:
+        conn.rollback()
+        import traceback; traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
+@inventory_bp.route("/api/inventory/batches/<int:brand_id>", methods=["GET"])
+def get_inventory_batches(brand_id):
+    """Return all active batches for a brand variant, ordered FEFO."""
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT
+                batch_id,
+                batch_number,
+                quantity_received,
+                quantity_on_hand,
+                unit_cost,
+                expiry_date
+            FROM  inventory_batch
+            WHERE inventory_brand_id = %s
+              AND batch_status_id    = %s
+            ORDER BY expiry_date ASC NULLS LAST, batch_id ASC
+        """, (brand_id, BATCH_STATUS_ACTIVE))
+        rows = cur.fetchall()
+        return jsonify([
+            {
+                "batch_id":          row[0],
+                "batch_number":      row[1] or "",
+                "quantity_received": int(row[2] or 0),
+                "quantity_on_hand":  int(row[3] or 0),
+                "unit_cost":         float(row[4] or 0),
+                "expiry_date":       row[5].isoformat() if row[5] else None,
+            }
+            for row in rows
+        ]), 200
+
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
+@inventory_bp.route("/api/inventory/expired-warning", methods=["GET"])
+def get_expired_warning():
+    """
+    Return active batch lines expiring within the next 30 days that still
+    have stock on hand. Results ordered by soonest expiry first.
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT
+                i.inventory_id,
+                i.item_name,
+                COALESCE(b.brand_name, 'No Brand') AS brand_name,
+                COALESCE(u.uom_name, '')           AS uom,
+                bat.batch_id,
+                bat.batch_number,
+                bat.quantity_on_hand,
+                bat.unit_cost,
+                bat.expiry_date,
+                (bat.expiry_date - CURRENT_DATE)   AS days_until_expiry
+            FROM  inventory_batch  bat
+            JOIN  inventory_brand  ib  ON ib.inventory_brand_id = bat.inventory_brand_id
+            JOIN  inventory        i   ON i.inventory_id        = ib.inventory_id
+            LEFT JOIN brand        b   ON b.brand_id            = ib.brand_id
+            LEFT JOIN unit_of_measure u ON u.uom_id             = ib.uom_id
+            WHERE bat.batch_status_id  = %s
+              AND bat.quantity_on_hand > 0
+              AND bat.expiry_date IS NOT NULL
+              AND bat.expiry_date <= CURRENT_DATE + INTERVAL '30 days'
+            ORDER BY bat.expiry_date ASC, bat.batch_id ASC
+        """, (BATCH_STATUS_ACTIVE,))
+        rows = cur.fetchall()
+        return jsonify([
+            {
+                "inventory_id":      row[0],
+                "item_name":         row[1],
+                "brand_name":        row[2],
+                "uom":               row[3],
+                "batch_id":          row[4],
+                "batch_number":      row[5] or "",
+                "quantity_on_hand":  int(row[6] or 0),
+                "unit_cost":         float(row[7] or 0),
+                "expiry_date":       row[8].isoformat() if row[8] else None,
+                "days_until_expiry": int(row[9]) if row[9] is not None else None,
+            }
+            for row in rows
+        ]), 200
+
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
     finally:
         cur.close()
         conn.close()
