@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Login from "@/app/auth/auth";
+import CreatePassword from "@/app/auth/CreatePassword";
 import Dashboard from "@/app/dashboard/dashboard";
 import Sidebar from "@/components/layout/SideNavBar";
 import Reports from "@/app/reports/reports";
@@ -27,6 +28,7 @@ export default function Home() {
   const [authReady, setAuthReady] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState("Dashboard");
 
@@ -72,9 +74,14 @@ export default function Home() {
     return () => window.removeEventListener('app:navigate', handleNavigate);
   }, []);
 
-  const handleLogin = (data: UserInfo) => {
+  const handleLogin = (data: UserInfo, mustChange = false) => {
     setUserInfo(data);
-    setIsLoggedIn(true);
+    if (mustChange) {
+      // Show Create Password screen — don't enter the dashboard yet
+      setMustChangePassword(true);
+    } else {
+      setIsLoggedIn(true);
+    }
   };
 
   const handleLogout = () => {
@@ -87,7 +94,16 @@ export default function Home() {
 
  return (
     <main className="min-h-screen bg-linear-to-b from-[#0A2A43] to-[#1a5887]">
-      {!authReady ? null : !isLoggedIn || !userInfo ? (
+      {!authReady ? null : mustChangePassword && userInfo ? (
+        /* Show Create Password screen after logging in with a temp password */
+        <CreatePassword
+          userInfo={userInfo}
+          onLoginAgain={() => {
+            setMustChangePassword(false);
+            setUserInfo(null);
+          }}
+        />
+      ) : !isLoggedIn || !userInfo ? (
         /* Show Login Screen */
         <div className="flex justify-center items-center h-screen">
           <Login onLogin={handleLogin} />

@@ -10,7 +10,7 @@ import type { UserInfo } from "@/types/user";
 import ForgotPassword from "./ForgotPassword";
 
 interface LoginProps {
-  onLogin: (user: UserInfo) => void;
+  onLogin: (user: UserInfo, mustChangePassword?: boolean) => void;
 }
 
 export default function Login({ onLogin }: LoginProps) {
@@ -66,16 +66,23 @@ export default function Login({ onLogin }: LoginProps) {
         localStorage.removeItem("rememberMe");  
       }
 
-      localStorage.setItem("token", data.token);
-      onLogin({
-        employeeId:       data.employee_id,
-        employeeName:     data.employee_name,
-        employeeUsername: data.employee_username,
-        roleName:         data.role,
-        roleId:           data.role_id,
-        permissions:      data.permissions,
-        token:            data.token,
-      });
+      // Only persist the token now if no password change is required.
+      // If must_change_password is true, the token is saved after they set their new password.
+      if (!data.must_change_password) {
+        localStorage.setItem("token", data.token);
+      }
+      onLogin(
+        {
+          employeeId:       data.employee_id,
+          employeeName:     data.employee_name,
+          employeeUsername: data.employee_username,
+          roleName:         data.role,
+          roleId:           data.role_id,
+          permissions:      data.permissions,
+          token:            data.token,
+        },
+        data.must_change_password === true,
+      );
     } catch {
       showToast("Connection failed. The backend server is unreachable. Please try again later.", "error");
     }

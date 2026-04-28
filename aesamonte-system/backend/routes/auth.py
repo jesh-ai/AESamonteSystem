@@ -21,6 +21,7 @@ GMAIL_USER        = os.environ.get("GMAIL_USER", "")
 GMAIL_PASSWORD    = os.environ.get("GMAIL_APP_PASSWORD", "")
 
 _otp_store: dict = {}
+_pending_password_change: set = set()  # employee_ids that must change password after temp reset
 
 # ✅ Replace with these two functions
 def _build_permissions(role_id: int) -> dict:
@@ -155,7 +156,10 @@ def login():
         if not bcrypt.checkpw(password.encode('utf-8'), user['employee_password'].encode('utf-8')):
             return jsonify({"status": "error", "message": "Invalid credentials."}), 401
 
-        return jsonify(_build_token_response(user)), 200
+        response = _build_token_response(user)
+        if user['employee_id'] in _pending_password_change:
+            response['must_change_password'] = True
+        return jsonify(response), 200
 
     finally:
         cur.close()
@@ -207,6 +211,7 @@ def change_password():
             (hashed, employee_id),
         )
         conn.commit()
+        _pending_password_change.discard(int(employee_id))
         return jsonify({"status": "success", "message": "Password changed successfully."}), 200
 
     except Exception as e:
@@ -370,6 +375,7 @@ def reset_password():
             (hashed, employee['employee_id'])
         )
         conn.commit()
+        _pending_password_change.add(employee['employee_id'])
 
         try:
             msg = MIMEMultipart("alternative")
