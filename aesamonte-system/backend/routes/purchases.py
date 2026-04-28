@@ -330,6 +330,125 @@ def create_draft_purchase_order():
         conn.close()
 
 
+# ── PATCH /api/purchases/<po_id>/status ──────────────────────────────────────
+
+VALID_TRANSITIONS: dict[str, list[str]] = {
+    "DRAFT":     ["SENT", "CANCELLED"],
+    "SENT":      ["APPROVED", "CANCELLED"],
+    "APPROVED":  ["COMPLETED", "CANCELLED"],
+}
+
+@purchases_bp.route("/api/purchases/<int:po_id>/status", methods=["PATCH"])
+@require_purchase_access
+def update_purchase_order_status(po_id):
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        data       = request.get_json()
+        new_status = (data.get("status") or "").upper()
+
+        cur.execute("""
+            SELECT ss.status_code
+            FROM purchase_order po
+            JOIN static_status ss ON ss.status_id = po.status_id
+            WHERE po.purchase_order_id = %s
+        """, (po_id,))
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"error": f"Purchase order {po_id} not found."}), 404
+
+        current = row[0].upper()
+        allowed = VALID_TRANSITIONS.get(current, [])
+        if new_status not in allowed:
+            return jsonify({"error": f"Cannot move from {current} to {new_status}."}), 400
+
+        new_status_id = _get_status_id(cur, new_status)
+        cur.execute(
+            "UPDATE purchase_order SET status_id = %s WHERE purchase_order_id = %s",
+            (new_status_id, po_id),
+        )
+        conn.commit()
+        return jsonify({"message": f"Status updated to {new_status}.", "status": new_status}), 200
+
+    except Exception as e:
+        conn.rollback()
+        import traceback; traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
+# ── PUT /api/purchases/<po_id> ────────────────────────────────────────────────
+
+@purchases_bp.route("/api/purchases/<int:po_id>", methods=["PUT"])
+@require_purchase_access
+def update_purchase_order(po_id):
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        data = request.get_json()
+
+        supplier_id       = data.get("supplier_id")
+        notes             = data.get("notes", "")
+        expected_delivery = data.get("expected_delivery") or None
+        items             = data.get("items", [])
+
+        if not supplier_id:
+            return jsonify({"error": "supplier_id is required."}), 400
+        if not items:
+            return jsonify({"error": "At least one item is required."}), 400
+
+        # Only allow editing DRAFT orders
+        draft_status_id = _get_status_id(cur, "DRAFT")
+        cur.execute(
+            "SELECT status_id FROM purchase_order WHERE purchase_order_id = %s",
+            (po_id,)
+        )
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"error": f"Purchase order {po_id} not found."}), 404
+        if row[0] != draft_status_id:
+            return jsonify({"error": "Only DRAFT purchase orders can be edited."}), 400
+
+        # Update header
+        cur.execute("""
+            UPDATE purchase_order
+               SET supplier_id = %s, expected_delivery = %s, notes = %s
+             WHERE purchase_order_id = %s
+        """, (int(supplier_id), expected_delivery, notes, po_id))
+
+        # Replace all items
+        cur.execute("DELETE FROM purchase_order_item WHERE purchase_order_id = %s", (po_id,))
+
+        for item in items:
+            brand_id    = item.get("inventory_brand_id")
+            qty_ordered = int(item.get("quantity_ordered", 0))
+            unit_cost   = float(item.get("unit_cost", 0))
+            expiry_date = item.get("expiry_date") or None
+
+            if not brand_id or qty_ordered <= 0:
+                raise Exception("Each item requires inventory_brand_id and quantity_ordered > 0.")
+
+            cur.execute("""
+                INSERT INTO purchase_order_item
+                    (purchase_order_id, inventory_brand_id, quantity_ordered,
+                     quantity_received, unit_cost, expiry_date)
+                VALUES (%s, %s, %s, 0, %s, %s)
+            """, (po_id, int(brand_id), qty_ordered, unit_cost, expiry_date))
+
+        conn.commit()
+        return jsonify({"message": "Purchase order updated.", "purchase_order_id": po_id}), 200
+
+    except Exception as e:
+        conn.rollback()
+        import traceback; traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
 # ── POST /api/purchases/<po_id>/receive ───────────────────────────────────────
 
 @purchases_bp.route("/api/purchases/<int:po_id>/receive", methods=["POST"])
@@ -442,12 +561,19 @@ def archive_purchase_order(po_id):
     conn = get_connection()
     cur = conn.cursor()
     try:
-        cur.execute(
-            "SELECT purchase_order_id FROM purchase_order WHERE purchase_order_id = %s",
-            (po_id,),
-        )
-        if not cur.fetchone():
+        cur.execute("""
+            SELECT ss.status_code
+            FROM purchase_order po
+            JOIN static_status ss ON ss.status_id = po.status_id
+            WHERE po.purchase_order_id = %s
+        """, (po_id,))
+        row = cur.fetchone()
+        if not row:
             return jsonify({"error": f"Purchase order {po_id} not found."}), 404
+
+        current_status = row[0].upper()
+        if current_status not in ("COMPLETED", "CANCELLED"):
+            return jsonify({"error": "Only COMPLETED or CANCELLED purchase orders can be archived."}), 400
 
         archived_status_id = _get_status_id(cur, "ARCHIVED")
         cur.execute(

@@ -1,8 +1,9 @@
+import os
 from functools import wraps
 from flask import request, jsonify
 import jwt
 
-SECRET_KEY = "your_super_secret_key"
+SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "aesamonte_rbac_secret_2025")
 
 # Roles allowed to interact with the Purchase Module.
 # Must match role_name values stored in the employee_role table exactly.
