@@ -126,28 +126,43 @@ def get_notifications():
                 if isinstance(e, (psycopg2.OperationalError, psycopg2.InterfaceError)):
                     db_ok = False
 
-        # ── 5. Out of stock items ─────────────────────────────────────────────────
+        # ── 5. Out of stock items — per variant (inventory_brand_id) ─────────────
         if db_ok:
             try:
                 cur.execute("""
                     SELECT
-                        i.inventory_id,
-                        i.item_name,
+                        ib.inventory_brand_id,
+                        i.item_name || CASE
+                            WHEN ib.variant_name IS NOT NULL AND TRIM(ib.variant_name) != ''
+                            THEN ' (' || TRIM(ib.variant_name) || ')'
+                            ELSE ''
+                        END AS display_name,
                         'OUT_OF_STOCK',
                         'Out of Stock',
                         i.item_created_at AS event_time
-                    FROM inventory i
-                    JOIN static_status ss ON i.item_status_id = ss.status_id
+                    FROM inventory_brand ib
+                    JOIN inventory i
+                        ON i.inventory_id      = ib.inventory_id
+                    JOIN static_status ss
+                        ON i.item_status_id    = ss.status_id
+                    LEFT JOIN inventory_batch bat
+                        ON bat.inventory_brand_id = ib.inventory_brand_id
+                       AND bat.expiry_date > CURRENT_DATE
                     WHERE ss.status_code != 'INACTIVE'
-                      AND COALESCE((SELECT SUM(bat.quantity_on_hand) FROM inventory_batch bat JOIN inventory_brand ib ON ib.inventory_brand_id = bat.inventory_brand_id WHERE ib.inventory_id = i.inventory_id AND bat.expiry_date > CURRENT_DATE), 0) = 0
+                    GROUP BY
+                        ib.inventory_brand_id,
+                        i.item_name,
+                        ib.variant_name,
+                        i.item_created_at
+                    HAVING COALESCE(SUM(bat.quantity_on_hand), 0) = 0
                     ORDER BY event_time DESC
                     LIMIT 10
                 """)
                 for row in cur.fetchall():
-                    inventory_id, item_name, status_code, status_name, event_time = row
+                    inventory_brand_id, item_name, status_code, status_name, event_time = row
                     notifications.append({
                         "category": "INVENTORY",
-                        "reference": str(inventory_id),
+                        "reference": str(inventory_brand_id),
                         "item_name": item_name,
                         "item_sku": None,
                         "status_code": status_code,
@@ -160,47 +175,48 @@ def get_notifications():
                 if isinstance(e, (psycopg2.OperationalError, psycopg2.InterfaceError)):
                     db_ok = False
 
-        # ── 6. Low stock items ────────────────────────────────────────────────────
+        # ── 6. Low stock items — per variant (inventory_brand_id) ─────────────────
         if db_ok:
             try:
                 cur.execute("""
                     SELECT
-                        i.inventory_id,
-                        i.item_name,
+                        ib.inventory_brand_id,
+                        i.item_name || CASE
+                            WHEN ib.variant_name IS NOT NULL AND TRIM(ib.variant_name) != ''
+                            THEN ' (' || TRIM(ib.variant_name) || ')'
+                            ELSE ''
+                        END AS display_name,
                         'LOW_STOCK',
                         'Low Stock',
                         i.item_created_at AS event_time
-                    FROM inventory i
-                    JOIN static_status ss ON i.item_status_id = ss.status_id
+                    FROM inventory_brand ib
+                    JOIN inventory i
+                        ON i.inventory_id         = ib.inventory_id
+                    JOIN static_status ss
+                        ON i.item_status_id        = ss.status_id
+                    LEFT JOIN inventory_batch bat
+                        ON bat.inventory_brand_id  = ib.inventory_brand_id
+                       AND bat.expiry_date > CURRENT_DATE
+                    LEFT JOIN inventory_action ia
+                        ON ia.inventory_brand_id   = ib.inventory_brand_id
                     WHERE ss.status_code != 'INACTIVE'
-                      AND (
-                          SELECT COALESCE(SUM(bat.quantity_on_hand), 0)
-                          FROM inventory_batch bat
-                          JOIN inventory_brand ib ON ib.inventory_brand_id = bat.inventory_brand_id
-                          WHERE ib.inventory_id = i.inventory_id AND bat.expiry_date > CURRENT_DATE
-                      ) > 0
-                      AND (
-                          SELECT COALESCE(SUM(bat.quantity_on_hand), 0)
-                          FROM inventory_batch bat
-                          JOIN inventory_brand ib ON ib.inventory_brand_id = bat.inventory_brand_id
-                          WHERE ib.inventory_id = i.inventory_id AND bat.expiry_date > CURRENT_DATE
-                      ) <= COALESCE(
-                          (
-                              SELECT MIN(ia.reorder_qty)
-                              FROM inventory_action ia
-                              JOIN inventory_brand ib ON ib.inventory_brand_id = ia.inventory_brand_id
-                              WHERE ib.inventory_id = i.inventory_id
-                          ),
-                          10
-                      )
+                    GROUP BY
+                        ib.inventory_brand_id,
+                        i.item_name,
+                        ib.variant_name,
+                        i.item_created_at,
+                        ia.low_stock_qty
+                    HAVING
+                        COALESCE(SUM(bat.quantity_on_hand), 0) > 0
+                        AND COALESCE(SUM(bat.quantity_on_hand), 0) <= COALESCE(ia.low_stock_qty, 10)
                     ORDER BY event_time DESC
                     LIMIT 10
                 """)
                 for row in cur.fetchall():
-                    inventory_id, item_name, status_code, status_name, event_time = row
+                    inventory_brand_id, item_name, status_code, status_name, event_time = row
                     notifications.append({
                         "category": "INVENTORY",
-                        "reference": str(inventory_id),
+                        "reference": str(inventory_brand_id),
                         "item_name": item_name,
                         "item_sku": None,
                         "status_code": status_code,

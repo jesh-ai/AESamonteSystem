@@ -132,7 +132,7 @@ const COL_DEFS: Record<TabKey, ColDef> = {
 // CSV EXPORT
 // ─────────────────────────────────────────────────────────────────────────────
 
-function exportCSV(
+export function exportCSV(
   tab:      TabKey,
   rows:     Record<string, unknown>[],
   tabLabel: string,
@@ -170,7 +170,7 @@ function exportCSV(
 // EXCEL EXPORT  (dynamic import — keeps bundle lean for users who don't export)
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function exportExcel(
+export async function exportExcel(
   tab:       TabKey,
   rows:      Record<string, unknown>[],
   tabLabel:  string,
@@ -208,7 +208,7 @@ async function exportExcel(
 // PDF EXPORT  (dynamic import of jsPDF + jspdf-autotable)
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function exportPDF(
+export async function exportPDF(
   tab:       TabKey,
   rows:      Record<string, unknown>[],
   tabLabel:  string,
