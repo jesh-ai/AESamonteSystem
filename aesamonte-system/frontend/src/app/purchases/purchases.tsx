@@ -95,6 +95,10 @@ const ROWS_PER_PAGE = 10;
 
 const ALL_STATUSES = ['All Status', 'DRAFT', 'SENT', 'APPROVED', 'RECEIVED', 'COMPLETED', 'CANCELLED'];
 
+const STATUS_ORDER: Record<string, number> = {
+  DRAFT: 0, SENT: 1, APPROVED: 2, RECEIVED: 3, COMPLETED: 4, CANCELLED: 5, ARCHIVED: 6,
+};
+
 const STATUS_STYLE: Record<string, { badge: string }> = {
   DRAFT:     { badge: 'border border-gray-300   bg-gray-50   text-gray-600'   },
   SENT:      { badge: 'border border-blue-300   bg-blue-50   text-blue-700'   },
@@ -187,7 +191,7 @@ export default function PurchasesPage({
   const [statusFilter, setStatusFilter]   = useState('All Status');
   const [statusOpen, setStatusOpen]       = useState(false);
 
-  const menuRef   = useRef<HTMLDivElement>(null);
+  const menuRef   = useRef<HTMLTableCellElement>(null);
   const statusRef = useRef<HTMLDivElement>(null);
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
@@ -279,15 +283,18 @@ export default function PurchasesPage({
         o.status.toUpperCase() === statusFilter;
       return matchSearch && matchStatus;
     });
-    if (sortKey && sortDir) {
-      list = [...list].sort((a, b) => {
+    list = [...list].sort((a, b) => {
+      if (sortKey && sortDir) {
         const av = a[sortKey] ?? '';
         const bv = b[sortKey] ?? '';
         if (av < bv) return sortDir === 'asc' ? -1 :  1;
         if (av > bv) return sortDir === 'asc' ?  1 : -1;
         return 0;
-      });
-    }
+      }
+      const ao = STATUS_ORDER[a.status?.toUpperCase()] ?? 99;
+      const bo = STATUS_ORDER[b.status?.toUpperCase()] ?? 99;
+      return ao - bo;
+    });
     return list;
   }, [orders, searchTerm, isArchiveView, statusFilter, sortKey, sortDir]);
 

@@ -367,10 +367,8 @@ export default function OrderPage({ role, onLogout, initialSearch, permissions }
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => { setSearchTerm(e.target.value); setCurrentPage(1); };
 
-  const handleSort = (key: Exclude<SortKey, null>) => {
-    setSortConfig(prev => prev.key === key 
-      ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } 
-      : { key, direction: 'asc' });
+  const handleSort = (key: Exclude<SortKey, null>, direction: 'asc' | 'desc') => {
+    setSortConfig({ key, direction });
   };
 
   const filtered = useMemo(() => {
@@ -673,24 +671,39 @@ export default function OrderPage({ role, onLogout, initialSearch, permissions }
                 <thead>
                   <tr>
                     {[
-                      { label: 'ID', key: 'id', sortable: true }, { label: 'CUSTOMER', key: 'customer', sortable: true },
-                      { label: 'ADDRESS', key: 'address', sortable: true }, { label: 'QTY', key: 'totalQty', sortable: true },
-                      { label: 'TOTAL', key: 'totalAmount', sortable: true }, { label: 'PAYMENT', key: 'paymentMethod', sortable: true },
-                      { label: 'DATE', key: 'date', sortable: true }, { label: 'STATUS', key: 'status', sortable: true },
-                      { label: 'ACTION', key: null, sortable: false },
-                    ].map(col => (
-                      <th key={col.label} onClick={() => col.sortable && col.key && handleSort(col.key as Exclude<SortKey, null>)} style={{ cursor: col.sortable ? 'pointer' : 'default' }}>
-                        <div className={s.sortableHeader}>
-                          <span>{col.label}</span>
-                          {col.sortable && col.key && (
-                            <div className={s.sortIconsStack}>
-                              <LuChevronUp className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''} />
-                              <LuChevronDown className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''} />
-                            </div>
-                          )}
-                        </div>
-                      </th>
-                    ))}
+                      { label: 'ID', key: 'id' }, { label: 'CUSTOMER', key: 'customer' },
+                      { label: 'ADDRESS', key: 'address' }, { label: 'QTY', key: 'totalQty' },
+                      { label: 'TOTAL', key: 'totalAmount' }, { label: 'PAYMENT', key: 'paymentMethod' },
+                      { label: 'DATE', key: 'date' }, { label: 'STATUS', key: 'status' },
+                      { label: 'ACTION', key: null },
+                    ].map(col => {
+                      const isSortable = col.key === 'id'
+                      return (
+                        <th key={col.label}>
+                          <div className={isSortable ? s.sortableHeader : s.nonSortableHeader}>
+                            <span>{col.label}</span>
+                            {isSortable && (
+                              <div className={s.sortIconsStack}>
+                                <span
+                                  className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''}
+                                  onClick={() => handleSort(col.key as Exclude<SortKey, null>, 'asc')}
+                                  style={{ cursor: 'pointer' }}
+                                >
+                                  <LuChevronUp size={12} />
+                                </span>
+                                <span
+                                  className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''}
+                                  onClick={() => handleSort(col.key as Exclude<SortKey, null>, 'desc')}
+                                  style={{ cursor: 'pointer' }}
+                                >
+                                  <LuChevronDown size={12} />
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </th>
+                      )
+                    })}
                   </tr>
                 </thead>
                 <tbody>

@@ -150,6 +150,27 @@
   color: #fff;
 }
 
+.backArchiveIconBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  background-color: #1a4263;
+  color: #fff;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.9rem;
+  min-height: 36px;
+  white-space: nowrap;
+  transition: opacity 0.2s;
+}
+
+.backArchiveIconBtn:hover {
+  opacity: 0.85;
+}
+
 .popArchiveBtn:hover {
   background-color: #64748b;
 }
@@ -205,7 +226,16 @@
   user-select: none;
   display: flex !important;
   align-items: center;
-  justify-content: center; /* Push header text to the center */
+  justify-content: center;
+  gap: 6px;
+}
+
+.nonSortableHeader {
+  cursor: default;
+  user-select: none;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
   gap: 6px;
 }
 
@@ -227,19 +257,27 @@
   line-height: 1;
 }
 
-.sortIconsStack svg {
+.sortIconsStack span svg {
   display: block;
   color: #64748b;
-  transition: all 0.2s; 
+  transition: all 0.2s;
 }
 
-.sortIconsStack svg:hover {
+.sortIconsStack span:hover svg {
   color: #1a4263;
-  transform: scale(1.2); 
+  transform: scale(1.2);
 }
 
-.activeSort {
+.activeSort svg {
   color: #1a4263 !important;
+}
+
+.sortIconsStack span:not(.activeSort) svg {
+  color: #b3bac3;
+}
+
+.sortIconsStack span:not(.activeSort):hover svg {
+  color: #1a4263;
 }
 
 /* ACTIONS */

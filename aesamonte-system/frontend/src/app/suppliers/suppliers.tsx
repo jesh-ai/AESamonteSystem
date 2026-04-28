@@ -383,12 +383,9 @@ export default function Suppliers({
     }
   };
 
-  const handleSort = (key: SortKey) => {
+  const handleSort = (key: SortKey, direction: 'asc' | 'desc') => {
     if (!key) return;
-    setSortConfig(prev => {
-      if (prev.key === key) return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
-      return { key, direction: 'asc' };
-    });
+    setSortConfig({ key, direction });
   };
 
   const handleOpenView = (supplier: Supplier) => {
@@ -660,17 +657,34 @@ export default function Suppliers({
               <table className={s.table}>
                 <thead>
                   <tr>
-                    {columns.map(col => (
-                      <th key={col.key!} onClick={() => handleSort(col.key)} style={{ cursor: 'pointer' }}>
-                        <div className={s.sortableHeader}>
-                          <span>{col.label}</span>
-                          <div className={s.sortIconsStack}>
-                            <LuChevronUp size={12} className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''} />
-                            <LuChevronDown size={12} className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''} />
+                    {columns.map(col => {
+                      const isSortable = col.key === 'supplier_id'
+                      return (
+                        <th key={col.key!}>
+                          <div className={isSortable ? s.sortableHeader : s.nonSortableHeader}>
+                            <span>{col.label}</span>
+                            {isSortable && (
+                              <div className={s.sortIconsStack}>
+                                <span
+                                  className={sortConfig.key === col.key && sortConfig.direction === 'asc' ? s.activeSort : ''}
+                                  onClick={() => handleSort(col.key, 'asc')}
+                                  style={{ cursor: 'pointer' }}
+                                >
+                                  <LuChevronUp size={12} />
+                                </span>
+                                <span
+                                  className={sortConfig.key === col.key && sortConfig.direction === 'desc' ? s.activeSort : ''}
+                                  onClick={() => handleSort(col.key, 'desc')}
+                                  style={{ cursor: 'pointer' }}
+                                >
+                                  <LuChevronDown size={12} />
+                                </span>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      </th>
-                    ))}
+                        </th>
+                      )
+                    })}
                     <th className={s.actionHeader}>ACTION</th>
                   </tr>
                 </thead>
