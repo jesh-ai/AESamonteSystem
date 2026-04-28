@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import styles from "@/css/dashboard.module.css";
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+const API = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 interface ForecastItem {
   item_name: string;
@@ -147,7 +147,7 @@ export default function ForecastingPanel() {
   const [itemIndex, setItemIndex]   = useState(0);  // which item within slide
 
   useEffect(() => {
-    fetch(`${API}/api/dashboard/inventory-forecast`, { credentials: "include" })
+    fetch(`${API}/api/dashboard/inventory-forecast`)
       .then((r) => r.json())
       .then((json) => { if (Array.isArray(json)) setItems(json); })
       .catch(console.error)

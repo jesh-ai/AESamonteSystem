@@ -58,6 +58,14 @@ interface AddPOModalProps {
   isOpen:  boolean;
   onClose: () => void;
   onSaved: () => void;
+  initialItems?: Array<{
+    inventory_brand_id: number;
+    item_name: string;
+    brand_name: string;
+    uom_name: string;
+    quantity_ordered: number;
+    unit_cost: number;
+  }>;
 }
 
 // ── Auth helper ───────────────────────────────────────────────────────────────
@@ -114,7 +122,7 @@ const BLANK_SUPPLIER_ENTRY = (): SupplierEntry => ({
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function AddPOModal({ isOpen, onClose, onSaved }: AddPOModalProps) {
+export default function AddPOModal({ isOpen, onClose, onSaved, initialItems }: AddPOModalProps) {
   const s = styles as Record<string, string>;
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -161,7 +169,6 @@ export default function AddPOModal({ isOpen, onClose, onSaved }: AddPOModalProps
     setSupplierError('');
     setExpectedDelivery('');
     setNotes('');
-    setItems([BLANK_ITEM()]);
     setError('');
     setShowNewItemModal(false);
     setNewItemForm(BLANK_NEW_ITEM());
@@ -169,6 +176,23 @@ export default function AddPOModal({ isOpen, onClose, onSaved }: AddPOModalProps
     setSearchQuery({});
     setSearchResults({});
     setSearchOpen({});
+    // Pre-fill items from reorder if provided, otherwise start blank
+    if (initialItems && initialItems.length > 0) {
+      setItems(initialItems.map(it => ({
+        inventory_brand_id: it.inventory_brand_id,
+        brand_name:         it.brand_name,
+        item_name:          it.item_name,
+        uom_name:           it.uom_name,
+        quantity_ordered:   it.quantity_ordered,
+        unit_cost:          it.unit_cost,
+        expiry_date:        '',
+      })));
+      const qMap: Record<number, string> = {};
+      initialItems.forEach((it, i) => { qMap[i] = `${it.item_name} — ${it.brand_name}`; });
+      setSearchQuery(qMap);
+    } else {
+      setItems([BLANK_ITEM()]);
+    }
     fetchSuppliers();
     fetchBrands();
     fetchUoms();

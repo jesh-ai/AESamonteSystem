@@ -38,6 +38,8 @@ interface InventoryProps {
   onLogout: () => void;
   initialSearch?: string;
   permissions?: ModulePerms;
+  initialViewId?: string;
+  onViewOpened?: () => void;
 }
 
 interface Supplier {
@@ -126,7 +128,7 @@ function getBatchExpiryBadge(dateStr: string | null | undefined): React.ReactNod
   return <span>{label}</span>;
 }
 
-const Inventory: React.FC<InventoryProps> = ({ role, employeeId = 0, onLogout, initialSearch, permissions }) => {
+const Inventory: React.FC<InventoryProps> = ({ role, employeeId = 0, onLogout, initialSearch, permissions, initialViewId, onViewOpened }) => {
   const s = styles as Record<string, string>;
   const { guard, denied, dismiss } = usePermissionGuard();
 
@@ -259,6 +261,24 @@ const Inventory: React.FC<InventoryProps> = ({ role, employeeId = 0, onLogout, i
     } catch (err) { console.error("Failed to fetch UOMs", err); }
   };
 
+
+  // ── Notification deep-link: auto-filter + open modal when prop arrives ───────
+
+  useEffect(() => {
+    if (!initialViewId || products.length === 0) return;
+    const numId = Number(initialViewId);
+    // Match by inventory_id OR by any brand's inventory_brand_id (backend may send either)
+    const product = products.find(p =>
+      Number(p.id) === numId ||
+      (p.brands || []).some((b: any) => Number(b.inventory_brand_id) === numId)
+    );
+    if (!product) return;
+    setSearchTerm(product.item_name);
+    setCurrentPage(1);
+    handleViewClick(product);
+    onViewOpened?.();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, initialViewId]);
 
   useEffect(() => {
     fetchInventory();

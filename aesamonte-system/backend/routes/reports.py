@@ -193,12 +193,19 @@ def get_dashboard_extra():
         ]
 
         cur.execute("""
-            SELECT i.item_name, ib.total_quantity
+            SELECT i.item_name, COALESCE(SUM(bat.quantity_on_hand), 0) AS total_qty
             FROM inventory_brand ib
             JOIN inventory i      ON i.inventory_id = ib.inventory_id
             JOIN static_status ss ON ss.status_id   = i.item_status_id
+            LEFT JOIN inventory_batch bat ON bat.inventory_brand_id = ib.inventory_brand_id
+                AND bat.expiry_date > CURRENT_DATE
+                AND bat.batch_status_id != (
+                    SELECT status_id FROM static_status
+                    WHERE status_scope = 'INVENTORY_STATUS' AND status_code = 'ARCHIVED'
+                )
             WHERE ss.status_scope = 'INVENTORY_STATUS' AND ss.status_code != 'INACTIVE'
-            ORDER BY ib.total_quantity DESC
+            GROUP BY i.item_name
+            ORDER BY total_qty DESC
             LIMIT 3
         """)
         most_stock_db = cur.fetchall()
@@ -250,25 +257,45 @@ def report_stock_on_hand():
 
         cur.execute("""
             SELECT
-                COALESCE(ib.item_sku, '—')              AS sku,
+                COALESCE(ib.item_sku, '—')                                          AS sku,
                 i.item_name,
-                COALESCE(b.brand_name, 'Generic')        AS brand_name,
-                COALESCE(u.uom_name,  '—')               AS uom,
-                ib.total_quantity                         AS qty_on_hand,
-                COALESCE(ib.item_unit_price,   0)        AS unit_cost,
-                COALESCE(ib.item_selling_price, 0)       AS selling_price,
-                ss_i.status_code                          AS item_status,
+                COALESCE(b.brand_name, 'Generic')                                    AS brand_name,
+                COALESCE(u.uom_name,  '—')                                           AS uom,
+                COALESCE(SUM(bat.quantity_on_hand), 0)                               AS qty_on_hand,
+                COALESCE(fefo.unit_cost, 0)                                          AS unit_cost,
+                COALESCE(ib.item_selling_price, 0)                                   AS selling_price,
+                ss_i.status_code                                                      AS item_status,
                 i.inventory_id,
                 ib.inventory_brand_id,
-                ib.shelf_life
+                MIN(bat.expiry_date)                                                  AS shelf_life,
+                ss_b.status_code                                                      AS brand_status
             FROM inventory_brand ib
             JOIN inventory         i    ON i.inventory_id   = ib.inventory_id
             LEFT JOIN brand        b    ON b.brand_id       = ib.brand_id
             LEFT JOIN unit_of_measure u ON u.uom_id         = ib.uom_id
             JOIN static_status     ss_i ON ss_i.status_id  = i.item_status_id
             JOIN static_status     ss_b ON ss_b.status_id  = ib.item_status_id
+            LEFT JOIN inventory_batch bat ON bat.inventory_brand_id = ib.inventory_brand_id
+                AND bat.expiry_date > CURRENT_DATE
+                AND bat.batch_status_id != (
+                    SELECT status_id FROM static_status
+                    WHERE status_scope = 'INVENTORY_STATUS' AND status_code = 'ARCHIVED'
+                )
+            LEFT JOIN LATERAL (
+                SELECT unit_cost FROM inventory_batch
+                WHERE inventory_brand_id = ib.inventory_brand_id
+                  AND expiry_date > CURRENT_DATE
+                  AND batch_status_id != (
+                      SELECT status_id FROM static_status
+                      WHERE status_scope = 'INVENTORY_STATUS' AND status_code = 'ARCHIVED'
+                  )
+                ORDER BY expiry_date ASC
+                LIMIT 1
+            ) fefo ON TRUE
             WHERE ss_i.status_code != 'INACTIVE'
-              AND ss_b.status_code != 'ARCHIVED'
+            GROUP BY ib.inventory_brand_id, i.item_name, b.brand_name,
+                     ib.item_sku, u.uom_name, ib.item_selling_price,
+                     ss_i.status_code, i.inventory_id, ss_b.status_code, fefo.unit_cost
             ORDER BY i.item_name, b.brand_name
         """)
         rows = cur.fetchall()
@@ -284,24 +311,27 @@ def report_stock_on_hand():
             if search and search not in item_name.lower() and search not in brand_name.lower() and search not in sku.lower():
                 continue
 
-            qty         = int(r[4] or 0)
-            status_code = r[7]
-            action = action_map.get(r[9]) or action_map.get(r[8]) or {}
-            reorder_qty  = action.get("reorder_qty", 0)
-            low_stock_qty = action.get("low_stock_qty", 0)
-            threshold    = reorder_qty or low_stock_qty
+            qty          = int(r[4] or 0)
+            status_code  = r[7]    # parent inventory status (ss_i)
+            brand_status = r[11]   # brand-level status (ss_b = ib.item_status_id)
 
             shelf_life = r[10]
-            expiry_date = shelf_life.date() if shelf_life else None
+            if shelf_life is None:
+                expiry_date = None
+            elif hasattr(shelf_life, 'date'):
+                expiry_date = shelf_life.date()
+            else:
+                expiry_date = shelf_life
             days_to_expiry = (expiry_date - date.today()).days if expiry_date else None
 
-            if status_code == 'INACTIVE':
+            # Archived always wins — driven by parent inventory status (ss_i)
+            if status_code == 'ARCHIVED':
                 stock_status = 'Archived'
-            elif qty == 0:
+            elif qty == 0 or brand_status == 'OUT_OF_STOCK':
                 stock_status = 'Out of Stock'
             elif days_to_expiry is not None and days_to_expiry <= 30:
                 stock_status = 'Expiring Soon'
-            elif threshold > 0 and qty <= threshold:
+            elif brand_status == 'LOW_STOCK':
                 stock_status = 'Low Stock'
             else:
                 stock_status = 'Available'
@@ -319,6 +349,10 @@ def report_stock_on_hand():
                 "days_to_expiry": days_to_expiry,
             })
 
+        # Sort: Out of Stock first, then Low Stock, then Expiring Soon, then Available
+        STATUS_PRIORITY = {'Out of Stock': 0, 'Low Stock': 1, 'Expiring Soon': 2, 'Available': 3, 'Archived': 4}
+        result.sort(key=lambda x: (STATUS_PRIORITY.get(x['stock_status'], 9), x['item_name']))
+
         return jsonify(result), 200
     except Exception as e:
         print("[reports/stock-on-hand] error:", e)
@@ -331,123 +365,85 @@ def report_product_performance():
     conn = get_connection()
     cur  = conn.cursor()
     try:
-        start, end = parse_dates()
+        start_str = request.args.get("start_date")
+        end_str   = request.args.get("end_date")
+        use_dates = bool(start_str or end_str)
+        if use_dates:
+            start, end = parse_dates()
+            date_filter = "AND st.sales_date BETWEEN %s AND %s"
+            params: tuple = (start, end)
+        else:
+            date_filter = ""
+            params = ()
+
+        # Diagnostic: check what's in order_details
         cur.execute("""
+            SELECT COUNT(*), COUNT(batch_id), COALESCE(SUM(order_quantity),0), COALESCE(SUM(order_total),0)
+            FROM order_details WHERE is_archived IS NOT TRUE
+        """)
+        diag = cur.fetchone()
+        print(f"[product-performance] order_details: rows={diag[0]}, with_batch={diag[1]}, qty={diag[2]}, revenue={diag[3]}")
+
+        cur.execute(f"""
             SELECT
                 i.item_name,
-                COALESCE(b.brand_name, 'Generic')                       AS brand_name,
-                COALESCE(ib.item_sku, '—')                              AS sku,
-                COALESCE(u.uom_name, '—')                               AS uom,
-                COALESCE(SUM(od.order_quantity), 0)                      AS units_sold,
-                COALESCE(SUM(od.order_total), 0)                         AS revenue,
-                COALESCE(SUM(od.order_quantity * ib.item_unit_price), 0) AS cogs,
-                COALESCE(
-                    SUM(od.order_total) - SUM(od.order_quantity * ib.item_unit_price),
-                    0
-                )                                                         AS gross_profit
-            FROM order_details od
-            JOIN order_transaction ot  ON ot.order_id  = od.order_id
-            JOIN sales_transaction st  ON st.order_id  = ot.order_id
-            JOIN static_status ss_pay  ON ss_pay.status_id = st.payment_status_id
-            JOIN inventory_brand ib    ON ib.inventory_brand_id = od.inventory_brand_id
-            JOIN inventory       i     ON i.inventory_id = ib.inventory_id
-            LEFT JOIN brand      b     ON b.brand_id     = ib.brand_id
-            LEFT JOIN unit_of_measure u ON u.uom_id      = ib.uom_id
-            WHERE ss_pay.status_code = 'PAID'
-              AND st.sales_date BETWEEN %s AND %s
-              AND od.is_archived = FALSE
-            GROUP BY i.item_name, b.brand_name, ib.item_sku, u.uom_name
-            ORDER BY units_sold DESC, revenue DESC
-        """, (start, end))
+                COALESCE(b.brand_name, 'Generic')                                     AS brand_name,
+                COALESCE(ib.item_sku, '—')                                            AS sku,
+                COALESCE(u.uom_name, '—')                                             AS uom,
+                COALESCE(sales.qty_sold, 0)                                           AS qty_sold,
+                COALESCE(sales.qty_sold, 0) * COALESCE(ib.item_selling_price, 0)      AS gross_sales,
+                COALESCE(sales.cogs, 0)                                               AS cogs,
+                (COALESCE(sales.qty_sold, 0) * COALESCE(ib.item_selling_price, 0))
+                    - COALESCE(sales.cogs, 0)                                         AS net_profit
+            FROM inventory_brand ib
+            JOIN  inventory        i   ON i.inventory_id  = ib.inventory_id
+            LEFT JOIN brand        b   ON b.brand_id      = ib.brand_id
+            LEFT JOIN unit_of_measure u ON u.uom_id       = ib.uom_id
+            JOIN  static_status  ss_i  ON ss_i.status_id  = i.item_status_id
+            JOIN  static_status  ss_b  ON ss_b.status_id  = ib.item_status_id
+            LEFT JOIN (
+                SELECT
+                    bat.inventory_brand_id,
+                    SUM(od.order_quantity)                               AS qty_sold,
+                    SUM(od.order_quantity * COALESCE(bat.unit_cost, 0))  AS cogs
+                FROM order_details od
+                JOIN inventory_batch bat ON bat.batch_id = od.batch_id
+                JOIN order_transaction ot ON ot.order_id = od.order_id
+                JOIN sales_transaction st ON st.order_id = ot.order_id
+                WHERE od.is_archived IS NOT TRUE
+                  {date_filter}
+                GROUP BY bat.inventory_brand_id
+            ) sales ON sales.inventory_brand_id = ib.inventory_brand_id
+            WHERE ss_i.status_code != 'INACTIVE'
+              AND ss_b.status_code != 'ARCHIVED'
+            GROUP BY i.item_name, b.brand_name, ib.item_sku, u.uom_name,
+                     sales.qty_sold, sales.cogs, ib.item_selling_price
+            ORDER BY net_profit DESC
+        """, params)
         rows = cur.fetchall()
+        print(f"[product-performance] result rows={len(rows)}, sample={rows[:2]}")
+
+        total_revenue = sum(float(r[5] or 0) for r in rows)
 
         result = []
         for r in rows:
-            revenue      = float(r[5] or 0)
-            gross_profit = float(r[7] or 0)
-            margin_pct   = round((gross_profit / revenue * 100), 2) if revenue > 0 else 0.0
+            gross_sales  = float(r[5] or 0)
+            net_profit   = float(r[7] or 0)
+            contribution = round((gross_sales / total_revenue * 100), 2) if total_revenue > 0 else 0.0
             result.append({
                 "item_name":    r[0],
                 "brand_name":   r[1],
                 "sku":          r[2],
                 "uom":          r[3],
                 "units_sold":   int(r[4] or 0),
-                "revenue":      revenue,
+                "revenue":      gross_sales,
                 "cogs":         float(r[6] or 0),
-                "gross_profit": gross_profit,
-                "margin_pct":   margin_pct,
+                "gross_profit": net_profit,
+                "margin_pct":   contribution,
             })
         return jsonify(result), 200
     except Exception as e:
         print("[reports/product-performance] error:", e)
-        return err(e)
-    finally:
-        cur.close(); conn.close()
-
-@reports_bp.route("/api/reports/inventory-turnover", methods=["GET"])
-def report_inventory_turnover():
-    conn = get_connection()
-    cur  = conn.cursor()
-    try:
-        start, end  = parse_dates()
-        period_days = max((end - start).days, 1)
-
-        cur.execute("""
-            SELECT
-                COALESCE(ib.item_sku, '—')              AS sku,
-                i.item_name,
-                COALESCE(b.brand_name, 'Generic')        AS brand_name,
-                COALESCE(u.uom_name, '—')                AS uom,
-                COALESCE(SUM(od.order_quantity), 0)       AS units_sold,
-                ib.total_quantity                         AS ending_qty,
-                COALESCE(SUM(od.order_total), 0)          AS period_revenue,
-                COALESCE(SUM(od.order_quantity * ib.item_unit_price), 0) AS period_cogs
-            FROM inventory_brand ib
-            JOIN inventory       i     ON i.inventory_id = ib.inventory_id
-            LEFT JOIN brand      b     ON b.brand_id     = ib.brand_id
-            LEFT JOIN unit_of_measure u ON u.uom_id      = ib.uom_id
-            JOIN static_status ss_i    ON ss_i.status_id = i.item_status_id
-            JOIN static_status ss_b    ON ss_b.status_id = ib.item_status_id
-            LEFT JOIN order_details od ON od.inventory_brand_id = ib.inventory_brand_id
-                AND od.is_archived = FALSE
-                AND od.order_id IN (
-                    SELECT ot2.order_id
-                    FROM order_transaction ot2
-                    JOIN sales_transaction st2   ON st2.order_id = ot2.order_id
-                    JOIN static_status ss_pay2   ON ss_pay2.status_id = st2.payment_status_id
-                    WHERE ss_pay2.status_code = 'PAID'
-                      AND st2.sales_date BETWEEN %s AND %s
-                )
-            WHERE ss_i.status_code != 'INACTIVE'
-              AND ss_b.status_code != 'ARCHIVED'
-            GROUP BY ib.inventory_brand_id, i.item_name, b.brand_name,
-                     ib.item_sku, u.uom_name, ib.total_quantity
-            ORDER BY units_sold DESC, i.item_name
-        """, (start, end))
-        rows = cur.fetchall()
-
-        result = []
-        for r in rows:
-            units_sold   = int(r[4] or 0)
-            ending_qty   = int(r[5] or 0)
-            avg_inv      = (ending_qty + units_sold) / 2.0
-            turnover     = round(units_sold / avg_inv, 2) if avg_inv > 0 else 0.0
-            days_to_sell = round(period_days / turnover, 1) if turnover > 0 else None
-            result.append({
-                "sku":           r[0],
-                "item_name":     r[1],
-                "brand_name":    r[2],
-                "uom":           r[3],
-                "units_sold":    units_sold,
-                "ending_qty":    ending_qty,
-                "avg_inventory": round(avg_inv, 1),
-                "turnover_rate": turnover,
-                "days_to_sell":  days_to_sell,
-                "period_cogs":   float(r[7] or 0),
-            })
-        return jsonify({"period_days": period_days, "rows": result}), 200
-    except Exception as e:
-        print("[reports/inventory-turnover] error:", e)
         return err(e)
     finally:
         cur.close(); conn.close()
@@ -459,41 +455,66 @@ def report_inventory_valuation():
     try:
         cur.execute("""
             SELECT
-                COALESCE(ib.item_sku, '—')                                      AS sku,
+                COALESCE(ib.item_sku, '—')                                                   AS sku,
                 i.item_name,
-                COALESCE(b.brand_name, 'Generic')                                AS brand_name,
-                COALESCE(u.uom_name, '—')                                        AS uom,
-                ib.total_quantity                                                  AS qty_on_hand,
-                COALESCE(ib.item_unit_price,   0)                                AS unit_cost,
-                ib.total_quantity * COALESCE(ib.item_unit_price,   0)            AS total_cost_value,
-                COALESCE(ib.item_selling_price, 0)                               AS selling_price,
-                ib.total_quantity * COALESCE(ib.item_selling_price, 0)           AS total_retail_value,
-                (ib.total_quantity * COALESCE(ib.item_selling_price, 0))
-                    - (ib.total_quantity * COALESCE(ib.item_unit_price, 0))      AS potential_profit
+                COALESCE(b.brand_name, 'Generic')                                             AS brand_name,
+                COALESCE(u.uom_name, '—')                                                     AS uom,
+                COALESCE(SUM(bat.quantity_on_hand), 0)                                        AS qty_on_hand,
+                COALESCE(fefo.unit_cost, 0)                                                   AS unit_cost,
+                COALESCE(SUM(bat.quantity_on_hand), 0) * COALESCE(fefo.unit_cost, 0)          AS total_cost_value,
+                COALESCE(ib.item_selling_price, 0)                                            AS selling_price,
+                COALESCE(SUM(bat.quantity_on_hand), 0) * COALESCE(ib.item_selling_price, 0)   AS total_retail_value,
+                (COALESCE(SUM(bat.quantity_on_hand), 0) * COALESCE(ib.item_selling_price, 0))
+                    - (COALESCE(SUM(bat.quantity_on_hand), 0) * COALESCE(fefo.unit_cost, 0))  AS potential_profit
             FROM inventory_brand ib
             JOIN inventory       i    ON i.inventory_id  = ib.inventory_id
             LEFT JOIN brand      b    ON b.brand_id       = ib.brand_id
             LEFT JOIN unit_of_measure u ON u.uom_id       = ib.uom_id
             JOIN static_status   ss_i ON ss_i.status_id  = i.item_status_id
             JOIN static_status   ss_b ON ss_b.status_id  = ib.item_status_id
+            LEFT JOIN inventory_batch bat ON bat.inventory_brand_id = ib.inventory_brand_id
+                AND bat.expiry_date > CURRENT_DATE
+                AND bat.batch_status_id != (
+                    SELECT status_id FROM static_status
+                    WHERE status_scope = 'INVENTORY_STATUS' AND status_code = 'ARCHIVED'
+                )
+            LEFT JOIN LATERAL (
+                SELECT unit_cost FROM inventory_batch
+                WHERE inventory_brand_id = ib.inventory_brand_id
+                  AND expiry_date > CURRENT_DATE
+                  AND batch_status_id != (
+                      SELECT status_id FROM static_status
+                      WHERE status_scope = 'INVENTORY_STATUS' AND status_code = 'ARCHIVED'
+                  )
+                ORDER BY expiry_date ASC
+                LIMIT 1
+            ) fefo ON TRUE
             WHERE ss_i.status_code != 'INACTIVE'
               AND ss_b.status_code != 'ARCHIVED'
-            ORDER BY total_cost_value DESC
+            GROUP BY ib.inventory_brand_id, i.item_name, b.brand_name,
+                     ib.item_sku, u.uom_name, ib.item_selling_price, fefo.unit_cost
+            ORDER BY potential_profit DESC
         """)
         rows = cur.fetchall()
-        cols = [
-            "sku", "item_name", "brand_name", "uom", "qty_on_hand",
-            "unit_cost", "total_cost_value", "selling_price",
-            "total_retail_value", "potential_profit",
-        ]
-        result = [
-            dict(zip(cols, [
-                r[0], r[1], r[2], r[3], int(r[4] or 0),
-                float(r[5] or 0), float(r[6] or 0), float(r[7] or 0),
-                float(r[8] or 0), float(r[9] or 0),
-            ]))
-            for r in rows
-        ]
+        result = []
+        for r in rows:
+            potential_profit = float(r[9] or 0)
+            if potential_profit > 0:
+                profit_status = 'Profitable'
+            elif potential_profit < 0:
+                profit_status = 'Loss'
+            else:
+                profit_status = 'Break-even'
+            result.append({
+                "sku":              r[0], "item_name": r[1], "brand_name": r[2], "uom": r[3],
+                "qty_on_hand":      int(r[4] or 0),
+                "unit_cost":        float(r[5] or 0),
+                "total_cost_value": float(r[6] or 0),
+                "selling_price":    float(r[7] or 0),
+                "total_retail_value": float(r[8] or 0),
+                "potential_profit": potential_profit,
+                "profit_status":    profit_status,
+            })
         return jsonify(result), 200
     except Exception as e:
         print("[reports/inventory-valuation] error:", e)
@@ -509,57 +530,88 @@ def report_stock_ageing():
         today = date.today()
         cur.execute("""
             SELECT
-                COALESCE(ib.item_sku, '—')          AS sku,
                 i.item_name,
-                COALESCE(b.brand_name, 'Generic')    AS brand_name,
-                COALESCE(u.uom_name, '—')             AS uom,
-                ib.total_quantity                     AS qty_on_hand,
-                MAX(st.sales_date)                    AS last_sold_date
+                COALESCE(b.brand_name, 'Generic')              AS brand_name,
+                COALESCE(u.uom_name, '—')                      AS uom,
+                COALESCE(SUM(bat.quantity_on_hand), 0)         AS qty_on_hand,
+                MAX(bat.date_created)                          AS last_received_date,
+                COALESCE(fefo.unit_cost, 0)                    AS unit_cost
             FROM inventory_brand ib
-            JOIN inventory       i    ON i.inventory_id  = ib.inventory_id
-            LEFT JOIN brand      b    ON b.brand_id       = ib.brand_id
-            LEFT JOIN unit_of_measure u ON u.uom_id       = ib.uom_id
-            JOIN static_status   ss_i ON ss_i.status_id  = i.item_status_id
-            JOIN static_status   ss_b ON ss_b.status_id  = ib.item_status_id
-            LEFT JOIN order_details od ON od.inventory_brand_id = ib.inventory_brand_id
-                                       AND od.is_archived = FALSE
-            LEFT JOIN order_transaction ot ON ot.order_id = od.order_id
-            LEFT JOIN sales_transaction st ON st.order_id = ot.order_id
-            LEFT JOIN static_status ss_pay ON ss_pay.status_id = st.payment_status_id
-                                          AND ss_pay.status_code = 'PAID'
+            JOIN inventory       i    ON i.inventory_id   = ib.inventory_id
+            LEFT JOIN brand      b    ON b.brand_id        = ib.brand_id
+            LEFT JOIN unit_of_measure u ON u.uom_id        = ib.uom_id
+            JOIN static_status   ss_i ON ss_i.status_id   = i.item_status_id
+            JOIN static_status   ss_b ON ss_b.status_id   = ib.item_status_id
+            LEFT JOIN inventory_batch bat ON bat.inventory_brand_id = ib.inventory_brand_id
+                AND bat.quantity_on_hand > 0
+                AND bat.batch_status_id != (
+                    SELECT status_id FROM static_status
+                    WHERE status_scope = 'INVENTORY_STATUS' AND status_code = 'ARCHIVED'
+                )
+            LEFT JOIN LATERAL (
+                SELECT unit_cost FROM inventory_batch
+                WHERE inventory_brand_id = ib.inventory_brand_id
+                  AND expiry_date > CURRENT_DATE
+                  AND batch_status_id != (
+                      SELECT status_id FROM static_status
+                      WHERE status_scope = 'INVENTORY_STATUS' AND status_code = 'ARCHIVED'
+                  )
+                ORDER BY expiry_date ASC
+                LIMIT 1
+            ) fefo ON TRUE
             WHERE ss_i.status_code != 'INACTIVE'
               AND ss_b.status_code != 'ARCHIVED'
             GROUP BY ib.inventory_brand_id, i.item_name, b.brand_name,
-                     ib.item_sku, u.uom_name, ib.total_quantity
-            ORDER BY last_sold_date ASC NULLS FIRST, i.item_name
+                     ib.item_sku, u.uom_name, fefo.unit_cost
+            ORDER BY last_received_date ASC NULLS FIRST, i.item_name
         """)
         rows = cur.fetchall()
         result = []
         for r in rows:
-            last_sold  = r[5]
-            days_since = (today - last_sold).days if last_sold else None
+            qty              = int(r[3] or 0)
+            last_received    = r[4]
+            unit_cost        = float(r[5] or 0)
 
-            if days_since is None:
-                ageing_status = "Never Sold"
-            elif days_since <= 30:
-                ageing_status = "Active"
-            elif days_since <= 90:
-                ageing_status = "Slow-Moving"
-            elif days_since <= 180:
-                ageing_status = "At Risk"
+            if last_received:
+                if hasattr(last_received, 'date'):
+                    last_received = last_received.date()
+                days_in = (today - last_received).days
             else:
-                ageing_status = "Dead Stock"
+                days_in = None
+
+            if days_in is None:
+                ageing_category = '—'
+                ageing_status   = 'Fresh'
+            elif days_in <= 30:
+                ageing_category = '0–30 days'
+                ageing_status   = 'Fresh'
+            elif days_in <= 60:
+                ageing_category = '31–60 days'
+                ageing_status   = 'Ageing'
+            elif days_in <= 90:
+                ageing_category = '61–90 days'
+                ageing_status   = 'Old'
+            else:
+                ageing_category = '90+ days'
+                ageing_status   = 'Critical'
+
+            value_of_aged_stock = qty * unit_cost
 
             result.append({
-                "sku":                  r[0],
-                "item_name":            r[1],
-                "brand_name":           r[2],
-                "uom":                  r[3],
-                "qty_on_hand":          int(r[4] or 0),
-                "last_sold_date":       last_sold.isoformat() if last_sold else None,
-                "days_since_last_sale": days_since,
-                "ageing_status":        ageing_status,
+                "item_name":           r[0],
+                "brand_name":          r[1],
+                "uom":                 r[2],
+                "qty_on_hand":         qty,
+                "last_received_date":  last_received.isoformat() if last_received else None,
+                "days_in_inventory":   days_in,
+                "ageing_category":     ageing_category,
+                "value_of_aged_stock": round(value_of_aged_stock, 2),
+                "ageing_status":       ageing_status,
             })
+
+        AGEING_PRIORITY = {'Critical': 0, 'Old': 1, 'Ageing': 2, 'Fresh': 3}
+        result.sort(key=lambda x: (AGEING_PRIORITY.get(x['ageing_status'], 9), -(x['days_in_inventory'] or 0)))
+
         return jsonify(result), 200
     except Exception as e:
         print("[reports/stock-ageing] error:", e)
@@ -576,20 +628,26 @@ def report_reorder():
 
         cur.execute("""
             SELECT
-                COALESCE(ib.item_sku, '—')           AS sku,
+                COALESCE(ib.item_sku, '—')                    AS sku,
                 i.item_name,
-                COALESCE(b.brand_name, 'Generic')     AS brand_name,
-                COALESCE(u.uom_name, '—')              AS uom,
-                ib.total_quantity                      AS qty_on_hand,
+                COALESCE(b.brand_name, 'Generic')              AS brand_name,
+                COALESCE(u.uom_name, '—')                      AS uom,
+                COALESCE(SUM(bat.quantity_on_hand), 0)         AS qty_on_hand,
                 i.inventory_id,
                 ib.inventory_brand_id,
-                COALESCE(s.supplier_name,    '—')     AS primary_supplier,
-                COALESCE(s.supplier_contact, '—')     AS supplier_contact
+                COALESCE(s.supplier_name,    '—')              AS primary_supplier,
+                COALESCE(s.supplier_contact, '—')              AS supplier_contact
             FROM inventory_brand ib
             JOIN inventory         i    ON i.inventory_id  = ib.inventory_id
             LEFT JOIN brand        b    ON b.brand_id      = ib.brand_id
             LEFT JOIN unit_of_measure u ON u.uom_id        = ib.uom_id
             JOIN static_status     ss_i ON ss_i.status_id = i.item_status_id
+            LEFT JOIN inventory_batch bat ON bat.inventory_brand_id = ib.inventory_brand_id
+                AND bat.expiry_date > CURRENT_DATE
+                AND bat.batch_status_id != (
+                    SELECT status_id FROM static_status
+                    WHERE status_scope = 'INVENTORY_STATUS' AND status_code = 'ARCHIVED'
+                )
             LEFT JOIN LATERAL (
                 SELECT s2.supplier_name, s2.supplier_contact
                 FROM inventory_brand_supplier ibs2
@@ -604,6 +662,9 @@ def report_reorder():
                 WHERE ss_b2.status_id = ib.item_status_id
                   AND ss_b2.status_code != 'ARCHIVED'
               )
+            GROUP BY ib.inventory_brand_id, i.item_name, b.brand_name,
+                     ib.item_sku, u.uom_name, i.inventory_id,
+                     s.supplier_name, s.supplier_contact
             ORDER BY i.item_name, b.brand_name
         """)
         rows = cur.fetchall()
@@ -652,49 +713,72 @@ def report_customer_sales():
     conn = get_connection()
     cur  = conn.cursor()
     try:
-        start, end = parse_dates()
         cur.execute("""
             SELECT
                 c.customer_name,
-                COUNT(DISTINCT ot.order_id)                                       AS total_orders,
-                COALESCE(SUM(od.order_quantity), 0)                               AS total_qty,
-                COALESCE(SUM(ot.total_amount),   0)                               AS total_revenue,
-                COALESCE(SUM(od.order_quantity * ib.item_unit_price), 0)          AS total_cogs,
-                COALESCE(SUM(ot.total_amount), 0)
-                    - COALESCE(SUM(od.order_quantity * ib.item_unit_price), 0)    AS total_profit,
-                STRING_AGG(DISTINCT pm.status_name, ', ')                         AS payment_methods
-            FROM sales_transaction st
-            JOIN static_status     ss_pay ON ss_pay.status_id = st.payment_status_id
-            JOIN order_transaction  ot    ON ot.order_id  = st.order_id
-            JOIN customer           c     ON c.customer_id = ot.customer_id
-            LEFT JOIN static_status pm    ON pm.status_id  = ot.payment_method_id
-            LEFT JOIN order_details od    ON od.order_id   = ot.order_id
-                                         AND od.is_archived = FALSE
-            LEFT JOIN inventory_brand ib  ON ib.inventory_brand_id = od.inventory_brand_id
-            WHERE ss_pay.status_code = 'PAID'
-              AND st.sales_date BETWEEN %s AND %s
-            GROUP BY c.customer_name
+                COUNT(DISTINCT ot.order_id)                AS total_orders,
+                COALESCE(SUM(DISTINCT ot.total_amount), 0) AS total_revenue,
+                MAX(ot.order_date)                         AS last_purchase_date,
+                COALESCE(SUM(DISTINCT ot.total_amount) FILTER (
+                    WHERE ot.order_date >= DATE_TRUNC('month', CURRENT_DATE)
+                ), 0) AS this_month,
+                COALESCE(SUM(DISTINCT ot.total_amount) FILTER (
+                    WHERE ot.order_date >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month'
+                      AND ot.order_date <  DATE_TRUNC('month', CURRENT_DATE)
+                ), 0) AS last_month,
+                (
+                    SELECT STRING_AGG(DISTINCT pm2.status_name, ', ')
+                    FROM order_transaction ot3
+                    JOIN static_status pm2 ON pm2.status_id = ot3.payment_method_id
+                    WHERE ot3.customer_id = c.customer_id
+                ) AS preferred_payment
+            FROM order_transaction  ot
+            JOIN customer           c  ON c.customer_id  = ot.customer_id
+            WHERE 1=1
+            GROUP BY c.customer_id, c.customer_name
             ORDER BY total_revenue DESC
-        """, (start, end))
+        """)
         rows = cur.fetchall()
 
         result = []
         for r in rows:
-            total_revenue = float(r[3] or 0)
-            total_orders  = int(r[1] or 0)
-            total_profit  = float(r[5] or 0)
-            avg_order_val = round(total_revenue / total_orders, 2) if total_orders > 0 else 0.0
-            margin_pct    = round((total_profit / total_revenue * 100), 2) if total_revenue > 0 else 0.0
+            last_date  = r[3]
+            this_month = float(r[4] or 0)
+            last_month = float(r[5] or 0)
+            if last_month == 0 and this_month == 0:
+                ltv_trend = 'new'
+            elif last_month == 0:
+                ltv_trend = 'up'
+            elif this_month > last_month:
+                ltv_trend = 'up'
+            elif this_month < last_month:
+                ltv_trend = 'down'
+            else:
+                ltv_trend = 'flat'
+
+            days_inactive = (date.today() - last_date).days if last_date else None
+            if days_inactive is None:
+                activity_status = 'Unknown'
+            elif days_inactive <= 7:
+                activity_status = 'Active'
+            elif days_inactive <= 30:
+                activity_status = 'Inactive'
+            elif days_inactive <= 90:
+                activity_status = 'At Risk'
+            else:
+                activity_status = 'Dormant'
+
             result.append({
-                "customer_name":   r[0] or "Unknown",
-                "total_orders":    total_orders,
-                "total_qty":       int(r[2] or 0),
-                "total_revenue":   total_revenue,
-                "total_cogs":      float(r[4] or 0),
-                "total_profit":    total_profit,
-                "margin_pct":      margin_pct,
-                "avg_order_value": avg_order_val,
-                "payment_methods": r[6] or "—",
+                "customer_name":      r[0] or "Unknown",
+                "total_orders":       int(r[1] or 0),
+                "total_revenue":      float(r[2] or 0),
+                "last_purchase_date": last_date.isoformat() if last_date else None,
+                "days_inactive":      days_inactive,
+                "activity_status":    activity_status,
+                "ltv_trend":          ltv_trend,
+                "this_month":         this_month,
+                "last_month":         last_month,
+                "preferred_payment":  r[6] or "—",
             })
         return jsonify(result), 200
     except Exception as e:

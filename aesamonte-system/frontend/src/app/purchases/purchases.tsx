@@ -166,10 +166,23 @@ function SkeletonRow({ cols }: { cols: number }) {
 export default function PurchasesPage({
   role,
   onLogout,
+  initialViewId,
+  onViewOpened,
+  reorderItem,
 }: {
   role: string;
   onLogout: () => void;
   permissions?: any;
+  initialViewId?: string;
+  onViewOpened?: () => void;
+  reorderItem?: {
+    inventory_brand_id: number;
+    item_name: string;
+    brand_name: string;
+    uom_name: string;
+    quantity_ordered: number;
+    unit_cost: number;
+  } | null;
 }) {
   const [orders, setOrders]             = useState<PurchaseOrder[]>([]);
   const [isLoading, setIsLoading]       = useState(true);
@@ -179,8 +192,18 @@ export default function PurchasesPage({
   const [sortDir, setSortDir]           = useState<SortDir>(null);
   const [openMenuId, setOpenMenuId]     = useState<number | null>(null);
   const [statusChanging, setStatusChanging] = useState(false);
-  const [showAddModal, setShowAddModal]   = useState(false);
-  const [editingPO, setEditingPO]         = useState<PurchaseOrder | null>(null);
+  const [showAddModal, setShowAddModal]     = useState(false);
+  const [editingPO, setEditingPO]           = useState<PurchaseOrder | null>(null);
+  const [reorderPrefill, setReorderPrefill] = useState<typeof reorderItem>(null);
+
+  // Auto-open modal when navigated from reorder report
+  useEffect(() => {
+    if (reorderItem) {
+      setReorderPrefill(reorderItem);
+      setShowAddModal(true);
+    }
+  }, [reorderItem]);
+
   const [isArchiveView, setIsArchiveView] = useState(false);
   const [selectedPO, setSelectedPO]       = useState<PurchaseOrder | null>(null);
   const [poItems, setPoItems]             = useState<any[]>([]);
@@ -190,6 +213,18 @@ export default function PurchasesPage({
 
   const menuRef   = useRef<HTMLTableCellElement>(null);
   const statusRef = useRef<HTMLDivElement>(null);
+
+  // ── Notification deep-link: auto-filter + open modal when prop arrives ───────
+
+  useEffect(() => {
+    if (!initialViewId || orders.length === 0) return;
+    const po = orders.find(o => o.purchase_order_id === Number(initialViewId));
+    if (!po) return;
+    setSearchTerm(po.po_number);
+    setCurrentPage(1);
+    setSelectedPO(po);
+    onViewOpened?.();
+  }, [orders, initialViewId]);
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -346,8 +381,9 @@ export default function PurchasesPage({
 
       <AddPOModal
         isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onSaved={() => { setShowAddModal(false); fetchOrders(); }}
+        onClose={() => { setShowAddModal(false); setReorderPrefill(null); }}
+        onSaved={() => { setShowAddModal(false); setReorderPrefill(null); fetchOrders(); }}
+        initialItems={reorderPrefill ? [reorderPrefill] : undefined}
       />
 
       <EditPOModal

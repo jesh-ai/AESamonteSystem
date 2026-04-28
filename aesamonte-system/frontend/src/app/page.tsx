@@ -31,12 +31,17 @@ export default function Home() {
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState("Dashboard");
+  const [reorderItem, setReorderItem] = useState<{
+    inventory_brand_id: number; item_name: string; brand_name: string;
+    uom_name: string; quantity_ordered: number; unit_cost: number;
+  } | null>(null);
 
   const setActiveTabPersisted = (tab: string) => {
     localStorage.setItem("activeTab", tab);
     setActiveTab(tab);
   };
   const [pendingSearch, setPendingSearch] = useState<{ tab: string; term: string } | null>(null);
+  const [viewTarget, setViewTarget] = useState<{ tab: string; id: string } | null>(null);
 
   // Restore session from localStorage token on page load / browser refresh
   useEffect(() => {
@@ -66,9 +71,13 @@ export default function Home() {
 
   useEffect(() => {
     function handleNavigate(e: Event) {
-      const { tab, search } = (e as CustomEvent<{ tab: string; search: string }>).detail;
+      const detail = (e as CustomEvent).detail ?? {};
+      const { tab, search, view_inventory_id, view_po_id } = detail;
       setActiveTabPersisted(tab);
       setPendingSearch({ tab, term: search ?? '' });
+      if (view_inventory_id != null) setViewTarget({ tab: 'Inventory', id: String(view_inventory_id) });
+      else if (view_po_id != null)   setViewTarget({ tab: 'Purchases', id: String(view_po_id) });
+      else                           setViewTarget(null);
     }
     window.addEventListener('app:navigate', handleNavigate);
     return () => window.removeEventListener('app:navigate', handleNavigate);
@@ -126,14 +135,14 @@ export default function Home() {
             {activeTab === "Dashboard" ? (
               <Dashboard role={userInfo.roleName} onLogout={handleLogout} onNavigate={setActiveTabPersisted} />
             ) : activeTab === "Inventory" ? (
-              <Inventory role={userInfo.roleName} employeeId={userInfo.employeeId} onLogout={handleLogout} initialSearch={pendingSearch?.tab === 'inventory' ? pendingSearch.term : ''} permissions={userInfo.permissions?.inventory} />
+              <Inventory role={userInfo.roleName} employeeId={userInfo.employeeId} onLogout={handleLogout} initialSearch={pendingSearch?.tab === 'Inventory' ? pendingSearch.term : ''} permissions={userInfo.permissions?.inventory} initialViewId={viewTarget?.tab === 'Inventory' ? viewTarget.id : undefined} onViewOpened={() => setViewTarget(null)} />
             ) : activeTab === "Sales" ? (
-              <Sales role={userInfo.roleName} employeeId={userInfo.employeeId} onLogout={handleLogout} initialSearch={pendingSearch?.tab === 'sales' ? pendingSearch.term : ''} permissions={userInfo.permissions?.sales} />
+              <Sales role={userInfo.roleName} employeeId={userInfo.employeeId} onLogout={handleLogout} initialSearch={pendingSearch?.tab === 'Sales' ? pendingSearch.term : ''} permissions={userInfo.permissions?.sales} />
             ) : activeTab === "Orders" ? (
               // ✅ Fix — add permissions
-              <Orders role={userInfo.roleName} onLogout={handleLogout} initialSearch={pendingSearch?.tab === 'orders' ? pendingSearch.term : ''} permissions={userInfo.permissions?.orders} />
+              <Orders role={userInfo.roleName} onLogout={handleLogout} initialSearch={pendingSearch?.tab === 'Orders' ? pendingSearch.term : ''} permissions={userInfo.permissions?.orders} />
             ) : activeTab === "Reports" ? (
-              <Reports role={userInfo.roleName} onLogout={handleLogout} />
+              <Reports role={userInfo.roleName} onLogout={handleLogout} permissions={userInfo.permissions?.reports} onNavigate={(tab, item?) => { setActiveTabPersisted(tab); if (item) setReorderItem(item); }} />
             ) : activeTab === "Settings" ? (
               <Settings role={userInfo.roleName} roleId={userInfo.roleId} employeeId={userInfo.employeeId} onLogout={handleLogout} />
             ) : activeTab === "Help" ? (
@@ -141,7 +150,7 @@ export default function Home() {
             ) : activeTab === "Suppliers" ? (
               <Suppliers role={userInfo.roleName} onLogout={handleLogout} />
             ) : activeTab === "Purchases" ? (
-              <Purchases role={userInfo.roleName} onLogout={handleLogout} permissions={userInfo.permissions?.purchases} />
+              <Purchases role={userInfo.roleName} onLogout={handleLogout} permissions={userInfo.permissions?.purchases} initialViewId={viewTarget?.tab === 'Purchases' ? viewTarget.id : undefined} onViewOpened={() => setViewTarget(null)} reorderItem={reorderItem} />
             ) : null
 
             }
