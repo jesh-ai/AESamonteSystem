@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from database.db_config import get_connection
 from datetime import datetime
+from utils.auth import require_purchase_access
 
 purchases_bp = Blueprint("purchases", __name__)
 
@@ -22,6 +23,7 @@ def _get_status_id(cur, code, scope="PURCHASE_STATUS"):
 # ── GET /api/brands ───────────────────────────────────────────────────────────
 
 @purchases_bp.route("/api/brands", methods=["GET"])
+@require_purchase_access
 def get_brands():
     conn = get_connection()
     cur = conn.cursor()
@@ -41,6 +43,7 @@ def get_brands():
 # Returns the real inventory_brand_id so the PO row can reference it normally.
 
 @purchases_bp.route("/api/inventory/quick-add", methods=["POST"])
+@require_purchase_access
 def quick_add_inventory_item():
     conn = get_connection()
     cur = conn.cursor()
@@ -140,6 +143,7 @@ def quick_add_inventory_item():
 # ── GET /api/purchases ────────────────────────────────────────────────────────
 
 @purchases_bp.route("/api/purchases", methods=["GET"])
+@require_purchase_access
 def get_purchase_orders():
     conn = get_connection()
     cur = conn.cursor()
@@ -196,6 +200,7 @@ def get_purchase_orders():
 # ── GET /api/purchases/<po_id>/items ─────────────────────────────────────────
 
 @purchases_bp.route("/api/purchases/<int:po_id>/items", methods=["GET"])
+@require_purchase_access
 def get_purchase_order_items(po_id):
     conn = get_connection()
     cur = conn.cursor()
@@ -249,6 +254,7 @@ def get_purchase_order_items(po_id):
 # ── POST /api/purchases/draft ─────────────────────────────────────────────────
 
 @purchases_bp.route("/api/purchases/draft", methods=["POST"])
+@require_purchase_access
 def create_draft_purchase_order():
     conn = get_connection()
     cur = conn.cursor()
@@ -327,6 +333,7 @@ def create_draft_purchase_order():
 # ── POST /api/purchases/<po_id>/receive ───────────────────────────────────────
 
 @purchases_bp.route("/api/purchases/<int:po_id>/receive", methods=["POST"])
+@require_purchase_access
 def receive_purchase_order(po_id):
     conn = get_connection()
     cur = conn.cursor()
@@ -430,6 +437,7 @@ def receive_purchase_order(po_id):
 # ── PATCH /api/purchases/<po_id>/archive ──────────────────────────────────────
 
 @purchases_bp.route("/api/purchases/<int:po_id>/archive", methods=["PATCH"])
+@require_purchase_access
 def archive_purchase_order(po_id):
     conn = get_connection()
     cur = conn.cursor()
