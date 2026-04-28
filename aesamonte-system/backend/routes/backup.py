@@ -95,10 +95,10 @@ def _build_zip_bytes():
                        COALESCE((SELECT ib2.item_description FROM inventory_brand ib2 WHERE ib2.inventory_id = i.inventory_id LIMIT 1), '') AS item_description,
                        COALESCE((SELECT ib2.item_sku FROM inventory_brand ib2 WHERE ib2.inventory_id = i.inventory_id LIMIT 1), '') AS item_sku,
                        COALESCE((SELECT b2.brand_name FROM inventory_brand ib2 JOIN brand b2 ON ib2.brand_id = b2.brand_id WHERE ib2.inventory_id = i.inventory_id LIMIT 1), '') AS brand,
-                       COALESCE((SELECT SUM(ib3.total_quantity) FROM inventory_brand ib3 WHERE ib3.inventory_id = i.inventory_id), 0) AS item_quantity,
+                       COALESCE((SELECT SUM(bat3.quantity_on_hand) FROM inventory_batch bat3 JOIN inventory_brand ib3 ON ib3.inventory_brand_id = bat3.inventory_brand_id WHERE ib3.inventory_id = i.inventory_id AND bat3.expiry_date > CURRENT_DATE), 0) AS item_quantity,
                        COALESCE((SELECT u2.uom_name FROM inventory_brand ib2 JOIN unit_of_measure u2 ON ib2.uom_id = u2.uom_id WHERE ib2.inventory_id = i.inventory_id LIMIT 1), '') AS uom_code,
                        s.status_name,
-                       COALESCE((SELECT ib2.item_unit_price FROM inventory_brand ib2 WHERE ib2.inventory_id = i.inventory_id LIMIT 1), 0) AS item_unit_price,
+                       COALESCE((SELECT AVG(bat2.unit_cost) FROM inventory_batch bat2 JOIN inventory_brand ib2 ON ib2.inventory_brand_id = bat2.inventory_brand_id WHERE ib2.inventory_id = i.inventory_id AND bat2.expiry_date > CURRENT_DATE), 0) AS item_unit_price,
                        COALESCE((SELECT ib2.item_selling_price FROM inventory_brand ib2 WHERE ib2.inventory_id = i.inventory_id LIMIT 1), 0) AS item_selling_price
                 FROM inventory i
                 JOIN static_status s ON i.item_status_id = s.status_id
@@ -128,7 +128,9 @@ def _build_zip_bytes():
                 JOIN customer c ON ot.customer_id = c.customer_id
                 JOIN static_status sl ON ot.order_status_id = sl.status_id
                 LEFT JOIN order_details od ON ot.order_id = od.order_id
-                LEFT JOIN inventory i ON od.inventory_id = i.inventory_id
+                LEFT JOIN inventory_batch bat ON bat.batch_id = od.batch_id
+                LEFT JOIN inventory_brand ib ON ib.inventory_brand_id = bat.inventory_brand_id
+                LEFT JOIN inventory i ON i.inventory_id = ib.inventory_id
                 ORDER BY ot.order_id
             """)
             zf.writestr(f"Orders_{date_str}.csv", write_csv_buffer(cur, [
@@ -393,16 +395,14 @@ def restore_inventory(cur, rows):
             if uom_id and brand_id:
                 cur.execute("""
                     INSERT INTO inventory_brand
-                        (inventory_id, brand_id, item_sku, item_unit_price, item_selling_price,
-                         total_quantity, uom_id, item_description, item_status_id)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        (inventory_id, brand_id, item_sku, item_selling_price,
+                         uom_id, item_description, item_status_id)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT DO NOTHING
                 """, (
                     inv_id, brand_id,
                     row.get('item_sku') or None,
-                    float(row.get('item_unit_price',   0) or 0),
                     float(row.get('item_selling_price', 0) or 0),
-                    int(row.get('item_quantity', 0) or 0),
                     uom_id,
                     row.get('item_description') or None,
                     status_id,
