@@ -211,6 +211,12 @@ export default function PurchasesPage({
   const [statusFilter, setStatusFilter]   = useState('All Status');
   const [statusOpen, setStatusOpen]       = useState(false);
 
+  // ── Date Range ────────────────────────────────────────────────────────────
+  const [dateRangeOpen, setDateRangeOpen]   = useState(false);
+  const [dateFrom, setDateFrom]             = useState<string>('');
+  const [dateTo, setDateTo]                 = useState<string>('');
+  const dateRangeRef = useRef<HTMLDivElement>(null);
+
   const menuRef   = useRef<HTMLTableCellElement>(null);
   const statusRef = useRef<HTMLDivElement>(null);
 
@@ -242,8 +248,9 @@ export default function PurchasesPage({
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (menuRef.current   && !menuRef.current.contains(e.target as Node))   setOpenMenuId(null);
-      if (statusRef.current && !statusRef.current.contains(e.target as Node)) setStatusOpen(false);
+      if (menuRef.current      && !menuRef.current.contains(e.target as Node))      setOpenMenuId(null);
+      if (statusRef.current    && !statusRef.current.contains(e.target as Node))    setStatusOpen(false);
+      if (!(e.target as HTMLElement).closest('[data-filter="date"]')) setDateRangeOpen(false);
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -338,7 +345,9 @@ export default function PurchasesPage({
       const matchStatus =
         statusFilter === 'All Status' ||
         o.status.toUpperCase() === statusFilter;
-      return matchSearch && matchStatus;
+      const matchFrom = !dateFrom || (o.order_date && o.order_date.slice(0,10) >= dateFrom);
+      const matchTo   = !dateTo   || (o.order_date && o.order_date.slice(0,10) <= dateTo);
+      return matchSearch && matchStatus && matchFrom && matchTo;
     });
     list = [...list].sort((a, b) => {
       if (sortKey && sortDir) {
@@ -353,7 +362,7 @@ export default function PurchasesPage({
       return ao - bo;
     });
     return list;
-  }, [orders, searchTerm, isArchiveView, statusFilter, sortKey, sortDir]);
+  }, [orders, searchTerm, isArchiveView, statusFilter, sortKey, sortDir, dateFrom, dateTo]);
 
   // ── Pagination ─────────────────────────────────────────────────────────────
 
@@ -372,6 +381,18 @@ export default function PurchasesPage({
       acc.push(p);
       return acc;
     }, []);
+
+  // ── Date Range Picker helpers ──────────────────────────────────────────────
+
+  const getDateRangeLabel = () => {
+    if (!dateFrom && !dateTo) return 'Date Range';
+    if (dateFrom && dateTo) return `${dateFrom} to ${dateTo}`;
+    if (dateFrom) return `From ${dateFrom}`;
+    if (dateTo) return `Until ${dateTo}`;
+    return 'Date Range';
+  };
+
+  const handleClearDateFilter = () => { setDateFrom(''); setDateTo(''); setCurrentPage(1); };
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -437,11 +458,46 @@ export default function PurchasesPage({
                 /* ── Active view controls ── */
                 <>
                   {/* Date Range */}
-                  <button className={s.filterBtn}>
-                    <CalendarDays size={15} color="#64748b" />
-                    <span>Date Range</span>
-                    <ChevronDown size={14} color="#64748b" />
-                  </button>
+                  <div className={s.dateFilterContainer} data-filter="date" ref={dateRangeRef}>
+                    <button
+                      className={`${s.filterBtn} ${dateRangeOpen ? s.filterBtnActive : ''} ${(dateFrom || dateTo) ? s.filterBtnActive : ''}`}
+                      onClick={() => setDateRangeOpen(prev => !prev)}
+                    >
+                      <CalendarDays size={15} color="#64748b" />
+                      <span style={{ fontSize: '0.82rem', fontWeight: 500 }}>{getDateRangeLabel()}</span>
+                      {dateRangeOpen
+                        ? <ChevronUp size={14} color="#64748b" />
+                        : <ChevronDown size={14} color="#64748b" />}
+                    </button>
+
+                    {dateRangeOpen && (
+                      <div className={s.dateFilterMenu}>
+                        <div className={s.dateFilterInputGroup}>
+                          <label htmlFor="poFromDate" className={s.dateFilterLabel}>FROM</label>
+                          <input
+                            id="poFromDate"
+                            type="date"
+                            value={dateFrom}
+                            onChange={e => { setDateFrom(e.target.value); setCurrentPage(1); }}
+                            className={s.dateFilterInput}
+                          />
+                        </div>
+                        <div className={s.dateFilterInputGroup}>
+                          <label htmlFor="poToDate" className={s.dateFilterLabel}>TO</label>
+                          <input
+                            id="poToDate"
+                            type="date"
+                            value={dateTo}
+                            onChange={e => { setDateTo(e.target.value); setCurrentPage(1); }}
+                            className={s.dateFilterInput}
+                          />
+                        </div>
+                        {(dateFrom || dateTo) && (
+                          <button className={s.dateFilterClear} onClick={handleClearDateFilter}>Clear Dates</button>
+                        )}
+                      </div>
+                    )}
+                  </div>
 
                   {/* All Status */}
                   <div className={s.filterDropdownWrap} ref={statusRef}>

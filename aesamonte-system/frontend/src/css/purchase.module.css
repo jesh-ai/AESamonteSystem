@@ -504,3 +504,69 @@
   padding-top: 15px;
   border-top: 1px dashed #e2e8f0;
 }
+/* ===== DATE RANGE FILTER ===== */
+.dateFilterContainer {
+  position: relative;
+}
+
+.dateFilterMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px;
+  min-width: 200px;
+  z-index: 50;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dateFilterInputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dateFilterLabel {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #94a3b8;
+}
+
+.dateFilterInput {
+  height: 36px;
+  padding: 0 10px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: #1e293b;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  background: #fff;
+}
+
+.dateFilterInput:focus {
+  border-color: #3b82f6;
+}
+
+.dateFilterClear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #3b82f6;
+  padding: 2px 0;
+  text-align: left;
+}
+
+.dateFilterClear:hover {
+  color: #2563eb;
+}
