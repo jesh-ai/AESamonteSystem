@@ -112,7 +112,6 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
     setActiveSearchIndex(index);
     const currentItem = (formData?.items || [])[index];
     if (currentItem?.inventory_brand_id) {
-      // Item already selected — eager-load default list so dropdown shows with highlight
       fetchSearchResults(index, '');
     } else if (!currentItem?.item?.trim() && !(searchResults[index] || []).length) {
       fetchSearchResults(index, '');
@@ -209,6 +208,7 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
 
   const safeItems = formData.items || [];
   const safeStatus = formData.status || 'Preparing';
+  const isLocked = safeStatus.trim().toLowerCase() === 'received' || safeStatus.trim().toLowerCase() === 'cancelled';
   const safePayment = formData.paymentMethod || 'Cash';
   const isPreparing = safeStatus.trim().toLowerCase() === 'preparing';
 
@@ -272,6 +272,7 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
                   className={s.cleanInput}
                   style={customerNameHasError() ? FIELD_ERROR_STYLE : {}}
                   value={formData.customerName || ''}
+                  disabled={isLocked}
                   onChange={(e) => { setSubmitError(''); setFormData({...formData, customerName: e.target.value}); }}
                 />
                 {customerNameHasError() && (
@@ -280,7 +281,7 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
               </div>
               <div className={s.formGroup}>
                 <label style={{ ...LABEL_STYLE }}>Contact Number</label>
-                <input className={s.cleanInput} value={formData.contact || ''} onChange={(e) => setFormData({...formData, contact: e.target.value})} />
+                <input className={s.cleanInput} value={formData.contact || ''} disabled={isLocked} onChange={(e) => setFormData({...formData, contact: e.target.value})} />
               </div>
             </div>
             <div className={s.formGroupFull}>
@@ -291,6 +292,7 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
                 className={s.cleanInput}
                 style={addressHasError() ? FIELD_ERROR_STYLE : {}}
                 value={formData.address || ''}
+                disabled={isLocked}
                 onChange={(e) => { setSubmitError(''); setFormData({...formData, address: e.target.value}); }}
               />
               {addressHasError() && (
@@ -305,7 +307,7 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
               <div className={s.formGroup}>
                 <label style={{ ...LABEL_STYLE }}>Status</label>
-                <select className={s.cleanInput} value={safeStatus.trim()} onChange={(e) => setFormData({...formData, status: e.target.value})}>
+                <select className={s.cleanInput} value={safeStatus.trim()} disabled={isLocked} onChange={(e) => setFormData({...formData, status: e.target.value})}>
                   {statuses.length === 0 && <option value={safeStatus.trim()}>{safeStatus.trim()}</option>}
                   {statuses.map((st: any) => (
                     <option key={st.status_id} value={st.status_name.trim()}>{st.status_name.trim()}</option>
@@ -314,7 +316,7 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
               </div>
               <div className={s.formGroup}>
                 <label style={{ ...LABEL_STYLE }}>Payment Method</label>
-                <select className={s.cleanInput} value={safePayment.trim()} onChange={(e) => setFormData({...formData, paymentMethod: e.target.value})}>
+                <select className={s.cleanInput} value={safePayment.trim()} disabled={isLocked} onChange={(e) => setFormData({...formData, paymentMethod: e.target.value})}>
                   {paymentMethods.length === 0 && <option value={safePayment.trim()}>{safePayment.trim()}</option>}
                   {paymentMethods.map((pm: any) => (
                     <option key={pm.status_id} value={pm.status_name.trim()}>{pm.status_name.trim()}</option>
@@ -363,7 +365,7 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
                         backgroundColor: (!item.inventory_brand_id && item.item.length > 0) ? '#fff5f5' : '#fff'
                       }}
                     />
-                    {activeSearchIndex === index && isPreparing && (item.item.trim().length >= 2 || (searchResults[index] || []).length > 0 || searchLoading[index]) && (
+                    {activeSearchIndex === index && isPreparing && !item.inventory_brand_id && (item.item.trim().length >= 2 || (searchResults[index] || []).length > 0 || searchLoading[index]) && (
                       <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: '6px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', maxHeight: '250px', overflowY: 'auto', marginTop: '4px' }}>
                         {searchLoading[index] ? (
                           <div style={{ padding: '10px 12px', fontSize: '0.8rem', color: '#64748b', textAlign: 'center' }}>Searching...</div>
@@ -471,7 +473,9 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
           )}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
             <button className={s.cancelBtn} onClick={handleCancelClick}>Cancel</button>
-            <button className={s.saveBtn} onClick={handleSubmit}>Save Changes</button>
+            {!isLocked && ( 
+              <button className={s.saveBtn} onClick={handleSubmit}>Save Changes</button>
+            )}
           </div>
         </div>
 
