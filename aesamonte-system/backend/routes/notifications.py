@@ -139,7 +139,7 @@ def get_notifications():
                     FROM inventory i
                     JOIN static_status ss ON i.item_status_id = ss.status_id
                     WHERE ss.status_code != 'INACTIVE'
-                      AND i.total_quantity = 0
+                      AND COALESCE((SELECT SUM(bat.quantity_on_hand) FROM inventory_batch bat JOIN inventory_brand ib ON ib.inventory_brand_id = bat.inventory_brand_id WHERE ib.inventory_id = i.inventory_id AND bat.expiry_date > CURRENT_DATE), 0) = 0
                     ORDER BY event_time DESC
                     LIMIT 10
                 """)
@@ -171,11 +171,11 @@ def get_notifications():
                         'Low Stock',
                         i.item_created_at AS event_time
                     FROM inventory i
-                    LEFT JOIN inventory_action ia ON ia.inventory_id = i.inventory_id
+                    LEFT JOIN inventory_action ia ON ia.inventory_brand_id IN (SELECT inventory_brand_id FROM inventory_brand WHERE inventory_id = i.inventory_id)
                     JOIN static_status ss ON i.item_status_id = ss.status_id
                     WHERE ss.status_code != 'INACTIVE'
-                      AND i.total_quantity > 0
-                      AND i.total_quantity <= COALESCE(ia.reorder_qty, 10)
+                      AND COALESCE((SELECT SUM(bat.quantity_on_hand) FROM inventory_batch bat JOIN inventory_brand ib ON ib.inventory_brand_id = bat.inventory_brand_id WHERE ib.inventory_id = i.inventory_id AND bat.expiry_date > CURRENT_DATE), 0) > 0
+                      AND COALESCE((SELECT SUM(bat.quantity_on_hand) FROM inventory_batch bat JOIN inventory_brand ib ON ib.inventory_brand_id = bat.inventory_brand_id WHERE ib.inventory_id = i.inventory_id AND bat.expiry_date > CURRENT_DATE), 0) <= COALESCE(ia.reorder_qty, 10)
                     ORDER BY event_time DESC
                     LIMIT 10
                 """)

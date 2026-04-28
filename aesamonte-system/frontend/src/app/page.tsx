@@ -31,6 +31,10 @@ export default function Home() {
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState("Dashboard");
+  const [reorderItem, setReorderItem] = useState<{
+    inventory_brand_id: number; item_name: string; brand_name: string;
+    uom_name: string; quantity_ordered: number; unit_cost: number;
+  } | null>(null);
 
   const setActiveTabPersisted = (tab: string) => {
     localStorage.setItem("activeTab", tab);
@@ -138,7 +142,7 @@ export default function Home() {
               // ✅ Fix — add permissions
               <Orders role={userInfo.roleName} onLogout={handleLogout} initialSearch={pendingSearch?.tab === 'Orders' ? pendingSearch.term : ''} permissions={userInfo.permissions?.orders} />
             ) : activeTab === "Reports" ? (
-              <Reports role={userInfo.roleName} onLogout={handleLogout} />
+              <Reports role={userInfo.roleName} onLogout={handleLogout} permissions={userInfo.permissions?.reports} onNavigate={(tab, item?) => { setActiveTabPersisted(tab); if (item) setReorderItem(item); }} />
             ) : activeTab === "Settings" ? (
               <Settings role={userInfo.roleName} roleId={userInfo.roleId} employeeId={userInfo.employeeId} onLogout={handleLogout} />
             ) : activeTab === "Help" ? (
@@ -146,7 +150,7 @@ export default function Home() {
             ) : activeTab === "Suppliers" ? (
               <Suppliers role={userInfo.roleName} onLogout={handleLogout} />
             ) : activeTab === "Purchases" ? (
-              <Purchases role={userInfo.roleName} onLogout={handleLogout} permissions={userInfo.permissions?.purchases} initialViewId={viewTarget?.tab === 'Purchases' ? viewTarget.id : undefined} onViewOpened={() => setViewTarget(null)} />
+              <Purchases role={userInfo.roleName} onLogout={handleLogout} permissions={userInfo.permissions?.purchases} initialViewId={viewTarget?.tab === 'Purchases' ? viewTarget.id : undefined} onViewOpened={() => setViewTarget(null)} reorderItem={reorderItem} />
             ) : null
 
             }
