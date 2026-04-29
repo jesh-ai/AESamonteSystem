@@ -152,9 +152,16 @@ function StatusBadge({ status }: { status: string }) {
 function SkeletonRow({ cols }: { cols: number }) {
   return (
     <tr>
-      {Array.from({ length: cols }).map((_, i) => (
-        <td key={i} className={s.skeletonCell}>
-          <div className={s.skeletonBar} />
+      {Array.from({ length: cols }).map((_, j) => (
+        <td key={j} style={{ padding: '10px 12px' }}>
+          <div style={{
+            height: '12px',
+            borderRadius: j === cols - 2 ? '20px' : '4px',
+            background: 'linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%)',
+            backgroundSize: '600px 100%',
+            animation: 'shimmer 1.4s infinite linear',
+            width: ['140px','120px','50px','80px','90px','90px','70px','30px'][j] ?? '60px',
+          }} />
         </td>
       ))}
     </tr>
@@ -590,9 +597,9 @@ export default function PurchasesPage({
 
               <tbody>
                 {isLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <SkeletonRow key={i} cols={COLUMNS.length + 1} />
-                  ))
+                Array.from({ length: 5 }).map((_, i) => (
+                  <SkeletonRow key={i} cols={COLUMNS.length + 1} />
+                ))
                 ) : paginated.length === 0 ? (
                   <tr className={s.emptyRow}>
                     <td colSpan={COLUMNS.length + 1}>
