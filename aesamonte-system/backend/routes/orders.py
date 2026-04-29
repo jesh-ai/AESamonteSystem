@@ -472,6 +472,58 @@ def _insert_items_only(cur, order_id, items):
         """, (order_id, batch_id, qty, unit_price, amount))
 
 
+
+def _create_sales_record(cur, order_id):
+    """
+    Inserts a row into sales_transaction when an order is marked RECEIVED.
+    Skips silently if a record already exists for this order.
+    """
+    # Check if a sales record already exists
+    cur.execute(
+        "SELECT sales_id FROM sales_transaction WHERE order_id = %s LIMIT 1",
+        (order_id,)
+    )
+    if cur.fetchone():
+        return  # Already recorded — idempotent
+
+    # Resolve the PENDING payment status id (auto-fix will upgrade to PAID later)
+    cur.execute("""
+        SELECT status_id FROM static_status
+        WHERE status_scope = 'SALES_STATUS' AND status_code = 'PENDING'
+        LIMIT 1
+    """)
+    pending_row = cur.fetchone()
+
+    # Fallback: try PAID if PENDING doesn't exist
+    if not pending_row:
+        cur.execute("""
+            SELECT status_id FROM static_status
+            WHERE status_scope = 'SALES_STATUS' AND status_code = 'PAID'
+            LIMIT 1
+        """)
+        pending_row = cur.fetchone()
+
+    if not pending_row:
+        raise Exception("No PENDING or PAID status found in SALES_STATUS scope.")
+
+    payment_status_id = pending_row[0]
+
+    # Fetch payment_method_id from the order
+    cur.execute("""
+        SELECT payment_method_id
+        FROM order_transaction
+        WHERE order_id = %s
+    """, (order_id,))
+    order_row = cur.fetchone()
+    payment_method_id = order_row[0] if order_row else None
+
+    cur.execute("""
+        INSERT INTO sales_transaction
+            (order_id, sales_date, payment_status_id, employee_id, payment_method_id)
+        VALUES (%s, CURRENT_DATE, %s, %s, %s)
+    """, (order_id, payment_status_id, 1, payment_method_id))
+
+
 # ================= UPDATE ORDER =================
 @orders_bp.route("/update/<string:order_id>", methods=["PUT", "OPTIONS"])
 def update_order(order_id):
@@ -483,7 +535,7 @@ def update_order(order_id):
     cur  = conn.cursor()
 
     try:
-        # --- BLOCK UPDATES IF RECEIVED OR CANCELLED ---
+        # --- BLOCK UPDATES IF ALREADY CANCELLED ---
         cur.execute("""
             SELECT ss.status_code
             FROM order_transaction ot
@@ -493,8 +545,8 @@ def update_order(order_id):
         row = cur.fetchone()
         if row:
             current_status = row[0].upper()
-            if current_status in ['RECEIVED', 'CANCELLED']:
-                return jsonify({"error": f"Cannot edit an order that is already {current_status}."}), 400
+            if current_status == 'CANCELLED':
+                return jsonify({"error": "Cannot edit an order that is already CANCELLED."}), 400
 
         # --- Resolve new status (id + code) ---
         status_name = data.get('status', '').strip()
@@ -543,7 +595,12 @@ def update_order(order_id):
         new_is_active   = new_status_code in DEDUCTED_STATES if new_status_code else False
 
         # --- State machine ---
-        if old_is_deducted and new_status_code == 'CANCELLED':
+        if new_status_code == 'RECEIVED':
+            # Order is being marked as received → create sales record
+            # Stock was already deducted when order entered PREPARING/PACKED/SHIPPING
+            _create_sales_record(cur, order_id)
+
+        elif old_is_deducted and new_status_code == 'CANCELLED':
             # Restore stock, preserve order_details for audit trail
             _restore_batch_items(cur, order_id)
 
@@ -589,6 +646,8 @@ def update_order(order_id):
 
     except Exception as e:
         conn.rollback()
+        import traceback
+        traceback.print_exc()
         print("Error updating order:", e)
         return jsonify({"error": str(e)}), 500
     finally:
@@ -672,14 +731,18 @@ def add_order():
         """, (customer_id, today, status_id, pm_id, payment_status_id))
         order_id = cur.fetchone()[0]
 
-        # 4. Insert items — FIFO deduction only for active states
-        ACTIVE_STATES = {'PREPARING', 'PACKED', 'SHIPPING'}
+        # 4. Insert items — FIFO deduction only for active/received states
+        ACTIVE_STATES = {'PREPARING', 'PACKED', 'SHIPPING', 'RECEIVED'}
         if initial_status_code in ACTIVE_STATES:
             _insert_and_deduct_items(cur, order_id, items)
         else:
             _insert_items_only(cur, order_id, items)
 
-        # 5. Sync total_amount
+        # 5a. If created directly as RECEIVED, create the sales record immediately
+        if initial_status_code == 'RECEIVED':
+            _create_sales_record(cur, order_id)
+
+        # 5b. Sync total_amount
         cur.execute("""
             UPDATE order_transaction
             SET total_amount = (

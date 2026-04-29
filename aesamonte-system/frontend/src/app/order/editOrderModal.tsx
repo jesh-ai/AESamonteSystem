@@ -208,7 +208,7 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
 
   const safeItems = formData.items || [];
   const safeStatus = formData.status || 'Preparing';
-  const isLocked = safeStatus.trim().toLowerCase() === 'received' || safeStatus.trim().toLowerCase() === 'cancelled';
+  const isLocked = originalData?.status?.trim().toLowerCase() === 'received' || originalData?.status?.trim().toLowerCase() === 'cancelled';
   const safePayment = formData.paymentMethod || 'Cash';
   const isPreparing = safeStatus.trim().toLowerCase() === 'preparing';
 
@@ -217,12 +217,14 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
 
   const customerNameHasError = () => submitAttempted && !formData.customerName?.trim();
   const addressHasError = () => submitAttempted && !formData.address?.trim();
+  const contactHasError = () => submitAttempted && !formData.contact?.trim();
 
   const handleSubmit = () => {
     setSubmitAttempted(true);
     setSubmitError('');
     if (!formData.customerName?.trim()) { setSubmitError('Customer name is required.'); return; }
     if (!formData.address?.trim()) { setSubmitError('Delivery address is required.'); return; }
+    if (!formData.contact?.trim()) { setSubmitError('Contact number is required.'); return; }
     if (!hasChanges()) { setSubmitError('No changes detected. Please modify at least one field before updating.'); return; }
     setSubmitError('');
     onSave({ ...formData, totalQty, totalAmt });
@@ -280,8 +282,19 @@ const OrderEditModal = ({ isOpen, onClose, orderData, onSave, statuses = [], pay
                 )}
               </div>
               <div className={s.formGroup}>
-                <label style={{ ...LABEL_STYLE }}>Contact Number</label>
-                <input className={s.cleanInput} value={formData.contact || ''} disabled={isLocked} onChange={(e) => setFormData({...formData, contact: e.target.value})} />
+                <label style={{ ...LABEL_STYLE, color: contactHasError() ? '#dc2626' : '#6b7280' }}>
+                  Contact Number <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  className={s.cleanInput}
+                  style={contactHasError() ? FIELD_ERROR_STYLE : {}}
+                  value={formData.contact || ''}
+                  disabled={isLocked}
+                  onChange={(e) => { setSubmitError(''); setFormData({...formData, contact: e.target.value}); }}
+                />
+                {contactHasError() && (
+                  <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Contact number is required.</p>
+                )}
               </div>
             </div>
             <div className={s.formGroupFull}>
