@@ -4,6 +4,7 @@ from datetime import datetime
 from utils.auth import require_purchase_access
 import os
 import jwt
+import pytz
 
 purchases_bp = Blueprint("purchases", __name__)
 
@@ -280,12 +281,15 @@ def create_draft_purchase_order():
 
         draft_status_id = _get_status_id(cur, "DRAFT")
 
+        manila_tz = pytz.timezone('Asia/Manila')
+        now_manila = datetime.now(manila_tz)
+
         # Insert PO without po_number first so we have the PK for the pattern
         cur.execute("""
             INSERT INTO purchase_order
                 (supplier_id, status_id, po_number, ordered_by,
                 expected_delivery, notes, date_created)
-            VALUES (%s, %s, 'PENDING', %s, %s, %s, NOW())
+            VALUES (%s, %s, 'PENDING', %s, %s, %s, %s)
             RETURNING purchase_order_id, date_created
         """, (
             int(supplier_id),
@@ -293,6 +297,7 @@ def create_draft_purchase_order():
             int(employee_id),
             expected_delivery,
             notes,
+            now_manila,
         ))
         po_id, order_date = cur.fetchone()
 

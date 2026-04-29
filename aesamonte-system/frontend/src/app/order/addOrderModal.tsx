@@ -260,6 +260,10 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
       setSubmitError('Delivery address is required.');
       return;
     }
+    if (!customerData.contactNumber.trim()) {
+      setSubmitError('Contact number is required.');
+      return;
+    }
     const hasValidItem = items.some(item => item.inventory_brand_id && item.item?.trim());
     if (!hasValidItem) {
       setSubmitError('Please select at least one valid item before saving.');
@@ -282,6 +286,7 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
   // ── ERROR HELPERS ──
   const customerNameHasError = () => submitAttempted && !customerData.customerName.trim();
   const addressHasError = () => submitAttempted && !customerData.deliveryAddress.trim();
+  const contactHasError = () => submitAttempted && !customerData.contactNumber.trim();
   const itemHasError = (index: number) => submitAttempted && !items[index].inventory_brand_id && items[index].item?.trim();
 
   return (
@@ -337,8 +342,19 @@ const AddOrderModal: React.FC<AddOrderModalProps> = ({
                 )}
               </div>
               <div className={s.formGroup}>
-                <label style={{ ...LABEL_STYLE }}>Contact Number</label>
-                <input className={s.cleanInput} value={customerData.contactNumber} onChange={(e) => setCustomerData({ ...customerData, contactNumber: e.target.value })} placeholder="09XXXXXXXXX" />
+                <label style={{ ...LABEL_STYLE, color: contactHasError() ? '#dc2626' : '#6b7280' }}>
+                  Contact Number <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  className={s.cleanInput}
+                  style={contactHasError() ? { border: '1px solid #f87171', backgroundColor: '#fff5f5' } : {}}
+                  value={customerData.contactNumber}
+                  onChange={(e) => { setSubmitError(''); setCustomerData({ ...customerData, contactNumber: e.target.value }); }}
+                  placeholder="09XXXXXXXXX"
+                />
+                {contactHasError() && (
+                  <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: '#dc2626' }}>Contact number is required.</p>
+                )}
               </div>
             </div>
 

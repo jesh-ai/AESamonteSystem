@@ -418,6 +418,7 @@ def report_product_performance():
               AND ss_b.status_code != 'ARCHIVED'
             GROUP BY i.item_name, b.brand_name, ib.item_sku, u.uom_name,
                      sales.qty_sold, sales.cogs, ib.item_selling_price
+            HAVING COALESCE(sales.qty_sold, 0) > 0
             ORDER BY net_profit DESC
         """, params)
         rows = cur.fetchall()
@@ -493,6 +494,7 @@ def report_inventory_valuation():
               AND ss_b.status_code != 'ARCHIVED'
             GROUP BY ib.inventory_brand_id, i.item_name, b.brand_name,
                      ib.item_sku, u.uom_name, ib.item_selling_price, fefo.unit_cost
+            HAVING COALESCE(SUM(bat.quantity_on_hand), 0) > 0
             ORDER BY potential_profit DESC
         """)
         rows = cur.fetchall()
@@ -528,14 +530,28 @@ def report_stock_ageing():
     cur  = conn.cursor()
     try:
         today = date.today()
-        cur.execute("""
+        start_str = request.args.get("start_date")
+        end_str   = request.args.get("end_date")
+        date_filter = ""
+        params: tuple = ()
+        if start_str or end_str:
+            try:
+                start = date.fromisoformat(start_str) if start_str else date(2000, 1, 1)
+                end   = date.fromisoformat(end_str)   if end_str   else today
+            except ValueError:
+                start, end = date(2000, 1, 1), today
+            date_filter = "AND bat.date_created BETWEEN %s AND %s"
+            params = (start, end)
+        cur.execute(f"""
             SELECT
                 i.item_name,
-                COALESCE(b.brand_name, 'Generic')              AS brand_name,
+                STRING_AGG(DISTINCT COALESCE(b.brand_name, 'Generic'), ', ' ORDER BY COALESCE(b.brand_name, 'Generic')) AS brand_names,
                 COALESCE(u.uom_name, '—')                      AS uom,
                 COALESCE(SUM(bat.quantity_on_hand), 0)         AS qty_on_hand,
                 MAX(bat.date_created)                          AS last_received_date,
-                COALESCE(fefo.unit_cost, 0)                    AS unit_cost
+                COALESCE(AVG(fefo.unit_cost), 0)               AS unit_cost,
+                MAX(st.sales_date)                             AS last_sale_date,
+                MIN(bat.expiry_date)                           AS earliest_expiry
             FROM inventory_brand ib
             JOIN inventory       i    ON i.inventory_id   = ib.inventory_id
             LEFT JOIN brand      b    ON b.brand_id        = ib.brand_id
@@ -559,18 +575,30 @@ def report_stock_ageing():
                 ORDER BY expiry_date ASC
                 LIMIT 1
             ) fefo ON TRUE
+            LEFT JOIN order_details od ON od.batch_id IN (
+                SELECT batch_id FROM inventory_batch
+                WHERE inventory_brand_id = ib.inventory_brand_id
+            ) AND od.is_archived = FALSE
+            LEFT JOIN order_transaction ot ON ot.order_id = od.order_id
+            LEFT JOIN sales_transaction st ON st.order_id = ot.order_id
             WHERE ss_i.status_code != 'INACTIVE'
               AND ss_b.status_code != 'ARCHIVED'
-            GROUP BY ib.inventory_brand_id, i.item_name, b.brand_name,
-                     ib.item_sku, u.uom_name, fefo.unit_cost
+              {date_filter}
+            GROUP BY i.inventory_id, i.item_name, u.uom_name
             ORDER BY last_received_date ASC NULLS FIRST, i.item_name
-        """)
+        """, params)
         rows = cur.fetchall()
+        HOLDING_RATE = 0.025  # 2.5% per month
         result = []
         for r in rows:
-            qty              = int(r[3] or 0)
-            last_received    = r[4]
-            unit_cost        = float(r[5] or 0)
+            qty           = int(r[3] or 0)
+            last_received = r[4]
+            unit_cost     = float(r[5] or 0)
+            last_sale     = r[6]
+            earliest_expiry = r[7]
+
+            if earliest_expiry and hasattr(earliest_expiry, 'date'):
+                earliest_expiry = earliest_expiry.date()
 
             if last_received:
                 if hasattr(last_received, 'date'):
@@ -579,38 +607,88 @@ def report_stock_ageing():
             else:
                 days_in = None
 
-            if days_in is None:
-                ageing_category = '—'
-                ageing_status   = 'Fresh'
-            elif days_in <= 30:
-                ageing_category = '0–30 days'
-                ageing_status   = 'Fresh'
-            elif days_in <= 60:
-                ageing_category = '31–60 days'
-                ageing_status   = 'Ageing'
-            elif days_in <= 90:
-                ageing_category = '61–90 days'
-                ageing_status   = 'Old'
-            else:
-                ageing_category = '90+ days'
-                ageing_status   = 'Critical'
+            if last_sale:
+                if hasattr(last_sale, 'date'):
+                    last_sale = last_sale.date()
 
-            value_of_aged_stock = qty * unit_cost
+            if qty == 0:
+                continue
+
+            # Days since last sale
+            days_since_sale = (today - last_sale).days if last_sale else None
+
+            never_sold = last_sale is None
+
+            if days_in is None or days_in <= 30:
+                ageing_category    = '0–30 Days'
+                ageing_label       = 'Active Stock'
+                recommended_action = 'Maintain'
+            elif days_in <= 60:
+                ageing_category    = '31–60 Days'
+                ageing_label       = 'Slow-Moving'
+                recommended_action = 'Maintain'
+            elif days_in <= 90:
+                ageing_category    = '61–90 Days'
+                ageing_label       = 'Stagnant'
+                recommended_action = 'Promote / Bundle'
+            else:
+                if never_sold:
+                    ageing_category    = '91+ Days'
+                    ageing_label       = 'Non-Mover'
+                    recommended_action = 'Liquidate / Discount'
+                elif days_since_sale is not None and days_since_sale <= 60:
+                    ageing_category    = '91+ Days'
+                    ageing_label       = 'Stagnant'
+                    recommended_action = 'Promote / Bundle'
+                else:
+                    ageing_category    = '91+ Days'
+                    ageing_label       = 'Dead Stock'
+                    recommended_action = 'Liquidate / Discount'
+
+            total_cost_value = qty * unit_cost
+            holding_cost     = round(total_cost_value * HOLDING_RATE, 2)
+
+            if earliest_expiry:
+                days_to_expiry = (earliest_expiry - today).days
+                if days_to_expiry < 0:
+                    expiry_status = 'Expired'
+                elif days_to_expiry < 30:
+                    expiry_status = 'Critical'
+                elif days_to_expiry <= 90:
+                    expiry_status = 'Near Expiry'
+                elif days_to_expiry <= 1095:  # up to 3 years
+                    expiry_status = 'Stable'
+                else:
+                    expiry_status = 'Stable'
+            else:
+                days_to_expiry = None
+                expiry_status = ''
 
             result.append({
                 "item_name":           r[0],
-                "brand_name":          r[1],
+                "brand_name":          r[1] or "—",
                 "uom":                 r[2],
                 "qty_on_hand":         qty,
                 "last_received_date":  last_received.isoformat() if last_received else None,
+                "last_sale_date":      last_sale.isoformat() if last_sale else None,
+                "earliest_expiry":     earliest_expiry.isoformat() if earliest_expiry else None,
+                "expiry_status":       expiry_status,
+                "days_to_expiry":      days_to_expiry,
                 "days_in_inventory":   days_in,
                 "ageing_category":     ageing_category,
-                "value_of_aged_stock": round(value_of_aged_stock, 2),
-                "ageing_status":       ageing_status,
+                "ageing_label":        ageing_label,
+                "value_of_aged_stock": round(total_cost_value, 2),
+                "holding_cost":        holding_cost,
+                "recommended_action":  recommended_action,
             })
 
-        AGEING_PRIORITY = {'Critical': 0, 'Old': 1, 'Ageing': 2, 'Fresh': 3}
-        result.sort(key=lambda x: (AGEING_PRIORITY.get(x['ageing_status'], 9), -(x['days_in_inventory'] or 0)))
+        AGEING_PRIORITY = {'91+ Days': 0, '61–90 Days': 1, '31–60 Days': 2, '0–30 Days': 3}
+        EXPIRY_PRIORITY = {'Critical': 0, 'Near Expiry': 1, 'Expired': 2, '': 3}
+        result.sort(key=lambda x: (
+            EXPIRY_PRIORITY.get(x['expiry_status'], 3),
+            AGEING_PRIORITY.get(x['ageing_category'], 9),
+            x['days_to_expiry'] if x['days_to_expiry'] is not None else 9999,
+        ))
 
         return jsonify(result), 200
     except Exception as e:
@@ -756,6 +834,19 @@ def report_customer_sales():
             else:
                 ltv_trend = 'flat'
 
+            # Rule-based spending insight
+            if this_month == 0 or last_month == 0:
+                spending_insight = ""
+            else:
+                diff = this_month - last_month
+                pct  = abs(round((diff / last_month) * 100, 1))
+                if diff > 0:
+                    spending_insight = f"↑ {pct}% vs last month"
+                elif diff < 0:
+                    spending_insight = f"↓ {pct}% vs last month"
+                else:
+                    spending_insight = ""
+
             days_inactive = (date.today() - last_date).days if last_date else None
             if days_inactive is None:
                 activity_status = 'Unknown'
@@ -778,6 +869,7 @@ def report_customer_sales():
                 "ltv_trend":          ltv_trend,
                 "this_month":         this_month,
                 "last_month":         last_month,
+                "spending_insight":   spending_insight,
                 "preferred_payment":  r[6] or "—",
             })
         return jsonify(result), 200
