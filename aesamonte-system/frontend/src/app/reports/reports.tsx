@@ -12,7 +12,7 @@ import type { ModulePerms } from '@/types/user';
 // ─── Tab config ───────────────────────────────────────────────────────────────
 interface TabConfig { key: TabKey; label: string; usesDateFilter: boolean; endpoint: string; }
 const TABS: TabConfig[] = [
-  { key: 'stock-on-hand',       label: 'Stock on Hand',       usesDateFilter: false, endpoint: '/api/reports/stock-on-hand'       },
+  { key: 'stock-on-hand',       label: 'Stocks',              usesDateFilter: false, endpoint: '/api/reports/stock-on-hand'       },
   { key: 'product-performance', label: 'Product Performance', usesDateFilter: false, endpoint: '/api/reports/product-performance' },
   { key: 'inventory-valuation', label: 'Inventory Valuation', usesDateFilter: false, endpoint: '/api/reports/inventory-valuation' },
   { key: 'stock-ageing',        label: 'Stock Ageing',        usesDateFilter: false, endpoint: '/api/reports/stock-ageing'        },
@@ -24,9 +24,9 @@ const TABS: TabConfig[] = [
 interface StockOnHandRow        { sku: string; item_name: string; brand_name: string; uom: string; qty_on_hand: number; unit_cost: number; selling_price: number; stock_status: string; shelf_life: string | null; days_to_expiry: number | null; }
 interface ProductPerfRow        { item_name: string; brand_name: string; sku: string; uom: string; units_sold: number; revenue: number; cogs: number; gross_profit: number; margin_pct: number; }
 interface InventoryValuationRow { sku: string; item_name: string; brand_name: string; uom: string; qty_on_hand: number; unit_cost: number; total_cost_value: number; selling_price: number; total_retail_value: number; potential_profit: number; profit_status: string; }
-interface StockAgeingRow        { item_name: string; brand_name: string; uom: string; qty_on_hand: number; last_received_date: string | null; days_in_inventory: number | null; ageing_category: string; value_of_aged_stock: number; ageing_status: string; }
+interface StockAgeingRow        { item_name: string; brand_name: string; uom: string; qty_on_hand: number; last_received_date: string | null; last_sale_date: string | null; earliest_expiry: string | null; expiry_status: string; days_in_inventory: number | null; ageing_category: string; ageing_label: string; value_of_aged_stock: number; holding_cost: number; recommended_action: string; }
 interface ReorderRow            { sku: string; item_name: string; brand_name: string; uom: string; qty_on_hand: number; reorder_point: number; min_order_qty: number; lead_time_days: number; suggested_order_qty: number; primary_supplier: string; supplier_contact: string; inventory_brand_id: number; }
-interface CustomerSalesRow      { customer_name: string; total_orders: number; total_revenue: number; last_purchase_date: string | null; days_inactive: number | null; activity_status: string; ltv_trend: string; this_month: number; last_month: number; preferred_payment: string; }
+interface CustomerSalesRow      { customer_name: string; total_orders: number; total_revenue: number; last_purchase_date: string | null; days_inactive: number | null; activity_status: string; ltv_trend: string; this_month: number; last_month: number; spending_insight: string; preferred_payment: string; }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const peso = (v: number | null | undefined) => `\u20b1${(v ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -107,7 +107,10 @@ export default function ReportsPage({
     const cfg = TABS.find(t => t.key === tab)!;
     setLoading(true); setErrMsg(null);
     let url = cfg.endpoint;
-    if (cfg.usesDateFilter) url += `?start_date=${sd}&end_date=${ed}`;
+    const params = new URLSearchParams();
+    if (sd) params.set('start_date', sd);
+    if (ed) params.set('end_date', ed);
+    if (params.toString()) url += `?${params.toString()}`;
     try {
       const res  = await fetch(url, { cache: 'no-store' });
       const json = await res.json();
@@ -119,13 +122,13 @@ export default function ReportsPage({
   }, []);
 
   useEffect(() => {
-    const cfg = TABS.find(t => t.key === activeTab)!;
-    // Always re-fetch; don't use stale cache
-    fetchTab(activeTab, startDate, endDate);
+    // On tab change, fetch without date filter (show all data initially)
+    fetchTab(activeTab, '', '');
     setSearch(''); setStatusFilter('All'); setFromDate(''); setToDate('');
-    setSortKey(''); setSortDir('asc');
+    // if (activeTab === 'inventory-turnover') { setSortKey('turnover_rate'); setSortDir('desc'); }
+    // else { setSortKey(''); setSortDir('asc'); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, startDate, endDate]);
+  }, [activeTab]);
 
   const allRows = useMemo<Record<string, unknown>[]>(() => dataMap[activeTab] ?? [], [dataMap, activeTab]);
   const rows = useMemo(() => {
@@ -149,10 +152,12 @@ export default function ReportsPage({
     ],
     'stock-ageing': [
       { label: 'All',          color: '#9ca3af', field: '' },
-      { label: 'Fresh',        color: '#10b981', field: 'ageing_status' },
-      { label: 'Ageing',       color: '#f59e0b', field: 'ageing_status' },
-      { label: 'Old',          color: '#f97316', field: 'ageing_status' },
-      { label: 'Critical',     color: '#ef4444', field: 'ageing_status' },
+      { label: '0–30 Days',    color: '#10b981', field: 'ageing_category' },
+      { label: '31–60 Days',   color: '#f59e0b', field: 'ageing_category' },
+      { label: '61–90 Days',   color: '#f97316', field: 'ageing_category' },
+      { label: '91+ Days',     color: '#ef4444', field: 'ageing_category' },
+      { label: 'Non-Mover',    color: '#7c3aed', field: 'ageing_label'    },
+      { label: 'Dead Stock',   color: '#b91c1c', field: 'ageing_label'    },
     ],
     'product-performance': [
       { label: 'All', color: '#9ca3af', field: '' },
@@ -187,6 +192,7 @@ export default function ReportsPage({
       if (opt && opt.field) {
         if (opt.field === 'stock_status') result = result.filter(r => (r as Record<string,unknown>).stock_status === opt.label);
         else if (opt.field === 'ageing_status') result = result.filter(r => (r as Record<string,unknown>).ageing_status === opt.label);
+        else if (opt.field === 'ageing_category') result = result.filter(r => (r as Record<string,unknown>).ageing_category === opt.label);
         else if (opt.field === 'item_status') result = result.filter(r => (r as Record<string,unknown>).item_status === opt.label);
         else if (opt.field === 'activity_status') result = result.filter(r => (r as Record<string,unknown>).activity_status === opt.label);
         else if (opt.field === '_margin') {
@@ -251,7 +257,7 @@ export default function ReportsPage({
   }
 
   // Tabs that show date inputs (server-side via usesDateFilter, or client-side filtering)
-  const hasDateFilter = ['product-performance'].includes(activeTab);
+  const hasDateFilter = ['product-performance', 'stock-ageing', 'customer-sales', 'stock-on-hand', 'inventory-valuation', 'inventory-turnover', 'reorder'].includes(activeTab);
 
   return (
     <div className={styles.container}>
@@ -294,10 +300,8 @@ export default function ReportsPage({
           {canExport && (
             <ExportButton onSelect={async (type) => {
               if (!filteredRows.length) { toast('No data to export.', true); return; }
-              const fileDate  = new Date().toISOString().slice(0, 10);
-              const dateRange = cfg.usesDateFilter && startDate && endDate
-                ? `${startDate} → ${endDate}`
-                : 'Snapshot';
+              const fileDate  = fromDate && toDate ? `${fromDate}_to_${toDate}` : new Date().toISOString().slice(0, 10);
+              const dateRange = fromDate && toDate ? `${fromDate} → ${toDate}` : fromDate ? `From ${fromDate}` : toDate ? `Until ${toDate}` : 'All Time';
               try {
                 if (type === 'csv')  exportCSV(activeTab, filteredRows, cfg.label, dateRange, fileDate);
                 if (type === 'xlsx') await exportExcel(activeTab, filteredRows, cfg.label, dateRange, fileDate);
@@ -338,23 +342,23 @@ export default function ReportsPage({
                   <div className={styles.filterGroup}>
                     <label className={styles.filterLabel}>Start Date</label>
                     <input type="date" className={styles.dateInput}
-                      value={cfg.usesDateFilter ? startDate : fromDate}
-                      max={cfg.usesDateFilter ? endDate : (toDate || undefined)}
-                      onChange={e => cfg.usesDateFilter ? setStartDate(e.target.value) : setFromDate(e.target.value)} />
+                      value={fromDate}
+                      max={toDate || undefined}
+                      onChange={e => setFromDate(e.target.value)} />
                   </div>
                   <div className={styles.filterGroup}>
                     <label className={styles.filterLabel}>End Date</label>
                     <input type="date" className={styles.dateInput}
-                      value={cfg.usesDateFilter ? endDate : toDate}
-                      min={cfg.usesDateFilter ? startDate : (fromDate || undefined)}
-                      onChange={e => cfg.usesDateFilter ? setEndDate(e.target.value) : setToDate(e.target.value)} />
+                      value={toDate}
+                      min={fromDate || undefined}
+                      onChange={e => setToDate(e.target.value)} />
                   </div>
                   <button className={styles.generateBtn}
-                    onClick={() => { if (cfg.usesDateFilter) fetchTab(activeTab, startDate, endDate); }}>
+                    onClick={() => fetchTab(activeTab, fromDate, toDate)}>
                     Generate
                   </button>
-                  {!cfg.usesDateFilter && (fromDate || toDate) && (
-                    <button onClick={() => { setFromDate(''); setToDate(''); }}
+                  {(fromDate || toDate) && (
+                    <button onClick={() => { setFromDate(''); setToDate(''); fetchTab(activeTab, '', ''); }}
                       style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 7, padding: '7px 12px', fontSize: '0.8rem', color: '#94a3b8', cursor: 'pointer' }}>
                       Clear
                     </button>
@@ -557,37 +561,82 @@ export default function ReportsPage({
           {/* STOCK AGEING */}
           {activeTab === 'stock-ageing' && (() => {
             const r = filteredRows as unknown as StockAgeingRow[];
+            const bucketStyle: Record<string, { color: string; bg: string }> = {
+              'Active Stock': { color: '#15803d', bg: '#dcfce7' },
+              'Slow-Moving':  { color: '#854d0e', bg: '#fef9c3' },
+              'Stagnant':     { color: '#9a3412', bg: '#ffedd5' },
+              'Dead Stock':   { color: '#b91c1c', bg: '#fee2e2' },
+              'Non-Mover':    { color: '#7c3aed', bg: '#ede9fe' },
+            };
+            const actionStyle: Record<string, string> = {
+              'Maintain':           '#15803d',
+              'Promote / Bundle':   '#854d0e',
+              'Liquidate / Discount': '#b91c1c',
+            };
             return (
               <div className={styles.tableWrapper}>
                 <table className={styles.reportTable}>
                   <thead><tr>
                     <th>Item Name</th><th>Brand</th><th>UOM</th>
                     <th className={styles.numCol} style={{ cursor:'pointer' }} onClick={() => toggleSort('qty_on_hand')}>Qty on Hand <SortIcon col="qty_on_hand" /></th>
-                    <th style={{ cursor:'pointer' }} onClick={() => toggleSort('last_received_date')}>Last Received <SortIcon col="last_received_date" /></th>
+                    <th style={{ cursor:'pointer' }} onClick={() => toggleSort('last_received_date')}>Date Received <SortIcon col="last_received_date" /></th>
+                    <th style={{ cursor:'pointer' }} onClick={() => toggleSort('last_sale_date')}>Last Sale Date <SortIcon col="last_sale_date" /></th>
+                    <th style={{ cursor:'pointer' }} onClick={() => toggleSort('earliest_expiry')}>Earliest Expiry <SortIcon col="earliest_expiry" /></th>
+                    <th>Expiration Status</th>
                     <th className={styles.numCol} style={{ cursor:'pointer' }} onClick={() => toggleSort('days_in_inventory')}>Days in Inventory <SortIcon col="days_in_inventory" /></th>
-                    <th>Ageing Category</th>
-                    <th className={styles.numCol} style={{ cursor:'pointer' }} onClick={() => toggleSort('value_of_aged_stock')}>Value of Aged Stock <SortIcon col="value_of_aged_stock" /></th>
-                    <th>Status</th>
+                    <th>Stock Status</th>
+                    <th className={styles.numCol} style={{ cursor:'pointer' }} onClick={() => toggleSort('value_of_aged_stock')}>Total Cost Value <SortIcon col="value_of_aged_stock" /></th>
+                    <th className={styles.numCol} style={{ cursor:'pointer' }} onClick={() => toggleSort('holding_cost')}>Holding Cost <SortIcon col="holding_cost" /></th>
+                    <th>Recommended Action</th>
                   </tr></thead>
                   <tbody>
-                    {loading ? <LoadingRow cols={9} /> : r.length === 0 ? <EmptyRow cols={9} /> : r.map((row, i) => (
-                      <tr key={i}>
-                        <td>{row.item_name}</td>
-                        <td>{row.brand_name}</td><td>{row.uom}</td>
-                        <td className={styles.numCol}>{num(row.qty_on_hand)}</td>
-                        <td>{row.last_received_date ?? <span style={{ color: '#94a3b8' }}>—</span>}</td>
-                        <td className={styles.numCol}>{row.days_in_inventory ?? <span style={{ color: '#94a3b8' }}>—</span>}</td>
-                        <td style={{ fontSize: '0.82rem', color: '#475569' }}>{row.ageing_category}</td>
-                        <td className={`${styles.numCol} ${styles.soldVal}`}>{peso(row.value_of_aged_stock)}</td>
-                        <td><AgeingBadge status={row.ageing_status} /></td>
-                      </tr>
-                    ))}
+                    {loading ? <LoadingRow cols={13} /> : r.length === 0 ? <EmptyRow cols={13} /> : r.map((row, i) => {
+                      const bs = bucketStyle[row.ageing_label] ?? { color: '#64748b', bg: '#f1f5f9' };
+                      return (
+                        <tr key={i}>
+                          <td>{row.item_name}</td>
+                          <td>{row.brand_name}</td><td>{row.uom}</td>
+                          <td className={styles.numCol}>{num(row.qty_on_hand)}</td>
+                          <td>{row.last_received_date ?? <span style={{ color: '#94a3b8' }}>—</span>}</td>
+                          <td>{row.last_sale_date
+                            ? row.last_sale_date
+                            : <span style={{ color: '#94a3b8' }}>—</span>
+                          }</td>
+                          <td>{row.earliest_expiry ?? <span style={{ color: '#94a3b8' }}>—</span>}</td>
+                          <td>{row.expiry_status
+                            ? <span className={styles.statusBadge} style={{
+                                background: row.expiry_status === 'Expired'     ? '#1e293b' :
+                                            row.expiry_status === 'Critical'    ? '#fee2e2' :
+                                            row.expiry_status === 'Near Expiry' ? '#fef9c3' :
+                                            row.expiry_status === 'Stable'      ? '#f0fdf4' : '#f1f5f9',
+                                color:      row.expiry_status === 'Expired'     ? '#f8fafc' :
+                                            row.expiry_status === 'Critical'    ? '#b91c1c' :
+                                            row.expiry_status === 'Near Expiry' ? '#854d0e' :
+                                            row.expiry_status === 'Stable'      ? '#15803d' : '#64748b',
+                              }}>{row.expiry_status}</span>
+                            : <span style={{ color: '#94a3b8' }}>—</span>
+                          }</td>
+                          <td className={styles.numCol}>{row.days_in_inventory ?? <span style={{ color: '#94a3b8' }}>—</span>}</td>
+                          <td>
+                            <span className={styles.statusBadge} style={{ background: bs.bg, color: bs.color }}>
+                              {row.ageing_label}
+                            </span>
+                          </td>
+                          <td className={`${styles.numCol} ${styles.soldVal}`}>{peso(row.value_of_aged_stock)}</td>
+                          <td className={`${styles.numCol} ${styles.soldVal}`}>{peso(row.holding_cost)}</td>
+                          <td style={{ fontSize: '0.82rem', fontWeight: 600, color: actionStyle[row.recommended_action] ?? '#64748b' }}>
+                            {row.recommended_action}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                   {r.length > 0 && <tfoot><tr>
                     <td colSpan={3} className={styles.totalLabel}>Totals</td>
                     <td className={`${styles.numCol} ${styles.totalValue}`}>{num(sumField(r, 'qty_on_hand'))}</td>
-                    <td /><td /><td />
+                    <td /><td /><td /><td /><td /><td />
                     <td className={`${styles.numCol} ${styles.totalValue}`}>{peso(sumField(r, 'value_of_aged_stock'))}</td>
+                    <td className={`${styles.numCol} ${styles.totalValue}`}>{peso(sumField(r, 'holding_cost'))}</td>
                     <td />
                   </tr></tfoot>}
                 </table>
@@ -710,9 +759,12 @@ export default function ReportsPage({
                           <td>
                             {row.ltv_trend === 'new'
                               ? <span style={{ color: '#94a3b8' }}>—</span>
-                              : <span className={styles.statusBadge} style={{ background: trend.bg, color: trend.color }}>
-                                  {trend.icon} {peso(row.this_month)} vs {peso(row.last_month)}
-                                </span>
+                              : <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+                                  <span className={styles.statusBadge} style={{ background: trend.bg, color: trend.color }}>
+                                    {trend.icon} {peso(row.this_month)} vs {peso(row.last_month)}
+                                  </span>
+                                  {row.spending_insight && <span style={{ fontSize: '0.72rem', color: '#64748b' }}>{row.spending_insight}</span>}
+                                </div>
                             }
                           </td>
                           <td><span className={styles.paymentBadge}>{row.preferred_payment}</span></td>
