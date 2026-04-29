@@ -413,14 +413,12 @@ def update_purchase_order(po_id):
         # Only allow editing DRAFT orders
         draft_status_id = _get_status_id(cur, "DRAFT")
         cur.execute(
-            "SELECT status_id FROM purchase_order WHERE purchase_order_id = %s",
-            (po_id,)
+    "SELECT purchase_order_id FROM purchase_order WHERE purchase_order_id = %s",
+    (po_id,)
         )
         row = cur.fetchone()
         if not row:
             return jsonify({"error": f"Purchase order {po_id} not found."}), 404
-        if row[0] != draft_status_id:
-            return jsonify({"error": "Only DRAFT purchase orders can be edited."}), 400
 
         # Update header
         cur.execute("""

@@ -84,7 +84,8 @@ const BLANK = (): ItemRow => ({
 
 export default function EditPOModal({ purchaseOrder, onClose, onSaved }: EditPOModalProps) {
   const s = styles as Record<string, string>;
-
+  
+  const [currentStatus, setCurrentStatus]   = useState('');
   const [suppliers, setSuppliers]           = useState<Supplier[]>([]);
   const [uoms, setUoms]                     = useState<UOM[]>([]);
   const [supplierName, setSupplierName]     = useState('');
@@ -117,6 +118,7 @@ export default function EditPOModal({ purchaseOrder, onClose, onSaved }: EditPOM
     setSearchQuery({});
     setSearchResults({});
     setSearchOpen({});
+    setCurrentStatus(purchaseOrder.status ?? '');
 
     // Fetch reference data + existing items in parallel
     setLoading(true);
@@ -231,7 +233,19 @@ export default function EditPOModal({ purchaseOrder, onClose, onSaved }: EditPOM
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/purchases/${purchaseOrder!.purchase_order_id}`, {
+      // ── Update status if changed ──
+      // ── Update status if changed ──
+if (currentStatus !== purchaseOrder!.status) {
+  const statusRes = await fetch(`/api/purchases/${purchaseOrder!.purchase_order_id}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeader() },
+    body: JSON.stringify({ status: currentStatus }),
+  });
+  const statusData = await statusRes.json();
+  if (!statusRes.ok) { setError(statusData.error ?? 'Failed to update status.'); setSubmitting(false); return; }
+}
+
+const res = await fetch(`/api/purchases/${purchaseOrder!.purchase_order_id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify({
@@ -489,9 +503,24 @@ export default function EditPOModal({ purchaseOrder, onClose, onSaved }: EditPOM
                   Supplier &amp; Delivery
                 </h4>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                  <div>
-                    <label style={LABEL}>Supplier *</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px' }}>
+                <div>
+                  <label style={LABEL}>Status</label>
+                <select value={currentStatus} onChange={e => setCurrentStatus(e.target.value)} style={FIELD}>
+                  {[
+                    purchaseOrder!.status,
+                    ...(({
+                      DRAFT:    ['SENT', 'CANCELLED'],
+                      SENT:     ['APPROVED', 'CANCELLED'],
+                      APPROVED: ['COMPLETED', 'CANCELLED'],
+                    } as Record<string, string[]>)[purchaseOrder!.status] ?? [])
+                  ].map(st => (
+                    <option key={st} value={st}>{st}</option>
+                  ))}
+                </select>
+                </div>
+                <div>
+                  <label style={LABEL}>Supplier *</label>
                     <select
                       value={supplierName}
                       onChange={e => handleSupplierChange(e.target.value)}

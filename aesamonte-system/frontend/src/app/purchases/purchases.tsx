@@ -631,7 +631,7 @@ export default function PurchasesPage({
                       />
                       {openMenuId === po.purchase_order_id && (
                         <div className={s.popupMenu} ref={openMenuId === po.purchase_order_id ? menuRef : null}>
-                          {po.status.toUpperCase() === 'DRAFT' && (
+                          {['DRAFT', 'SENT', 'APPROVED'].includes(po.status.toUpperCase()) && (
                             <button className={s.popBtnEdit} onClick={e => { e.stopPropagation(); setEditingPO(po); setOpenMenuId(null); }}>
                               <LuPencil size={12} /> Edit
                             </button>
